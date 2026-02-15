@@ -4,9 +4,10 @@ import (
 	"log"
 	"os"
 
-	"backend-go-blueprint/internal/application/usecases"
-	"backend-go-blueprint/internal/infrastructure/adapters/out/database"
-	"backend-go-blueprint/internal/interfaces/http"
+	"event-service/internal/application/usecases"
+	"event-service/internal/infrastructure/adapters/out/database"
+	"event-service/internal/interfaces/http"
+
 	"github.com/joho/godotenv"
 )
 
@@ -21,10 +22,10 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	userRepo := database.NewPostgresUserRepository(db)
-	blueprintUseCase := usecases.NewBlueprintUseCase(userRepo)
+	eventRepo := database.NewPostgresEventRepository(db)
+	eventUseCase := usecases.NewEventUseCase(eventRepo)
 
-	router := http.SetupRoutes(blueprintUseCase)
+	router := http.SetupRoutes(eventUseCase)
 
 	port := os.Getenv("PORT")
 	if port == "" {

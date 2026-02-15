@@ -54,5 +54,9 @@ temp/
 /bin/
 /dist/
 
+# Go build artifacts
+api
+*.exe
+
 # Docker
 .dockerignore
