@@ -1,6 +1,6 @@
-# Backend Go Blueprint
+# Backend
 
-A clean architecture Go backend template following hexagonal architecture principles. This blueprint provides a solid foundation for building scalable REST APIs with PostgreSQL integration.
+A clean architecture Go backend following hexagonal architecture principles. Provides a solid foundation for building scalable REST APIs with PostgreSQL integration.
 
 ## Architecture
 
