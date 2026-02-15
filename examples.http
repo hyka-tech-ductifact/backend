@@ -1,0 +1,91 @@
+### Health Check
+GET http://localhost:8080/health
+
+###
+
+### Create User
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "name": "John Doe"
+}
+
+###
+
+### Get User by ID
+GET http://localhost:8080/api/v1/users/{{user_id}}
+
+###
+
+### Update User
+PUT http://localhost:8080/api/v1/users/{{user_id}}
+Content-Type: application/json
+
+{
+  "email": "john.updated@example.com",
+  "name": "John Updated"
+}
+
+###
+
+### Delete User
+DELETE http://localhost:8080/api/v1/users/{{user_id}}
+
+###
+
+### List Users
+GET http://localhost:8080/api/v1/users
+
+###
+
+### List Users with Pagination
+GET http://localhost:8080/api/v1/users?limit=5&offset=0
+
+###
+
+### Example with actual UUID (replace with real UUID from create response)
+GET http://localhost:8080/api/v1/users/123e4567-e89b-12d3-a456-426614174000
+
+###
+
+### Create Multiple Users for Testing
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "name": "Alice Smith"
+}
+
+###
+
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "name": "Bob Johnson"
+}
+
+###
+
+### Test Invalid Email
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "name": "Test User"
+}
+
+###
+
+### Test Missing Fields
+POST http://localhost:8080/api/v1/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
