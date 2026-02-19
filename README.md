@@ -28,8 +28,42 @@ This project follows Clean Architecture (Hexagonal Architecture) with the follow
 ## Prerequisites
 
 - Go 1.23+
-- Docker and Docker Compose (v2+)
-- PostgreSQL (if running locally)
+- Docker CLI + Compose plugin v2+ (Docker Engine can be local or remote)
+- PostgreSQL (only if you run it outside Compose)
+
+## Using Docker Compose with a Remote Docker Engine
+
+If Docker Engine (`dockerd`) runs on another machine, you only need the **CLI** and the **Compose plugin** installed locally — no local Docker Engine required.
+
+```bash
+# Ubuntu/Debian — install only the client and compose (no dockerd)
+sudo apt-get install docker-ce-cli docker-compose-plugin
+```
+
+Then point the CLI to the remote engine using `DOCKER_HOST`:
+
+```bash
+# Via SSH (recommended — no need to expose TCP ports on the daemon)
+export DOCKER_HOST=ssh://user@192.168.1.10
+
+# Verify connection
+docker info
+
+# All commands (make docker-run, docker compose, etc.) now target the remote host
+make docker-run
+```
+
+To make it persistent, use a **docker context**:
+
+```bash
+docker context create remote --docker host=ssh://user@192.168.1.ipremote
+docker context use remote
+
+# Switch back to local engine
+docker context use default
+```
+
+> **Note:** Published ports (e.g. `8080:8080`) are exposed on the **remote host**, not on your local machine.
 
 ## Quick Start
 
