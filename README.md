@@ -31,39 +31,65 @@ This project follows Clean Architecture (Hexagonal Architecture) with the follow
 - Docker CLI + Compose plugin v2+ (Docker Engine can be local or remote)
 - PostgreSQL (only if you run it outside Compose)
 
-## Using Docker Compose with a Remote Docker Engine
+## Container Engine Setup
 
-If Docker Engine (`dockerd`) runs on another machine, you only need the **CLI** and the **Compose plugin** installed locally — no local Docker Engine required.
+This project works with three different container engine setups. Choose the one that fits your environment.
+
+---
+
+### Option A — Local Docker Engine (standard)
+
+The simplest setup: install Docker Engine locally and everything works out of the box with no extra configuration.
+
+---
+
+### Option B — Remote Docker Engine via `DOCKER_HOST`
+
+If Docker Engine (`dockerd`) runs on another machine (e.g. a server or VM), you only need the **CLI** and the **Compose plugin** installed locally — no local daemon required.
 
 ```bash
-# Ubuntu/Debian — install only the client and compose (no dockerd)
+# Ubuntu/Debian — install only the client tools (no dockerd)
 sudo apt-get install docker-ce-cli docker-compose-plugin
 ```
 
-Then point the CLI to the remote engine using `DOCKER_HOST`:
+Point the CLI to the remote engine using `DOCKER_HOST`:
 
 ```bash
-# Via SSH (recommended — no need to expose TCP ports on the daemon)
+# Via SSH (recommended — no open TCP ports required on the daemon)
 export DOCKER_HOST=ssh://user@192.168.1.10
 
-# Verify connection
-docker info
-
-# All commands (make docker-run, docker compose, etc.) now target the remote host
-make docker-run
 ```
 
-To make it persistent, use a **docker context**:
+> **Note:** Published ports (e.g. `192.168.1.10:8080`) are exposed on the **remote host**, not on your local machine.
+
+---
+
+### Option C — Podman via `DOCKER_HOST` (WSL / Linux, no Docker Engine)
+
+If you use **Podman** instead of Docker Engine (e.g. on Ubuntu WSL with Podman Desktop on Windows), you can point the Docker CLI and Compose plugin directly at the Podman socket. No `dockerd` is required.
 
 ```bash
-docker context create remote --docker host=ssh://user@192.168.1.ipremote
-docker context use remote
+# Ubuntu/Debian — install Podman and Docker CLI compatibility layer
+sudo apt install -y podman podman-docker docker-ce-cli docker-compose-plugin
 
-# Switch back to local engine
-docker context use default
+# Silence the Podman emulation notice
+sudo mkdir -p /etc/containers && sudo touch /etc/containers/nodocker
+
+# Enable the Podman user socket
+systemctl --user enable --now podman.socket
 ```
 
-> **Note:** Published ports (e.g. `8080:8080`) are exposed on the **remote host**, not on your local machine.
+Set `DOCKER_HOST` to the Podman socket and persist it in your shell:
+
+```bash
+# Add to ~/.bashrc (replace 1000 with your user id if different)
+echo 'export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock' >> ~/.bashrc
+source ~/.bashrc
+```
+
+> **Note:** Podman runs **daemonless** — each CLI call spawns a short-lived process. The socket is created by `podman.socket` (systemd user unit) and lives at `/run/user/<uid>/podman/podman.sock`.
+>
+> Image names in `Dockerfile` must be **fully qualified** (e.g. `docker.io/library/golang:1.23-alpine`) because Podman does not resolve short names by default.
 
 ## Quick Start
 
@@ -142,7 +168,8 @@ make dev
 docker compose ps
 
 # Test the health endpoint (API runs on localhost:8080 regardless of DB_HOST)
-curl http://localhost:8080/health
+curl http://192.168.1.10:8080/health
+curl http://192.168.1.10:8080/health
 ```
 
 ### Alternative: Manual Commands
