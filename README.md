@@ -11,9 +11,11 @@ Go REST API following Clean Architecture (Hexagonal) principles, with PostgreSQL
 ## Setup
 
 ```bash
-cp .env.example .env   # configure your environment variables once
+cp .env.example .env   # create your local .env (git-ignored) from the template
 make deps              # download Go dependencies
 ```
+
+> The `.env` file holds database credentials and app settings. It is **not committed to git** to keep secrets out of the repo. The `.env.example` file serves as a reference with safe default values so every developer knows which variables are needed.
 
 ---
 
