@@ -27,7 +27,7 @@ func main() {
 
 	router := http.SetupRoutes(eventUseCase)
 
-	port := os.Getenv("PORT")
+	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "8080"
 	}

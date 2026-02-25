@@ -18,7 +18,7 @@ func LoadTestEnv(t *testing.T) {
 	os.Setenv("DB_USER", "test_user")
 	os.Setenv("DB_PASSWORD", "test_password")
 	os.Setenv("DB_NAME", "event_service_test")
-	os.Setenv("PORT", "8080")
+	os.Setenv("APP_PORT", "8080")
 }
 
 // TestConfig holds test configuration
