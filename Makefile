@@ -145,8 +145,10 @@ lint:
 	@echo "Linting code..."
 	golangci-lint run
 
-# Install dependencies
+# Install dependencies and dev tools
 deps:
 	@echo "Installing dependencies..."
 	go mod tidy
 	go mod download
+	@echo "Installing dev tools..."
+	go install github.com/air-verse/air@latest

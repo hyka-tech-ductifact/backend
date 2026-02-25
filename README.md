@@ -12,10 +12,18 @@ Go REST API following Clean Architecture (Hexagonal) principles, with PostgreSQL
 
 ```bash
 cp .env.example .env   # create your local .env (git-ignored) from the template
-make deps              # download Go dependencies
+make deps              # download Go dependencies and install dev tools
 ```
 
 > The `.env` file holds database credentials and app settings. It is **not committed to git** to keep secrets out of the repo. The `.env.example` file serves as a reference with safe default values so every developer knows which variables are needed.
+
+### Add Go bin to PATH
+
+Dev tools like `air` are installed in `$(go env GOPATH)/bin`. Make sure this directory is in your `PATH`:
+
+```bash
+echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.bashrc
+```
 
 ---
 
