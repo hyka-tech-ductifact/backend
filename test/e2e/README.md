@@ -58,16 +58,9 @@ make dev-start
 go test -v ./test/e2e/...
 ```
 
-### Docker Environment
+### With `make`
 ```bash
-# Start services for testing
-make test-start
-
-# Run E2E tests
-go test -v ./test/e2e/...
-
-# Stop services when done
-make test-stop
+make test-e2e
 ```
 
 ## Test Structure

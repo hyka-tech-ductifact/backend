@@ -7,92 +7,33 @@ This directory contains comprehensive tests for the Event Service application, o
 ```
 test/
 ├── README.md                    # This file
-├── api.http                     # Unified HTTP API test suite
-├── unit/                        # Unit tests
+├── api.http                     # HTTP API test suite
+├── unit/                        # Unit tests (no dependencies)
 │   └── domain/
-│       └── entities/            # Domain entity unit tests
-│           ├── event_test.go    # Event entity tests
-│           └── user_test.go     # User entity tests
-├── integration/                 # Integration tests
-│   ├── event_test.go           # Event-related integration tests
-│   └── user_test.go            # User-related integration tests
-├── e2e/                        # End-to-end tests
-│   ├── setup.go                # E2E test environment setup
-│   ├── event_e2e_test.go       # Event-related E2E tests
-│   └── README.md               # E2E test documentation
-├── fixtures/                   # Test data and fixtures (future)
-└── helpers/                    # Test utilities and configuration
-    ├── test_config.go          # Test configuration
-    └── test_utils.go           # Common test utilities
+│       └── entities/
+│           └── event_test.go
+├── integration/                 # Integration tests (requires DB)
+│   └── event_test.go
+├── e2e/                         # E2E tests (requires DB + running server)
+│   ├── setup.go
+│   ├── event_e2e_test.go
+│   └── README.md
+└── helpers/                     # Shared test utilities
+    ├── test_config.go
+    └── test_utils.go
 ```
 
-## Testing Approaches
+## Running Tests
 
-### 🚀 **Local Development Testing** (Recommended for Development)
+Tests always run locally. Only the DB runs in Docker.
 
-**When to use:**
-- During active development
-- Debugging issues
-- Quick iteration and feedback
-
-**Commands:**
 ```bash
-# Run all tests locally
-make test
-
-# Run only unit tests
-go test -v ./test/unit/...
-
-# Run only integration tests
-go test -v ./test/integration/...
-
-# Run only E2E tests
-go test -v ./test/e2e/...
-
-# Run tests with coverage
-make test-coverage
+make test-unit          # unit tests — no dependencies needed
+make test-integration   # integration tests — requires: make dev-start
+make test-e2e           # E2E tests — requires: make dev-start + make run
+make test               # all of the above in order
+make test-coverage      # all tests + HTML coverage report
 ```
-
-**Pros:**
-- ⚡ Fastest execution
-- 🔧 Easy debugging with IDE
-- 💻 Direct access to logs
-- 🚀 Quick iteration
-
-### 🐳 **Docker-Based Testing** (Recommended for CI/CD)
-
-**When to use:**
-- CI/CD pipelines
-- Integration testing with real database
-- Ensuring environment consistency
-
-**Commands:**
-```bash
-# Run all tests in Docker
-make test-docker
-
-# Start test database only
-make test-start
-
-# Run tests with PostgreSQL
-make test-postgres
-
-# Stop test database
-make test-stop
-```
-
-**Pros:**
-- 🔄 Consistent environment
-- 🐳 Isolated testing
-- 📋 Reproducible results
-- 🚀 CI/CD ready
-
-### 🔄 **Hybrid Approach** (Best Practice)
-
-**Development Workflow:**
-1. **Local testing** for development and debugging
-2. **Docker testing** before commits
-3. **CI/CD testing** for automated validation
 
 ## Test Types
 
@@ -127,47 +68,11 @@ make test-stop
 | **Integration** | ⚡⚡ | `httptest.NewRecorder()` | Real | Component interaction |
 | **E2E** | ⚡ | Real HTTP requests | Real | Complete system |
 
-## Running Tests
+## Test Data
 
-### Quick Start
-```bash
-# Start development database
-make dev-start
-
-# Run all tests
-make test
-
-# Run specific test types
-go test -v ./test/unit/...      # Unit tests only
-go test -v ./test/integration/... # Integration tests only
-go test -v ./test/e2e/...       # E2E tests only
-```
-
-### Advanced Usage
-```bash
-# Run tests with coverage
-make test-coverage
-
-# Run tests in Docker environment
-make test-docker
-
-# Run tests with verbose output
-go test -v -count=1 ./...
-```
-
-## Test Data Management
-
-### Database Setup
-- Integration and E2E tests use real PostgreSQL databases
-- Test databases are isolated from development/production
-- Automatic schema migration for test databases
-- Clean state between test runs
-
-### Test Fixtures
-- Test data is created programmatically
-- No external fixture files required
-- UUIDs generated for unique test data
-- Realistic data scenarios
+- Data is created programmatically in each test, no fixture files needed
+- UUIDs are generated per test run to avoid collisions
+- Integration and E2E tests use the development DB (`microservice_db`)
 
 ## Best Practices
 

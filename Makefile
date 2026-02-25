@@ -1,88 +1,93 @@
 # Event Service Makefile
 
-.PHONY: help build run dev test test-coverage clean docker-build docker-run docker-stop fmt lint deps test-docker test-start test-stop dev-start dev-stop
+.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e clean db-start db-stop prod-start prod-stop prod-build fmt lint deps
 
 # Default target
 help:
 	@echo "Available commands:"
-	@echo "  build          - Build the application"
-	@echo "  run            - Run the application"
-	@echo "  dev            - Run with hot reloading (air)"
-	@echo "  test           - Run all tests"
-	@echo "  test-coverage  - Run tests with coverage report"
-	@echo "  test-docker    - Run tests in Docker with database"
-	@echo "  test-start     - Start test services (database + test runner)"
-	@echo "  test-stop      - Stop test services"
-	@echo "  dev-start      - Start development database only"
-	@echo "  dev-stop       - Stop development database"
-	@echo "  clean          - Clean build artifacts"
-	@echo "  docker-build   - Build Docker image"
-	@echo "  docker-run     - Run with Docker Compose"
-	@echo "  docker-stop    - Stop Docker Compose services"
-	@echo "  fmt            - Format code"
-	@echo "  lint           - Lint code"
-	@echo "  deps           - Install dependencies"
+	@echo ""
+	@echo "  Development:"
+	@echo "    db-start       - Start database in Docker"
+	@echo "    db-stop        - Stop database"
+	@echo "    app-watch      - Run app with hot reloading (air)"
+	@echo "    app-run        - Run app without hot reloading"
+	@echo "    app-build      - Compile binary to bin/api"
+	@echo ""
+	@echo "  Testing:"
+	@echo "    test-unit          - Run unit tests (no dependencies needed)"
+	@echo "    test-integration   - Run integration tests (requires DB)"
+	@echo "    test-e2e           - Run E2E tests (requires DB + running server)"
+	@echo "    test               - Run all tests"
+	@echo ""
+	@echo "    Add COVERAGE to any test target to generate a coverage report:"
+	@echo "    make test-unit COVERAGE"
+	@echo "    make test COVERAGE"
+	@echo ""
+	@echo "  Production:"
+	@echo "    prod-start     - Start app + DB in Docker"
+	@echo "    prod-stop      - Stop production services"
+	@echo "    prod-build     - Build Docker image"
+	@echo ""
+	@echo "  Code quality:"
+	@echo "    fmt            - Format code"
+	@echo "    lint           - Lint code"
+	@echo "    deps           - Install dependencies"
+	@echo "    clean          - Remove build artifacts"
 
-# Build the application
-build:
+# Compile binary to bin/api
+app-build:
 	@echo "Building event-service..."
 	go build -o bin/api ./cmd/api
 
 # Run the application
-run:
+app-run:
 	@echo "Running event-service..."
 	go run ./cmd/api
 
 # Run the application with hot reloading
-dev:
+app-watch:
 	@echo "Running event-service with hot reloading..."
 	air
 
+# Coverage flag: run with COVERAGE to generate a report (e.g. make test-unit COVERAGE)
+_COVERAGE := $(filter command line,$(origin COVERAGE))
+
+define run-tests
+	@if [ -n "$(_COVERAGE)" ]; then \
+		go test -v -coverprofile=coverage.out $(1) && \
+		go tool cover -html=coverage.out -o coverage.html && \
+		echo "Coverage report generated: coverage.html"; \
+	else \
+		go test -v $(1); \
+	fi
+endef
+
+# Run unit tests — no dependencies needed
+test-unit:
+	@echo "Running unit tests..."
+	$(call run-tests,./test/unit/...)
+
+# Run integration tests — requires DB running (make db-start)
+test-integration:
+	@echo "Running integration tests..."
+	$(call run-tests,./test/integration/...)
+
+# Run E2E tests — requires DB + server running (make db-start && make app-run)
+test-e2e:
+	@echo "Running E2E tests..."
+	$(call run-tests,./test/e2e/...)
+
 # Run all tests
-test:
-	@echo "Running all tests..."
-	go test -v ./...
+test: test-unit test-integration test-e2e
 
-# Run tests with coverage
-test-coverage:
-	@echo "Running tests with coverage..."
-	go test -v -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
-
-# Run tests in Docker with proper database connection
-test-docker:
-	@echo "Running tests in Docker with database..."
-	@echo "Starting test database..."
-	@docker compose -f docker-compose.test.yml up -d test-db
-	@echo "Waiting for database to be ready..."
-	@sleep 5
-	@echo "Running tests..."
-	@docker run --rm --network event-service_default \
-		-e DB_HOST=test-db -e DB_PORT=5432 -e DB_USER=test_user \
-		-e DB_PASSWORD=test_password -e DB_NAME=event_service_test \
-		event-service-test make test
-	@echo "Cleaning up..."
-	@docker compose -f docker-compose.test.yml down
-
-# Start test services (database + test runner)
-test-start:
-	@echo "Starting test services..."
-	docker compose -f docker-compose.test.yml up -d
-
-# Stop test services
-test-stop:
-	@echo "Stopping test services..."
-	docker compose -f docker-compose.test.yml down
-
-# Start development database only
-dev-start:
-	@echo "Starting development database..."
+# Start database in Docker
+db-start:
+	@echo "Starting database..."
 	docker compose -f docker-compose.dev.yml up -d
 
-# Stop development database
-dev-stop:
-	@echo "Stopping development database..."
+# Stop database
+db-stop:
+	@echo "Stopping database..."
 	docker compose -f docker-compose.dev.yml down
 
 # Clean build artifacts
@@ -116,18 +121,18 @@ clean:
 	@echo "Cleanup completed!"
 
 # Build Docker image
-docker-build:
+prod-build:
 	@echo "Building Docker image..."
 	docker build -t event-service .
 
-# Run with Docker Compose
-docker-run:
-	@echo "Starting services with Docker Compose..."
+# Start app + DB in Docker
+prod-start:
+	@echo "Starting production services..."
 	docker compose up -d
 
-# Stop Docker Compose
-docker-stop:
-	@echo "Stopping Docker Compose services..."
+# Stop production services
+prod-stop:
+	@echo "Stopping production services..."
 	docker compose down
 
 # Format code
