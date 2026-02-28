@@ -1,4 +1,4 @@
-package database
+package persistence
 
 import (
 	"context"
@@ -10,10 +10,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// PostgresEventRepository is an outbound adapter that implements
+// the domain's EventRepository interface (outbound port).
 type PostgresEventRepository struct {
 	db *gorm.DB
 }
 
+// EventModel is the GORM-specific database model.
+// It lives in the infrastructure layer, NOT in the domain.
 type EventModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	Title       string    `gorm:"not null"`

@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"event-service/internal/application/usecases"
-	"event-service/internal/infrastructure/adapters/out/database"
-	"event-service/internal/interfaces/http"
+	"event-service/internal/application/services"
+	httpAdapter "event-service/internal/infrastructure/adapters/inbound/http"
+	"event-service/internal/infrastructure/adapters/outbound/persistence"
 
 	"github.com/joho/godotenv"
 )
@@ -17,15 +17,20 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-	db, err := database.NewPostgresConnection()
+	// Outbound adapter: PostgreSQL
+	db, err := persistence.NewPostgresConnection()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	eventRepo := database.NewPostgresEventRepository(db)
-	eventUseCase := usecases.NewEventUseCase(eventRepo)
+	// Outbound adapter implements domain repository interface (outbound port)
+	eventRepo := persistence.NewPostgresEventRepository(db)
 
-	router := http.SetupRoutes(eventUseCase)
+	// Application service implements inbound port
+	eventService := services.NewEventService(eventRepo)
+
+	// Inbound adapter: HTTP
+	router := httpAdapter.SetupRoutes(eventService)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {

@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"event-service/internal/application/usecases"
-	"event-service/internal/infrastructure/adapters/out/database"
-	httphandlers "event-service/internal/interfaces/http"
+	"event-service/internal/application/services"
+	httpAdapter "event-service/internal/infrastructure/adapters/inbound/http"
+	"event-service/internal/infrastructure/adapters/outbound/persistence"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -50,7 +50,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 
 	// Auto migrate the schema with production models
-	err = db.AutoMigrate(&database.EventModel{})
+	err = db.AutoMigrate(&persistence.EventModel{})
 	require.NoError(t, err)
 
 	return db
@@ -60,14 +60,14 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 func SetupTestRouter(t *testing.T) *gin.Engine {
 	db := SetupTestDB(t)
 
-	// Setup repositories
-	eventRepo := database.NewPostgresEventRepository(db)
+	// Outbound adapter
+	eventRepo := persistence.NewPostgresEventRepository(db)
 
-	// Setup use cases
-	eventUseCase := usecases.NewEventUseCase(eventRepo)
+	// Application service (inbound port)
+	eventService := services.NewEventService(eventRepo)
 
-	// Setup router
-	router := httphandlers.SetupRoutes(eventUseCase)
+	// Inbound adapter: HTTP router
+	router := httpAdapter.SetupRoutes(eventService)
 
 	return router
 }

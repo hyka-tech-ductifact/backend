@@ -1,12 +1,15 @@
 package http
+package http
 
 import (
-	"event-service/internal/application/usecases"
+	"event-service/internal/application/ports"
 
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(eventUseCase *usecases.EventUseCase) *gin.Engine {
+// SetupRoutes configures the HTTP router.
+// It receives the inbound port (EventService interface), not a concrete implementation.
+func SetupRoutes(eventService ports.EventService) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
@@ -14,7 +17,7 @@ func SetupRoutes(eventUseCase *usecases.EventUseCase) *gin.Engine {
 	})
 
 	// Event routes
-	eventHandler := NewEventHandler(eventUseCase)
+	eventHandler := NewEventHandler(eventService)
 	eventRoutes := r.Group("/events")
 	{
 		eventRoutes.POST("", eventHandler.CreateEvent)
