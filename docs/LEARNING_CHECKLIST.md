@@ -94,40 +94,47 @@ This checklist provides a structured learning path for mastering backend develop
   - Connection pooling
   - Performance considerations
 
-### Phase 4: Architecture Fundamentals
-*Understand clean architecture principles*
+### Phase 4: Hexagonal Architecture (Ports & Adapters)
+*Understand and implement hexagonal architecture principles*
 
 - [ ] **4.1 Separation of Concerns**
   - Single Responsibility Principle
-  - Dependency direction and coupling
-  - Layer responsibilities
-  - Code organization strategies
+  - Dependency direction: everything points inward
+  - Inside (domain + application) vs Outside (adapters)
+  - Code organization that reflects architecture
 
-- [ ] **4.2 Hexagonal Architecture Basics**
-  - Core concepts: ports and adapters
-  - Domain-driven design principles
-  - Dependency inversion principle
-  - Benefits and trade-offs
+- [ ] **4.2 Hexagonal Architecture Core Concepts**
+  - The hexagon metaphor: core vs outside world
+  - Inbound ports (what the app offers) vs Outbound ports (what the app needs)
+  - Inbound adapters (driving: HTTP, CLI) vs Outbound adapters (driven: DB, APIs)
+  - Difference between Hexagonal and Clean Architecture
+  - Dependency Inversion Principle
 
-- [ ] **4.3 Repository Pattern**
-  - Abstraction of data access
-  - Interface design for repositories
-  - Multiple implementations
-  - Testing with mock repositories
+- [ ] **4.3 Repository Pattern (Outbound Ports)**
+  - Domain defines the interface (outbound port)
+  - Infrastructure implements it (outbound adapter)
+  - Translating between domain entities and DB models
+  - Multiple adapters for the same port (PostgreSQL, MongoDB, in-memory)
 
-- [ ] **4.4 Dependency Injection**
-  - Manual dependency injection
-  - Constructor injection patterns
-  - Interface-based design
-  - Avoiding global state
+- [ ] **4.4 Service Pattern (Inbound Ports)**
+  - Application defines the service interface (inbound port)
+  - Application service implements business orchestration
+  - Inbound adapters depend on the port, not the concrete service
+  - Unexported structs, exported interfaces
+
+- [ ] **4.5 Dependency Injection**
+  - Manual DI in the composition root (`main.go`)
+  - Constructor injection with interfaces
+  - Only `main.go` knows all concrete types
+  - Wiring: outbound adapters → services → inbound adapters
 
 ### Phase 5: Application Layer Patterns
 *Master business logic organization*
 
-- [ ] **5.1 Use Case Pattern**
-  - Organizing business workflows
-  - Input/output models (DTOs)
-  - Use case composition
+- [ ] **5.1 Application Services**
+  - Organizing business workflows in services
+  - Implementing inbound ports
+  - Orchestrating domain entities and outbound ports
   - Cross-cutting concerns
 
 - [ ] **5.2 Validation Strategies**

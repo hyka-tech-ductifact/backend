@@ -1,6 +1,8 @@
 # Backend
 
-Go REST API following Clean Architecture (Hexagonal) principles, with PostgreSQL and Docker.
+Go REST API following **Hexagonal Architecture** (Ports & Adapters) principles, with PostgreSQL and Docker.
+
+> **Note:** This project uses Hexagonal Architecture, not Clean Architecture. They share goals but differ in structure. See `docs/LEARNING_GUIDE.md` for a full explanation.
 
 ## Prerequisites
 
