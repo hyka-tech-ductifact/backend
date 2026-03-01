@@ -522,6 +522,33 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 }
 ```
 
+### ¿Dónde va cada tipo de validación?
+
+La entidad (`NewUser`) y el servicio (`CreateUser`) validan cosas distintas. La diferencia es **qué información necesitan**:
+
+```go
+// 🔵 DOMINIO — entities.NewUser()
+// Solo necesita los datos que le pasan. No consulta nada externo.
+func NewUser(name, email string) (*User, error) {
+    if name == ""     { ... } // ✅ autocontenida: solo miro el string
+    NewEmail(email)           // ✅ autocontenida: solo valido el formato
+}
+
+// 🟢 APLICACIÓN — userService.CreateUser()
+// Necesita consultar la BD para verificar estado externo.
+func (s *userService) CreateUser(ctx context.Context, ...) {
+    entities.NewUser(name, email)            // delega validaciones internas al dominio
+    s.userRepo.GetByEmail(ctx, email)        // ✅ requiere estado externo: ¿ya existe?
+}
+```
+
+| Tipo de validación | ¿Dónde? | Ejemplo | Motivo |
+|-------------------|---------|---------|--------|
+| **Autocontenida** | 🔵 Entidad | Nombre vacío, formato de email | Solo necesita los datos que recibe |
+| **Requiere estado externo** | 🟢 Servicio | Email único, límite de usuarios | Necesita consultar la BD u otros servicios |
+
+La entidad **no puede** verificar unicidad porque no conoce el repositorio — y no debe conocerlo. Un `User` sabe qué *es* un usuario, no qué *otros usuarios existen*.
+
 ### ¿Por qué es mejor que el patrón de Event?
 
 | Aspecto | Event (actual) | User (mejorado) | Por qué |
