@@ -1,0 +1,890 @@
+# Guía: Crear la entidad Usuario desde cero
+
+Guía completa para implementar un caso de uso nuevo en arquitectura hexagonal, con **mejores prácticas de Go idiomático**. Se construye de dentro hacia fuera: dominio → aplicación → infraestructura.
+
+---
+
+## Índice
+
+1. [Filosofía y principios](#filosofía-y-principios)
+2. [Paso 1 — Entidad de dominio](#paso-1--entidad-de-dominio)
+3. [Paso 2 — Value Objects](#paso-2--value-objects)
+4. [Paso 3 — Puerto de salida (Repository)](#paso-3--puerto-de-salida-repository)
+5. [Paso 4 — Puerto de entrada (Service interface)](#paso-4--puerto-de-entrada-service-interface)
+6. [Paso 5 — Servicio de aplicación](#paso-5--servicio-de-aplicación)
+7. [Paso 6 — Adaptador de salida (PostgreSQL)](#paso-6--adaptador-de-salida-postgresql)
+8. [Paso 7 — Adaptador de entrada (HTTP handler)](#paso-7--adaptador-de-entrada-http-handler)
+9. [Paso 8 — Router (registrar rutas)](#paso-8--router-registrar-rutas)
+10. [Paso 9 — Wiring en main.go](#paso-9--wiring-en-maingo)
+11. [Paso 10 — Base de datos (SQL)](#paso-10--base-de-datos-sql)
+12. [Resumen de archivos](#resumen-de-archivos)
+13. [Errores comunes a evitar](#errores-comunes-a-evitar)
+
+---
+
+## Filosofía y principios
+
+Antes de escribir código, las reglas fundamentales:
+
+1. **Siempre de dentro hacia fuera.** Primero el dominio, al final la infraestructura. Nunca diseñes tu entidad pensando en la base de datos.
+2. **El dominio NO depende de nada.** Nada de tags `json:`, nada de `gorm:`, nada de frameworks. Solo Go puro.
+3. **La entidad se protege a sí misma.** Si un `User` no puede existir sin email válido, la propia entidad debe impedirlo. No confíes en que "el handler ya lo valida".
+4. **Constructor obligatorio.** Nunca crear structs con `User{}` directamente. Siempre usar `NewUser(...)` que valida y devuelve error.
+5. **Errores con sentido.** Definir errores de dominio como variables (`var ErrInvalidEmail = ...`), no strings sueltos. Así se pueden comparar con `errors.Is()`.
+6. **Interfaces donde se consumen, no donde se implementan.** En Go, las interfaces pertenecen al consumidor.
+
+---
+
+## Paso 1 — Entidad de dominio
+
+📁 `internal/domain/entities/user.go`
+
+La entidad es el corazón. Representa *qué es un usuario* con sus reglas de negocio.
+
+```go
+package entities
+
+import (
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// --- Domain errors ---
+// Se definen como variables para poder comparar con errors.Is().
+
+var (
+	ErrEmptyUserName = errors.New("user name cannot be empty")
+)
+
+// User is a domain entity. No framework tags (json, gorm, etc.).
+// The struct fields are exported for mapper access, but construction
+// MUST go through NewUser to guarantee invariants.
+type User struct {
+	ID        uuid.UUID
+	Name      string
+	Email     string // Stored as string, but validated via value object on creation
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// NewUser is the only way to create a valid User.
+// It validates all business rules and returns an error if any fail.
+func NewUser(name, email string) (*User, error) {
+	if name == "" {
+		return nil, ErrEmptyUserName
+	}
+	// Email validation is delegated to the Email value object (Step 2).
+	// For now we accept any string — we'll plug in validation next.
+
+	now := time.Now()
+	return &User{
+		ID:        uuid.New(),
+		Name:      name,
+		Email:     email,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+```
+
+### ¿Por qué es diferente al patrón de Event?
+
+| Aspecto | Event (actual) | User (mejorado) | Por qué |
+|---------|---------------|-----------------|---------|
+| Tags `json:` en la entidad | ✅ Tiene | ❌ No tiene | Las entidades de dominio no deben conocer el formato de serialización. Eso es responsabilidad del adaptador HTTP (DTOs). |
+| Constructor devuelve error | ❌ `*Event` | ✅ `(*User, error)` | Si la creación puede fallar (validaciones), Go exige devolver error. Un constructor que nunca falla es sospechoso. |
+| Validación en constructor | ❌ No valida nada | ✅ Valida nombre | El dominio se protege a sí mismo. No depende de que el handler o el servicio validen. |
+| Errores como variables | ❌ No define errores | ✅ `var ErrEmptyUserName` | Permite comparar con `errors.Is()` en tests y en capas superiores. |
+
+### 💡 Consejo: ¿campos exportados o no?
+
+En Go idiomático, los campos de una entidad suelen ser exportados (mayúscula) para permitir el acceso desde los mappers de infraestructura. **La protección no viene de ocultar campos, sino de forzar la construcción a través de `NewUser`**. Si quisieras campos privados, necesitarías getters, lo cual es anti-idiomático en Go salvo que tengas una razón fuerte.
+
+---
+
+## Paso 2 — Value Objects
+
+📁 `internal/domain/valueobjects/email.go` (ya existe, lo usaremos)
+
+Un Value Object encapsula una regla de validación. Es inmutable y se define por su valor, no por su identidad.
+
+El archivo `email.go` ya tiene:
+
+```go
+package valueobjects
+
+import (
+	"errors"
+	"regexp"
+)
+
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+
+type Email struct {
+	value string
+}
+
+func NewEmail(email string) (*Email, error) {
+	if !emailRegex.MatchString(email) {
+		return nil, errors.New("invalid email format")
+	}
+	return &Email{value: email}, nil
+}
+
+func (e *Email) String() string {
+	return e.value
+}
+```
+
+### Ahora conectamos el Value Object a la entidad
+
+Volvemos a `user.go` y añadimos la validación de email al constructor:
+
+```go
+package entities
+
+import (
+	"errors"
+	"time"
+
+	"event-service/internal/domain/valueobjects"
+
+	"github.com/google/uuid"
+)
+
+var (
+	ErrEmptyUserName = errors.New("user name cannot be empty")
+)
+
+type User struct {
+	ID        uuid.UUID
+	Name      string
+	Email     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func NewUser(name, email string) (*User, error) {
+	if name == "" {
+		return nil, ErrEmptyUserName
+	}
+
+	// Validate email through the value object.
+	// The VO is used for validation, but we store the raw string.
+	// This avoids coupling the entity struct to the VO type.
+	validEmail, err := valueobjects.NewEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	return &User{
+		ID:        uuid.New(),
+		Name:      name,
+		Email:     validEmail.String(),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+```
+
+### 💡 Consejo: ¿por qué guardar `string` en vez del tipo `Email`?
+
+Guardar `Email` como tipo en la entidad obligaría a todos los mappers a saber desempaquetar el VO, complicando la serialización. El patrón pragmático es: **validar con el VO, almacenar el valor primitivo**. La validación ocurre una vez en la construcción, y a partir de ahí el valor es confiable.
+
+### 💡 Consejo: mejorar el error del Value Object
+
+El Value Object actual devuelve `errors.New("invalid email format")`, que es un string anónimo. Sería mejor definir un error como variable:
+
+```go
+var ErrInvalidEmail = errors.New("invalid email format")
+```
+
+Así cualquier capa puede hacer `errors.Is(err, valueobjects.ErrInvalidEmail)`.
+
+---
+
+## Paso 3 — Puerto de salida (Repository)
+
+📁 `internal/domain/repositories/user_repository.go`
+
+El repositorio es una **interfaz** que define las operaciones de persistencia que el dominio necesita. No sabe de PostgreSQL, GORM, ni nada externo.
+
+```go
+package repositories
+
+import (
+	"context"
+
+	"event-service/internal/domain/entities"
+
+	"github.com/google/uuid"
+)
+
+// UserRepository is the outbound port for user persistence.
+// It is defined in the domain but implemented in infrastructure.
+type UserRepository interface {
+	Create(ctx context.Context, user *entities.User) error
+	GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+	GetByEmail(ctx context.Context, email string) (*entities.User, error)
+	Update(ctx context.Context, user *entities.User) error
+}
+```
+
+### ¿Por qué `context.Context` en todos los métodos?
+
+Es la convención en Go para operaciones que podrían:
+- Cancelarse (el usuario cierra la conexión HTTP).
+- Tener timeout (la DB no responde).
+- Llevar metadata (tracing, request ID).
+
+Siempre va como **primer parámetro** y **nunca** se almacena en un struct.
+
+### ¿Por qué `GetByEmail`?
+
+Porque al crear un usuario querrás verificar que el email no esté ya en uso. Es una operación de negocio legítima. Además, el email funciona como un *identificador natural* del usuario.
+
+### 💡 Consejo: interfaces pequeñas
+
+En Go, las interfaces deben ser **lo más pequeñas posible**. Si tu caso de uso solo necesita `Create` y `GetByID`, no añadas `Delete` y `List` "por si acaso". Añádelos cuando los necesites. Es mucho más fácil añadir métodos a una interfaz que quitarlos.
+
+---
+
+## Paso 4 — Puerto de entrada (Service interface)
+
+📁 `internal/application/ports/user_service.go`
+
+El puerto de entrada define **qué operaciones expone tu aplicación al mundo exterior**. Los adaptadores de entrada (HTTP handlers, CLI, gRPC) dependen de esta interfaz.
+
+```go
+package ports
+
+import (
+	"context"
+
+	"event-service/internal/domain/entities"
+
+	"github.com/google/uuid"
+)
+
+// UserService is the inbound port for user operations.
+// Inbound adapters (HTTP handlers, CLI, etc.) depend on this interface.
+type UserService interface {
+	CreateUser(ctx context.Context, name, email string) (*entities.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+	UpdateUser(ctx context.Context, id uuid.UUID, name, email *string) (*entities.User, error)
+}
+```
+
+### ¿Por qué es diferente al patrón de Event?
+
+| Aspecto | Event (actual) | User (mejorado) | Por qué |
+|---------|---------------|-----------------|---------|
+| `CreateUser` recibe | `*entities.User` (entidad completa) | `name, email string` (primitivos) | El handler no debería construir entidades de dominio. Eso es responsabilidad del servicio. Recibir primitivos mantiene al handler ignorante del dominio. |
+| `UpdateUser` recibe | `*entities.User` (entidad completa) | `id` + punteros opcionales `*string` | Los punteros `*string` permiten distinguir "no enviado" (`nil`) de "enviado vacío" (`""`). Es el patrón estándar para *partial updates* en Go. |
+
+### 💡 Consejo: punteros para campos opcionales en updates
+
+```go
+// *string = nil  → el campo NO se actualiza
+// *string = ""   → el campo se actualiza a vacío (si las reglas lo permiten)
+// *string = "x"  → el campo se actualiza a "x"
+```
+
+Esto te ahorra el problema de "¿el usuario envió vacío a propósito o simplemente no envió el campo?".
+
+---
+
+## Paso 5 — Servicio de aplicación
+
+📁 `internal/application/services/user_service.go`
+
+El servicio **orquesta**: recibe datos primitivos del handler, construye la entidad de dominio, aplica reglas de negocio, y delega la persistencia al repositorio.
+
+```go
+package services
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"event-service/internal/domain/entities"
+	"event-service/internal/domain/repositories"
+
+	"github.com/google/uuid"
+)
+
+// --- Application-level errors ---
+
+var (
+	ErrEmailAlreadyInUse = errors.New("email already in use")
+	ErrUserNotFound      = errors.New("user not found")
+)
+
+// userService implements ports.UserService.
+// Unexported struct: can only be created via NewUserService.
+type userService struct {
+	userRepo repositories.UserRepository
+}
+
+// NewUserService creates a new UserService.
+// It receives the outbound port (repository interface), not a concrete implementation.
+func NewUserService(userRepo repositories.UserRepository) *userService {
+	return &userService{userRepo: userRepo}
+}
+
+// CreateUser orchestrates user creation:
+// 1. Build the domain entity (which validates name + email).
+// 2. Check email uniqueness (business rule).
+// 3. Persist via repository.
+func (s *userService) CreateUser(ctx context.Context, name, email string) (*entities.User, error) {
+	// Step 1: Domain entity validates its own invariants
+	user, err := entities.NewUser(name, email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 2: Business rule — email must be unique
+	existing, _ := s.userRepo.GetByEmail(ctx, email)
+	if existing != nil {
+		return nil, ErrEmailAlreadyInUse
+	}
+
+	// Step 3: Persist
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// GetUserByID retrieves a user by ID.
+func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+	user, err := s.userRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+	return user, nil
+}
+
+// UpdateUser applies a partial update to an existing user.
+// Only non-nil fields are updated.
+func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email *string) (*entities.User, error) {
+	// Step 1: Fetch existing
+	user, err := s.userRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	// Step 2: Apply changes
+	if name != nil {
+		user.Name = *name
+	}
+	if email != nil {
+		// If email changes, check uniqueness
+		if *email != user.Email {
+			existing, _ := s.userRepo.GetByEmail(ctx, *email)
+			if existing != nil {
+				return nil, ErrEmailAlreadyInUse
+			}
+		}
+		user.Email = *email
+	}
+
+	// Step 3: Update timestamp and persist
+	user.UpdatedAt = time.Now()
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+```
+
+### ¿Por qué es mejor que el patrón de Event?
+
+| Aspecto | Event (actual) | User (mejorado) | Por qué |
+|---------|---------------|-----------------|---------|
+| ¿Quién construye la entidad? | El handler HTTP | El servicio | La creación de entidades es lógica de dominio. El handler solo conoce primitivos. |
+| ¿Hay chequeo de duplicados? | ❌ No | ✅ Email único | Es una regla de negocio real. Si no lo haces en el servicio, dependes del error críptico de la BD. |
+| ¿Cómo se hace el update? | El handler hace el fetch, modifica y envía la entidad completa | El servicio recibe el ID y solo los campos que cambian | El handler no debería orquestar lógica. Eso es trabajo del servicio. |
+| Errores de aplicación | No define | `ErrEmailAlreadyInUse`, `ErrUserNotFound` | Permiten que el handler decida el HTTP status code apropiado. |
+
+### 💡 Consejo: `NewUserService` retorna `*userService` (concreto), no la interfaz
+
+En Go idiomático, los constructores retornan el **tipo concreto**, no la interfaz. ¿Por qué? Porque las interfaces pertenecen al consumidor. El router/main asignará el concreto a la interfaz `ports.UserService` — ahí es donde el compilador verifica que implementa todos los métodos.
+
+---
+
+## Paso 6 — Adaptador de salida (PostgreSQL)
+
+📁 `internal/infrastructure/adapters/outbound/persistence/postgres_user_repository.go`
+
+Este adaptador **implementa** la interfaz `UserRepository` con PostgreSQL + GORM.
+
+```go
+package persistence
+
+import (
+	"context"
+	"time"
+
+	"event-service/internal/domain/entities"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// --- Database Model (infrastructure concern) ---
+
+// UserModel is the GORM-specific database representation.
+// It is NOT a domain entity. It lives here because only this adapter cares about it.
+type UserModel struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name      string    `gorm:"not null"`
+	Email     string    `gorm:"uniqueIndex;not null"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (UserModel) TableName() string {
+	return "users"
+}
+
+// --- Repository implementation ---
+
+// PostgresUserRepository implements domain's UserRepository interface.
+type PostgresUserRepository struct {
+	db *gorm.DB
+}
+
+func NewPostgresUserRepository(db *gorm.DB) *PostgresUserRepository {
+	return &PostgresUserRepository{db: db}
+}
+
+func (r *PostgresUserRepository) Create(ctx context.Context, user *entities.User) error {
+	model := toUserModel(user)
+	return r.db.WithContext(ctx).Create(model).Error
+}
+
+func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+	var model UserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		return nil, err
+	}
+	return toUserEntity(&model), nil
+}
+
+func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*entities.User, error) {
+	var model UserModel
+	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error; err != nil {
+		return nil, err
+	}
+	return toUserEntity(&model), nil
+}
+
+func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User) error {
+	model := toUserModel(user)
+	return r.db.WithContext(ctx).Save(model).Error
+}
+
+// --- Mappers (package-level functions, not methods) ---
+
+func toUserModel(user *entities.User) *UserModel {
+	return &UserModel{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+}
+
+func toUserEntity(model *UserModel) *entities.User {
+	return &entities.User{
+		ID:        model.ID,
+		Name:      model.Name,
+		Email:     model.Email,
+		CreatedAt: model.CreatedAt,
+		UpdatedAt: model.UpdatedAt,
+	}
+}
+```
+
+### ¿Por qué funciones de paquete en vez de métodos del repositorio?
+
+Los mappers (`toUserModel`, `toUserEntity`) son funciones de paquete (no `func (r *PostgresUserRepository)`). Esto es más limpio porque:
+- No necesitan el receptor `r` — no acceden a la BD.
+- Son reutilizables por otros adaptadores del mismo paquete si fuera necesario.
+- Es más claro: el mapper es una transformación pura, no una operación del repositorio.
+
+### 💡 Consejo: `UserModel` separado de `entities.User`
+
+Esto es **fundamental**. La entidad de dominio y el modelo de base de datos son cosas distintas:
+
+```
+entities.User     → qué es un usuario para el negocio (sin tags de framework)
+UserModel         → cómo se guarda en PostgreSQL (con tags de GORM)
+```
+
+El mapper traduce entre los dos mundos. Si mañana cambias de GORM a sqlx, solo tocas este archivo.
+
+---
+
+## Paso 7 — Adaptador de entrada (HTTP handler)
+
+📁 `internal/infrastructure/adapters/inbound/http/user_handler.go`
+
+El handler traduce HTTP → servicio de aplicación. No conoce la base de datos ni las entidades de dominio (solo los DTOs).
+
+```go
+package http
+
+import (
+	"errors"
+	"net/http"
+
+	"event-service/internal/application/ports"
+	"event-service/internal/application/services"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+// --- DTOs (HTTP-specific, not domain objects) ---
+
+type CreateUserRequest struct {
+	Name  string `json:"name" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+}
+
+type UpdateUserRequest struct {
+	Name  *string `json:"name" binding:"omitempty"`
+	Email *string `json:"email" binding:"omitempty,email"`
+}
+
+type UserResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+// --- Handler ---
+
+type UserHandler struct {
+	userService ports.UserService
+}
+
+func NewUserHandler(userService ports.UserService) *UserHandler {
+	return &UserHandler{userService: userService}
+}
+
+func (h *UserHandler) CreateUser(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Pass primitives to the service — the handler does NOT create domain entities.
+	user, err := h.userService.CreateUser(c.Request.Context(), req.Name, req.Email)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, services.ErrEmailAlreadyInUse) {
+			status = http.StatusConflict
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, toUserResponse(user))
+}
+
+func (h *UserHandler) GetUser(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		return
+	}
+
+	user, err := h.userService.GetUserByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, toUserResponse(user))
+}
+
+func (h *UserHandler) UpdateUser(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		return
+	}
+
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Pass optional fields as pointers — the service handles the logic.
+	user, err := h.userService.UpdateUser(c.Request.Context(), id, req.Name, req.Email)
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, services.ErrUserNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, services.ErrEmailAlreadyInUse):
+			status = http.StatusConflict
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, toUserResponse(user))
+}
+
+// --- Mapper: Domain → HTTP Response ---
+
+func toUserResponse(user *entities.User) *UserResponse {
+	return &UserResponse{
+		ID:    user.ID.String(),
+		Name:  user.Name,
+		Email: user.Email,
+	}
+}
+```
+
+> **Nota:** Se necesita importar `"event-service/internal/domain/entities"` para el mapper `toUserResponse`.
+
+### ¿Por qué es mejor que el patrón de Event?
+
+| Aspecto | Event (actual) | User (mejorado) | Por qué |
+|---------|---------------|-----------------|---------|
+| Handler crea entidad de dominio | ✅ `entities.NewEvent(...)` | ❌ Pasa primitivos al servicio | El handler no debería conocer la estructura interna del dominio. |
+| Manejo de errores | Todo devuelve 400 | Usa `errors.Is()` para elegir status | 404 para no encontrado, 409 para duplicado, 500 para errores internos. |
+| DTOs usan `uuid.UUID` | ✅ | ❌ Usa `string` | En el JSON de respuesta, un UUID siempre es string. Mantener consistencia. |
+| Update pasa punteros | ❌ Handler busca y modifica | ✅ Pasa `*string` opcionales | El handler solo transporta datos. La lógica de "qué cambió" es del servicio. |
+
+### 💡 Consejo: `errors.Is()` para mapear errores a HTTP status
+
+Este es un patrón muy limpio. Los errores de dominio/aplicación se definen como variables (`var ErrUserNotFound = ...`). El handler usa `errors.Is()` para decidir qué código HTTP devolver. Así el servicio no sabe nada de HTTP, y el handler no sabe nada de lógica de negocio.
+
+---
+
+## Paso 8 — Router (registrar rutas)
+
+📁 `internal/infrastructure/adapters/inbound/http/router.go` (modificar)
+
+Añadir el `UserService` como parámetro y registrar las rutas:
+
+```go
+func SetupRoutes(eventService ports.EventService, userService ports.UserService) *gin.Engine {
+	r := gin.Default()
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "healthy !!!!"})
+	})
+
+	// Event routes
+	eventHandler := NewEventHandler(eventService)
+	eventRoutes := r.Group("/events")
+	{
+		eventRoutes.POST("", eventHandler.CreateEvent)
+		eventRoutes.GET("/:id", eventHandler.GetEvent)
+	}
+
+	// User routes
+	userHandler := NewUserHandler(userService)
+	userRoutes := r.Group("/users")
+	{
+		userRoutes.POST("", userHandler.CreateUser)
+		userRoutes.GET("/:id", userHandler.GetUser)
+		userRoutes.PUT("/:id", userHandler.UpdateUser)
+	}
+
+	return r
+}
+```
+
+### 💡 Consejo: ¿pasarle muchos servicios al router?
+
+Cuando tengas 5-10 servicios, pasar todos como parámetros se vuelve incómodo. En ese punto, considera crear un struct `Dependencies` o usar un patrón de *options*. Pero para 2-3 servicios, parámetros directos es lo más simple.
+
+---
+
+## Paso 9 — Wiring en main.go
+
+📁 `cmd/api/main.go` (modificar)
+
+El `main.go` es el **composition root**: aquí se conectan todas las piezas. Es el único lugar que conoce *todas* las implementaciones concretas.
+
+```go
+func main() {
+	// ...
+
+	// Database
+	db, err := persistence.NewPostgresConnection()
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// --- Event wiring ---
+	eventRepo := persistence.NewPostgresEventRepository(db)
+	eventService := services.NewEventService(eventRepo)
+
+	// --- User wiring (new) ---
+	userRepo := persistence.NewPostgresUserRepository(db)
+	userService := services.NewUserService(userRepo)
+
+	// --- HTTP ---
+	router := httpAdapter.SetupRoutes(eventService, userService)
+
+	// ...
+}
+```
+
+### 💡 Consejo: el flujo de dependencias
+
+Fíjate en el orden: **siempre de fuera hacia dentro** en el wiring.
+
+```
+DB connection → Repository (outbound adapter) → Service (application) → Router (inbound adapter)
+```
+
+Cada pieza recibe sus dependencias por **inyección de constructor** (parámetro en `New...()`). No hay variables globales, no hay singletons, no hay magia.
+
+---
+
+## Paso 10 — Base de datos (SQL)
+
+📁 `init.sql` (modificar)
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       VARCHAR(255) NOT NULL,
+    email      VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+```
+
+### 💡 Consejo: `TIMESTAMPTZ` vs `TIMESTAMP`
+
+Siempre usar `TIMESTAMPTZ` (con timezone). `TIMESTAMP` sin timezone puede causar bugs cuando la app corre en una timezone diferente a la BD. Con `TIMESTAMPTZ`, PostgreSQL normaliza todo a UTC internamente.
+
+---
+
+## Resumen de archivos
+
+| #  | Capa | Archivo | Acción |
+|----|------|---------|--------|
+| 1  | 🔵 Dominio | `internal/domain/entities/user.go` | **Modificar** (añadir validación, quitar json tags) |
+| 2  | 🔵 Dominio | `internal/domain/valueobjects/email.go` | Ya existe ✅ (mejorar error opcionalmente) |
+| 3  | 🔵 Dominio | `internal/domain/repositories/user_repository.go` | **Crear** |
+| 4  | 🟢 Aplicación | `internal/application/ports/user_service.go` | **Crear** |
+| 5  | 🟢 Aplicación | `internal/application/services/user_service.go` | **Crear** |
+| 6  | 🟠 Infraestructura | `internal/infrastructure/adapters/outbound/persistence/postgres_user_repository.go` | **Crear** |
+| 7  | 🟠 Infraestructura | `internal/infrastructure/adapters/inbound/http/user_handler.go` | **Crear** |
+| 8  | 🟠 Infraestructura | `internal/infrastructure/adapters/inbound/http/router.go` | **Modificar** |
+| 9  | ⚙️ Wiring | `cmd/api/main.go` | **Modificar** |
+| 10 | 🗄️ SQL | `init.sql` | **Modificar** |
+
+---
+
+## Errores comunes a evitar
+
+### ❌ Poner tags `json:` o `gorm:` en las entidades de dominio
+
+```go
+// MAL — la entidad conoce detalles de infraestructura
+type User struct {
+	ID    uuid.UUID `json:"id" gorm:"primaryKey"`
+	Email string    `json:"email" gorm:"uniqueIndex"`
+}
+
+// BIEN — la entidad es Go puro
+type User struct {
+	ID    uuid.UUID
+	Email string
+}
+```
+
+### ❌ Constructor que no devuelve error
+
+```go
+// MAL — ¿y si el email es inválido? No hay forma de saberlo.
+func NewUser(name, email string) *User { ... }
+
+// BIEN — Go idiomático: si puede fallar, devuelve error.
+func NewUser(name, email string) (*User, error) { ... }
+```
+
+### ❌ Handler creando entidades de dominio
+
+```go
+// MAL — el handler conoce la estructura interna del dominio
+user := entities.NewUser(req.Name, req.Email)
+created, err := h.userService.CreateUser(ctx, user)
+
+// BIEN — el handler solo pasa datos primitivos
+created, err := h.userService.CreateUser(ctx, req.Name, req.Email)
+```
+
+### ❌ Devolver siempre HTTP 400
+
+```go
+// MAL — todo es "bad request"
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+// BIEN — errores específicos
+switch {
+case errors.Is(err, services.ErrUserNotFound):
+	c.JSON(http.StatusNotFound, ...)
+case errors.Is(err, services.ErrEmailAlreadyInUse):
+	c.JSON(http.StatusConflict, ...)
+default:
+	c.JSON(http.StatusInternalServerError, ...)
+}
+```
+
+### ❌ Interfaces demasiado grandes "por si acaso"
+
+```go
+// MAL — definir métodos que no necesitas todavía
+type UserRepository interface {
+	Create(...) error
+	GetByID(...) (...)
+	GetByEmail(...) (...)
+	Update(...) error
+	Delete(...) error        // ← ¿lo necesitas ahora? No.
+	List(...) (...)          // ← ¿lo necesitas ahora? No.
+	Search(...) (...)        // ← ¿lo necesitas ahora? No.
+	CountByStatus(...) (int) // ← ¿lo necesitas ahora? No.
+}
+
+// BIEN — solo lo que necesitas hoy
+type UserRepository interface {
+	Create(...) error
+	GetByID(...) (...)
+	GetByEmail(...) (...)
+	Update(...) error
+}
+```
+
+---
+
+> **Siguiente paso:** Implementar en el orden de los pasos (1→10). Cada paso compila independientemente.
+> Se recomienda usar el workflow de tareas (`ai-devkit/tasks/`) para la implementación.
