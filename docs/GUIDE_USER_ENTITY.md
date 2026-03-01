@@ -233,14 +233,47 @@ type UserRepository interface {
 }
 ```
 
-### ¿Por qué `context.Context` en todos los métodos?
+### ¿Qué es `context.Context` y por qué aparece aquí?
 
-Es la convención en Go para operaciones que podrían:
-- Cancelarse (el usuario cierra la conexión HTTP).
-- Tener timeout (la DB no responde).
-- Llevar metadata (tracing, request ID).
+`context.Context` es un tipo de la **biblioteca estándar de Go** (paquete `context`). No es de Gin, no es de GORM, no es de ningún framework. Es tan "de Go" como `string` o `error`.
 
-Siempre va como **primer parámetro** y **nunca** se almacena en un struct.
+**¿Pero no dijimos que el dominio no puede conocer infraestructura?** Correcto, y `context` NO es infraestructura:
+
+| Import | ¿Es infraestructura? | ¿Permitido en dominio? |
+|--------|----------------------|----------------------|
+| `context` | ❌ No, es stdlib | ✅ Sí |
+| `time` | ❌ No, es stdlib | ✅ Sí |
+| `errors` | ❌ No, es stdlib | ✅ Sí |
+| `github.com/google/uuid` | ⚠️ Externo, pero genérico | ✅ Aceptable |
+| `github.com/gin-gonic/gin` | ✅ Sí, es HTTP | ❌ No |
+| `gorm.io/gorm` | ✅ Sí, es BD | ❌ No |
+
+**¿Qué representa a nivel conceptual?** Piénsalo como una pregunta de negocio, no técnica:
+
+> *"¿Debería seguir ejecutando esta operación o alguien la canceló?"*
+
+Analogía real: estás en la cola de una tienda. Llevas 30 minutos esperando. Decides irte → eso es un **context cancelado**. La tienda cierra a las 21:00 y son las 20:59 → eso es un **context con deadline**. La cancelación y los timeouts no son conceptos de HTTP ni de bases de datos — son conceptos de **cualquier operación que tarda tiempo**.
+
+**¿Cómo funciona en la práctica?** El contexto se crea arriba del todo (en el handler HTTP) y se propaga hacia abajo:
+
+```
+HTTP Request llega
+    → Gin crea un context con timeout de 30s
+        → Se pasa al servicio: CreateUser(ctx, ...)
+            → Se pasa al repositorio: Create(ctx, ...)
+                → Se pasa a GORM: db.WithContext(ctx).Create(...)
+                    → Si el usuario cierra el navegador,
+                      ctx se cancela y la query de BD se aborta.
+```
+
+Sin context, si un usuario cierra la pestaña, el servidor seguiría ejecutando la query en la BD para nada — desperdiciando recursos.
+
+**Reglas de uso de `context.Context` en Go:**
+1. Siempre va como **primer parámetro** de la función.
+2. **Nunca** se almacena en un struct.
+3. **Nunca** se pasa `nil` — si no tienes uno, usa `context.TODO()` o `context.Background()`.
+
+**La prueba de que no rompe la pureza del dominio:** si cambias de PostgreSQL a MongoDB, ¿sigue necesitando `context.Context`? Sí. ¿Y si cambias a una API externa? Sí. El contexto no depende de ninguna implementación concreta — es transversal.
 
 ### ¿Por qué `GetByEmail`?
 
@@ -294,6 +327,91 @@ type UserService interface {
 ```
 
 Esto te ahorra el problema de "¿el usuario envió vacío a propósito o simplemente no envió el campo?".
+
+### 💡 Consejo: cuando los parámetros crecen, usa un Command
+
+Con 2 parámetros (`name`, `email`), primitivos directos es lo ideal. Pero si mañana el usuario tiene 6+ campos (phone, address, country, bio...), la firma se vuelve inmanejable:
+
+```go
+// ❌ Demasiados parámetros — difícil de leer, fácil de confundir el orden
+CreateUser(ctx context.Context, name, email, phone, address, country, bio string) (...)
+```
+
+La solución es crear un **Command** (un struct de aplicación, sin tags de framework):
+
+```go
+// internal/application/ports/user_service.go
+
+type CreateUserCommand struct {
+	Name    string
+	Email   string
+	Phone   string
+	Address string
+	Country string
+	Bio     string
+}
+
+type UpdateUserCommand struct {
+	Name    *string
+	Email   *string
+	Phone   *string
+	Address *string
+}
+
+type UserService interface {
+	CreateUser(ctx context.Context, cmd CreateUserCommand) (*entities.User, error)
+	UpdateUser(ctx context.Context, id uuid.UUID, cmd UpdateUserCommand) (*entities.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+}
+```
+
+**Regla práctica:**
+
+| Parámetros | Recomendación |
+|-----------|---------------|
+| 2-3 | ✅ Primitivos directos. Claro y simple. |
+| 4-5 | ⚠️ Empieza a ser incómodo. Considera agrupar. |
+| 6+ | ❌ Definitivamente usa un Command struct. |
+
+**Detalles importantes del Command:**
+- **Sin tags `json:`** — no es un DTO de HTTP, no conoce cómo llegan los datos.
+- **Sin `ID`, sin `CreatedAt`** — solo contiene lo que el *cliente* envía, no lo que el sistema genera.
+- **`*string` en Update** — mantiene el patrón de partial updates.
+- **`GetUserByID` sigue con primitivo** — un solo `uuid.UUID` no necesita struct.
+
+**¿Por qué NO pasar directamente el DTO de HTTP al servicio?**
+
+```go
+// ❌ MAL — el servicio depende de una estructura con tags json:
+func CreateUser(ctx context.Context, req CreateUserRequest) ...
+
+// ✅ BIEN — el servicio tiene su propio Command sin conocer HTTP
+func CreateUser(ctx context.Context, cmd CreateUserCommand) ...
+```
+
+Si mañana creas un CLI o un consumidor de mensajes, pueden construir el mismo `CreateUserCommand` sin saber nada de JSON ni de HTTP.
+
+**El handler simplemente traduce:**
+
+```go
+func (h *UserHandler) CreateUser(c *gin.Context) {
+	var req CreateUserRequest  // DTO HTTP (con tags json:)
+	if err := c.ShouldBindJSON(&req); err != nil { ... }
+
+	// HTTP DTO → Application Command
+	cmd := ports.CreateUserCommand{
+		Name:    req.Name,
+		Email:   req.Email,
+		Phone:   req.Phone,
+		Address: req.Address,
+	}
+
+	user, err := h.userService.CreateUser(c.Request.Context(), cmd)
+	// ...
+}
+```
+
+**Para este proyecto ahora:** con solo `name` y `email`, 2 primitivos es perfecto. Cuando añadas más campos, refactoriza a Command. El cambio es mecánico y no afecta al dominio ni a la infraestructura.
 
 ---
 

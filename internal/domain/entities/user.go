@@ -22,7 +22,7 @@ type User struct {
 
 // NewUser is the only way to create a valid User.
 // It validates all business rules and returns an error if any fail.
-func NewUser(name string, email string) (*User, error) {
+func NewUser(name, email string) (*User, error) {
 	if name == "" {
 		return nil, ErrEmptyUserName
 	}
