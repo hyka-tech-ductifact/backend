@@ -152,3 +152,4 @@ deps:
 	go mod download
 	@echo "Installing dev tools..."
 	go install github.com/air-verse/air@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

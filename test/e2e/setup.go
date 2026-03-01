@@ -53,7 +53,7 @@ func setupDockerEnvironment(t *testing.T) *TestEnvironment {
 func setupLocalEnvironment(t *testing.T) *TestEnvironment {
 	// For local development, assume services are running on default ports
 	apiBaseURL := "http://localhost:8080"
-	
+
 	// Wait for API to be ready
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
