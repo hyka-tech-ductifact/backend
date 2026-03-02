@@ -47,9 +47,10 @@ func NewPostgresConnection() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	err = db.AutoMigrate(&EventModel{})
-	if err != nil {
-		log.Printf("Failed to migrate database: %v", err)
+	if os.Getenv("AUTO_MIGRATE") == "true" {
+		if err := db.AutoMigrate(&EventModel{}, &UserModel{}); err != nil {
+			log.Printf("Failed to migrate database: %v", err)
+		}
 	}
 
 	return db, nil

@@ -8,7 +8,7 @@ import (
 
 // SetupRoutes configures the HTTP router.
 // It receives the inbound port (EventService interface), not a concrete implementation.
-func SetupRoutes(eventService ports.EventService) *gin.Engine {
+func SetupRoutes(eventService ports.EventService, userService ports.UserService) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
@@ -21,6 +21,15 @@ func SetupRoutes(eventService ports.EventService) *gin.Engine {
 	{
 		eventRoutes.POST("", eventHandler.CreateEvent)
 		eventRoutes.GET("/:id", eventHandler.GetEvent)
+	}
+
+	// User routes
+	userHandler := NewUserHandler(userService)
+	userRoutes := r.Group("/users")
+	{
+		userRoutes.POST("", userHandler.CreateUser)
+		userRoutes.GET("/:id", userHandler.GetUser)
+		userRoutes.PUT("/:id", userHandler.UpdateUser)
 	}
 
 	return r

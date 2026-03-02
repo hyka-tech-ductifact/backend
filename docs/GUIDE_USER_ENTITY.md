@@ -677,6 +677,34 @@ UserModel         → cómo se guarda en PostgreSQL (con tags de GORM)
 
 El mapper traduce entre los dos mundos. Si mañana cambias de GORM a sqlx, solo tocas este archivo.
 
+### 💡 Consejo: ¿por qué `toUserEntity` no usa `NewUser()` para validar?
+
+Fíjate que el mapper construye la entidad directamente (`&entities.User{...}`) en vez de usar el constructor `NewUser()`. ¿No es peligroso saltarse la validación?
+
+**No**, porque esos datos **ya fueron validados por `NewUser()` cuando se guardaron.** El flujo completo es:
+
+```
+Crear:  Handler → Service → NewUser() ← VALIDA → repo.Create() → BD
+Leer:   BD → repo.GetByID() → toUserEntity() → Service → Handler
+                                ↑
+                         Los datos ya son válidos
+```
+
+Además, `NewUser()` genera un nuevo `uuid` y nuevos timestamps — no queremos eso al leer de la BD, queremos los valores originales.
+
+**La protección real contra datos corruptos va en la BD, no en el mapper:**
+
+```sql
+CREATE TABLE users (
+    name  VARCHAR(255) NOT NULL CHECK (length(name) > 0),
+    email VARCHAR(255) NOT NULL UNIQUE
+);
+```
+
+Con constraints en la BD, es **físicamente imposible** que existan datos inválidos, sin importar quién escriba (la app, un script, un DBA).
+
+**Si algún día descubres datos corruptos en la BD** (por ejemplo, un bug en producción que se saltó validaciones), la solución es un script de migración o una herramienta en `cmd/tools/`, no un mapper defensivo permanente.
+
 ---
 
 ## Paso 7 — Adaptador de entrada (HTTP handler)
