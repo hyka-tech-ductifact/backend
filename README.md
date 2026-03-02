@@ -132,11 +132,9 @@ make prod-stop     # stop all services
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
-| POST | `/events` | Create event |
-| GET | `/events/:id` | Get event by ID |
-| GET | `/events` | List events |
-| PUT | `/events/:id` | Update event |
-| DELETE | `/events/:id` | Delete event |
+| POST | `/users` | Create user |
+| GET | `/users/:id` | Get user by ID |
+| PUT | `/users/:id` | Update user |
 
 See `test/api.http` for request examples.
 

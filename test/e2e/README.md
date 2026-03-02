@@ -20,7 +20,7 @@ E2E tests verify that the entire system works together as a complete unit, testi
 ### 1. **Complete User Workflows**
 - Test multi-step user scenarios
 - Verify data flows through the entire system
-- Example: Creating multiple events and verifying they're all accessible
+- Example: Creating multiple users and verifying they're all accessible
 
 ### 2. **System Health & Recovery**
 - Test system resilience
@@ -30,7 +30,7 @@ E2E tests verify that the entire system works together as a complete unit, testi
 ### 3. **Data Consistency**
 - Verify data integrity across operations
 - Test that data remains consistent over time
-- Example: Retrieving the same event multiple times
+- Example: Retrieving the same user multiple times
 
 ## When to Use E2E Tests
 
@@ -68,7 +68,6 @@ make test-e2e
 ```
 test/e2e/
 ├── setup.go              # Test environment setup
-├── event_e2e_test.go     # Event-related E2E tests
 └── README.md             # This file
 ```
 
@@ -82,13 +81,13 @@ test/e2e/
 
 ## Example: Integration vs E2E Test
 
-### Integration Test (test/integration/event_test.go)
+### Integration Test (test/integration/)
 ```go
-func TestCreateEvent_Success(t *testing.T) {
+func TestCreateUser_Success(t *testing.T) {
     router := helpers.SetupTestRouter(t)  // In-memory router
     
     // Test single API call
-    req, _ := http.NewRequest("POST", "/events", bytes.NewBuffer(jsonBody))
+    req, _ := http.NewRequest("POST", "/users", bytes.NewBuffer(jsonBody))
     w := httptest.NewRecorder()
     router.ServeHTTP(w, req)  // In-memory HTTP
     
@@ -96,17 +95,17 @@ func TestCreateEvent_Success(t *testing.T) {
 }
 ```
 
-### E2E Test (test/e2e/event_e2e_test.go)
+### E2E Test (test/e2e/)
 ```go
-func TestEventE2E_CompleteUserWorkflow(t *testing.T) {
+func TestUserE2E_CompleteWorkflow(t *testing.T) {
     env := SetupTestEnvironment(t)  // Real running services
     
     // Test complete workflow
-    // 1. Create multiple events
+    // 1. Create multiple users
     // 2. Verify all are accessible
     // 3. Test system resilience
     
-    resp, err := http.Post(env.APIBaseURL+"/events", ...)  // Real HTTP
+    resp, err := http.Post(env.APIBaseURL+"/users", ...)  // Real HTTP
     // ... complete scenario testing
 }
 ```

@@ -1,6 +1,6 @@
 # Testing Guide
 
-This directory contains comprehensive tests for the Event Service application, organized in a centralized structure for better maintainability and clarity.
+This directory contains comprehensive tests for the Ductifact backend application, organized in a centralized structure for better maintainability and clarity.
 
 ## Test Structure
 
@@ -9,14 +9,9 @@ test/
 ├── README.md                    # This file
 ├── api.http                     # HTTP API test suite
 ├── unit/                        # Unit tests (no dependencies)
-│   └── domain/
-│       └── entities/
-│           └── event_test.go
 ├── integration/                 # Integration tests (requires DB)
-│   └── event_test.go
 ├── e2e/                         # E2E tests (requires DB + running server)
 │   ├── setup.go
-│   ├── event_e2e_test.go
 │   └── README.md
 └── helpers/                     # Shared test utilities
     ├── test_config.go
@@ -152,7 +147,7 @@ jobs:
 GIN_MODE=debug go test -v ./test/integration/...
 
 # Run single test with verbose output
-go test -v -run TestCreateEvent_Success ./test/integration/...
+go test -v -run TestCreateUser_Success ./test/integration/...
 ```
 
 ## Contributing

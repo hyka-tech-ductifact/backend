@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"event-service/internal/domain/entities"
+	"ductifact/internal/domain/entities"
 
 	"github.com/google/uuid"
 )

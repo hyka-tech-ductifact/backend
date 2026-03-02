@@ -1,8 +1,8 @@
-# Backend Development Learning Guide - Event Service
+# Backend Development Learning Guide - Ductifact
 
 ## 🎯 Project Purpose
 
-This **Event Service** is a learning project designed to understand and practice **backend development in Go** using **Hexagonal Architecture** (Ports & Adapters). The project focuses on creating a robust, maintainable, and testable backend service for managing football events.
+This **Ductifact** backend is a learning project designed to understand and practice **backend development in Go** using **Hexagonal Architecture** (Ports & Adapters). The project focuses on creating a robust, maintainable, and testable backend service.
 
 ### Learning Objectives
 - Master Go programming for backend development
@@ -108,29 +108,28 @@ backend/
 ├── internal/
 │   ├── domain/                              # 🔵 THE CORE — pure business logic
 │   │   ├── entities/
-│   │   │   ├── event.go                     #   Domain entity
 │   │   │   └── user.go                      #   Domain entity
 │   │   ├── repositories/
-│   │   │   └── event_repository.go          #   OUTBOUND PORT (interface)
+│   │   │   └── user_repository.go           #   OUTBOUND PORT (interface)
 │   │   └── valueobjects/
 │   │       └── email.go                     #   Value Object
 │   │
 │   ├── application/                         # 🟢 APPLICATION — orchestration
 │   │   ├── ports/
-│   │   │   └── event_service.go             #   INBOUND PORT (interface)
+│   │   │   └── user_service.go              #   INBOUND PORT (interface)
 │   │   └── services/
-│   │       └── event_service.go             #   Service (implements inbound port)
+│   │       └── user_service.go              #   Service (implements inbound port)
 │   │
 │   └── infrastructure/                      # 🟠 ADAPTERS — connect to the real world
 │       └── adapters/
 │           ├── inbound/
 │           │   └── http/
-│           │       ├── event_handler.go      #   INBOUND ADAPTER (HTTP → Service)
+│           │       ├── user_handler.go       #   INBOUND ADAPTER (HTTP → Service)
 │           │       └── router.go             #   HTTP routing configuration
 │           └── outbound/
 │               └── persistence/
 │                   ├── connection.go          #   Database connection setup
-│                   └── postgres_event_repo.go #   OUTBOUND ADAPTER (Service → PostgreSQL)
+│                   └── postgres_user_repo.go  #   OUTBOUND ADAPTER (Service → PostgreSQL)
 │
 ├── test/                                     # Tests organized by type
 │   ├── unit/
@@ -154,35 +153,40 @@ backend/
 
 #### 1.1 Entities (`domain/entities/`)
 
-An entity is a **business object with identity**. Two events are different even if they have the same title — because they have different IDs.
+An entity is a **business object with identity**. Two users are different even if they have the same name — because they have different IDs.
 
 ```go
-// domain/entities/event.go
-type Event struct {
-    ID          uuid.UUID
-    Title       string
-    Description string
-    Location    string
-    StartTime   time.Time
-    EndTime     time.Time
-    OrganizerID uuid.UUID
-    CreatedAt   time.Time
-    UpdatedAt   time.Time
+// domain/entities/user.go
+type User struct {
+    ID        uuid.UUID
+    Name      string
+    Email     valueobjects.Email
+    CreatedAt time.Time
+    UpdatedAt time.Time
 }
 
-func NewEvent(title, description, location string, ...) *Event {
-    return &Event{
-        ID:    uuid.New(),     // business rule: every event gets a unique ID
-        Title: title,
-        // ...
+func NewUser(name, email string) (*User, error) {
+    if name == "" {
+        return nil, ErrEmptyUserName
     }
+    emailVO, err := valueobjects.NewEmail(email)
+    if err != nil {
+        return nil, err
+    }
+    return &User{
+        ID:    uuid.New(),
+        Name:  name,
+        Email: *emailVO,
+        // ...
+    }, nil
 }
 ```
 
 **Key points:**
 - Entities contain **business rules** (validation, state transitions)
 - They are framework-agnostic: no `json:` tags, no `gorm:` tags here
-- The constructor `NewEvent()` ensures you can never create an invalid entity
+- The constructor `NewUser()` ensures you can never create an invalid entity
+- If creation can fail (validations), Go idiom requires returning `error`
 
 #### 1.2 Value Objects (`domain/valueobjects/`)
 
@@ -212,23 +216,22 @@ func NewEmail(email string) (*Email, error) {
 This is where the **outbound port** pattern lives. The domain declares *what it needs* (an interface), without knowing *how* it's implemented.
 
 ```go
-// domain/repositories/event_repository.go
-type EventRepository interface {
-    Create(ctx context.Context, event *entities.Event) error
-    GetByID(ctx context.Context, id uuid.UUID) (*entities.Event, error)
-    Update(ctx context.Context, event *entities.Event) error
-    Delete(ctx context.Context, id uuid.UUID) error
-    List(ctx context.Context, limit, offset int) ([]*entities.Event, error)
+// domain/repositories/user_repository.go
+type UserRepository interface {
+    Create(ctx context.Context, user *entities.User) error
+    GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+    GetByEmail(ctx context.Context, email string) (*entities.User, error)
+    Update(ctx context.Context, user *entities.User) error
 }
 ```
 
 **Key points:**
 - This is a **port**: a contract/interface that defines what the domain needs
-- The domain says "I need something that can save and retrieve events" — it doesn't care if it's PostgreSQL, MongoDB, or an in-memory map
+- The domain says "I need something that can save and retrieve users" — it doesn't care if it's PostgreSQL, MongoDB, or an in-memory map
 - The interface lives in the domain because the **domain owns the contract**
 - This enables **Dependency Inversion**: high-level business logic doesn't depend on low-level database details
 
-> **Why is it called an "outbound port"?** Because data flows *outward* from the application core toward the external system (database). The application says "save this event" and the data goes *out* to PostgreSQL.
+> **Why is it called an "outbound port"?** Because data flows *outward* from the application core toward the external system (database). The application says "save this user" and the data goes *out* to PostgreSQL.
 
 ---
 
@@ -243,10 +246,11 @@ type EventRepository interface {
 The inbound port is the **interface that defines what the application can do**. Inbound adapters (HTTP handlers, gRPC, CLI) depend on this interface.
 
 ```go
-// application/ports/event_service.go
-type EventService interface {
-    CreateEvent(ctx context.Context, event *entities.Event) (*entities.Event, error)
-    GetEventByID(ctx context.Context, id uuid.UUID) (*entities.Event, error)
+// application/ports/user_service.go
+type UserService interface {
+    CreateUser(ctx context.Context, name, email string) (*entities.User, error)
+    GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
+    UpdateUser(ctx context.Context, id uuid.UUID, name, email *string) (*entities.User, error)
 }
 ```
 
@@ -254,7 +258,7 @@ type EventService interface {
 - Defines the **application's capabilities** as an interface
 - Inbound adapters depend on this port, not on the concrete service
 - This means you can swap the implementation (e.g., for testing) without changing the adapters
-- Works with domain entities (`*entities.Event`), not HTTP request/response objects
+- Works with domain entities (`*entities.User`), not HTTP request/response objects
 
 > **Why is it called an "inbound port"?** Because requests flow *inward* from the outside world into the application core. An HTTP request comes *in* through this port.
 
@@ -263,35 +267,36 @@ type EventService interface {
 The service **implements the inbound port**. It orchestrates the domain layer and outbound ports to fulfill business operations.
 
 ```go
-// application/services/event_service.go
-type eventService struct {
-    eventRepo repositories.EventRepository  // depends on outbound PORT, not on PostgreSQL
+// application/services/user_service.go
+type userService struct {
+    userRepo repositories.UserRepository  // depends on outbound PORT, not on PostgreSQL
 }
 
-func NewEventService(eventRepo repositories.EventRepository) *eventService {
-    return &eventService{eventRepo: eventRepo}
+func NewUserService(userRepo repositories.UserRepository) *userService {
+    return &userService{userRepo: userRepo}
 }
 
-func (s *eventService) CreateEvent(ctx context.Context, event *entities.Event) (*entities.Event, error) {
-    // Business rule validation
-    if event.EndTime.Before(event.StartTime) {
-        return nil, ErrInvalidEventDuration
-    }
-    // Delegate to outbound port
-    err := s.eventRepo.Create(ctx, event)
+func (s *userService) CreateUser(ctx context.Context, name, email string) (*entities.User, error) {
+    // Create domain entity (validates business rules)
+    user, err := entities.NewUser(name, email)
     if err != nil {
         return nil, err
     }
-    return event, nil
+    // Delegate to outbound port
+    err = s.userRepo.Create(ctx, user)
+    if err != nil {
+        return nil, err
+    }
+    return user, nil
 }
 ```
 
 **Key points:**
-- Implements `ports.EventService` (the inbound port)
-- Depends on `repositories.EventRepository` (the outbound port) — **never** on `PostgresEventRepository`
+- Implements `ports.UserService` (the inbound port)
+- Depends on `repositories.UserRepository` (the outbound port) — **never** on `PostgresUserRepository`
 - Contains **application-level** business rules (validation, orchestration)
-- The struct is **unexported** (`eventService`, not `EventService`) — the outside world interacts through the port interface, enforcing the contract
-- Constructor `NewEventService()` receives interfaces, enabling dependency injection
+- The struct is **unexported** (`userService`, not `UserService`) — the outside world interacts through the port interface, enforcing the contract
+- Constructor `NewUserService()` receives interfaces, enabling dependency injection
 
 ---
 
@@ -306,90 +311,82 @@ func (s *eventService) CreateEvent(ctx context.Context, event *entities.Event) (
 Inbound adapters **receive external requests and translate them** into calls to the inbound port. They are the "driving" side — they drive the application.
 
 ```go
-// infrastructure/adapters/inbound/http/event_handler.go
+// infrastructure/adapters/inbound/http/user_handler.go
 
 // HTTP-specific DTOs — these belong HERE, not in domain or application
-type CreateEventRequest struct {
-    Title       string    `json:"title" binding:"required"`
-    Description string    `json:"description"`
-    Location    string    `json:"location" binding:"required"`
-    StartTime   time.Time `json:"start_time" binding:"required"`
-    EndTime     time.Time `json:"end_time" binding:"required"`
-    OrganizerID uuid.UUID `json:"organizer_id" binding:"required"`
+type CreateUserRequest struct {
+    Name  string `json:"name" binding:"required"`
+    Email string `json:"email" binding:"required,email"`
 }
 
-type EventResponse struct {
-    ID          uuid.UUID `json:"id"`
-    Title       string    `json:"title"`
-    // ...
+type UserResponse struct {
+    ID    string `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
 }
 
-type EventHandler struct {
-    eventService ports.EventService  // depends on INBOUND PORT, not concrete service
+type UserHandler struct {
+    userService ports.UserService  // depends on INBOUND PORT, not concrete service
 }
 
-func (h *EventHandler) CreateEvent(c *gin.Context) {
+func (h *UserHandler) CreateUser(c *gin.Context) {
     // 1. Parse HTTP request (external format)
-    var req CreateEventRequest
+    var req CreateUserRequest
     c.ShouldBindJSON(&req)
 
-    // 2. Translate to domain entity
-    event := entities.NewEvent(req.Title, req.Description, ...)
+    // 2. Call inbound port (passes primitives, NOT domain entities)
+    created, err := h.userService.CreateUser(c.Request.Context(), req.Name, req.Email)
 
-    // 3. Call inbound port
-    created, err := h.eventService.CreateEvent(c.Request.Context(), event)
-
-    // 4. Translate domain entity to HTTP response (external format)
-    c.JSON(http.StatusCreated, toEventResponse(created))
+    // 3. Translate domain entity to HTTP response (external format)
+    c.JSON(http.StatusCreated, toUserResponse(created))
 }
 ```
 
 **Key points:**
-- DTOs (`CreateEventRequest`, `EventResponse`) live **here**, not in domain or application — they are HTTP-specific concerns with `json:` and `binding:` tags
-- Depends on `ports.EventService` (the inbound port interface), NOT on `*services.eventService`
+- DTOs (`CreateUserRequest`, `UserResponse`) live **here**, not in domain or application — they are HTTP-specific concerns with `json:` and `binding:` tags
+- Depends on `ports.UserService` (the inbound port interface), NOT on `*services.userService`
 - Handles HTTP-specific concerns: status codes, JSON parsing, error formatting
 - Translates between the HTTP world and the domain world
 - Does NOT contain business logic — only translation and delegation
+- Passes **primitives** to the service, not domain entities
 
 #### 3.2 Outbound Adapters (`adapters/outbound/persistence/`)
 
 Outbound adapters **implement the outbound ports** defined in the domain. They translate between domain objects and external system formats (SQL rows, API calls, etc.).
 
 ```go
-// infrastructure/adapters/outbound/persistence/postgres_event_repository.go
+// infrastructure/adapters/outbound/persistence/postgres_user_repository.go
 
 // Database-specific model — lives HERE, not in domain
-type EventModel struct {
-    ID          uuid.UUID `gorm:"type:uuid;primary_key"`
-    Title       string    `gorm:"not null"`
-    // ...
+type UserModel struct {
+    ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+    Name      string    `gorm:"not null"`
+    Email     string    `gorm:"uniqueIndex;not null"`
+    CreatedAt time.Time
+    UpdatedAt time.Time
 }
 
-type PostgresEventRepository struct {
+type PostgresUserRepository struct {
     db *gorm.DB
 }
 
-func (r *PostgresEventRepository) Create(ctx context.Context, event *entities.Event) error {
+func (r *PostgresUserRepository) Create(ctx context.Context, user *entities.User) error {
     // Translate domain entity → database model
-    model := &EventModel{
-        ID:    event.ID,
-        Title: event.Title,
-        // ...
-    }
+    model := toUserModel(user)
     return r.db.WithContext(ctx).Create(model).Error
 }
 
-func (r *PostgresEventRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.Event, error) {
-    var model EventModel
+func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+    var model UserModel
     r.db.WithContext(ctx).Where("id = ?", id).First(&model)
     // Translate database model → domain entity
-    return r.toDomainEntity(&model), nil
+    return toUserEntity(&model), nil
 }
 ```
 
 **Key points:**
-- **Implements** `repositories.EventRepository` (the outbound port defined in the domain)
-- Database model (`EventModel`) with GORM tags lives **here**, not in domain — it's a persistence concern
+- **Implements** `repositories.UserRepository` (the outbound port defined in the domain)
+- Database model (`UserModel`) with GORM tags lives **here**, not in domain — it's a persistence concern
 - Translates between domain entities and database models in both directions
 - Contains ALL database-specific code (SQL, GORM queries, connection handling)
 - If you switch from PostgreSQL to MongoDB, you only change this adapter — nothing else changes
@@ -404,13 +401,13 @@ func (r *PostgresEventRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 func main() {
     // 1. Create outbound adapter (PostgreSQL)
     db, _ := persistence.NewPostgresConnection()
-    eventRepo := persistence.NewPostgresEventRepository(db)
+    userRepo := persistence.NewPostgresUserRepository(db)
 
     // 2. Create application service, injecting the outbound port
-    eventService := services.NewEventService(eventRepo)
+    userService := services.NewUserService(userRepo)
 
     // 3. Create inbound adapter (HTTP), injecting the inbound port
-    router := httpAdapter.SetupRoutes(eventService)
+    router := httpAdapter.SetupRoutes(userService)
 
     // 4. Start
     router.Run(":8080")
@@ -439,20 +436,20 @@ func main() {
 │            ▼                           │                                 │
 │   ┌─────────────────┐         ┌───────┴──────────┐                      │
 │   │  Inbound Port   │         │  Outbound Port   │                      │
-│   │  (EventService  │         │  (EventRepository│                      │
+│   │  (UserService  │         │  (UserRepository│                      │
 │   │   interface)    │         │   interface)      │                      │
 │   └────────▲────────┘         └────────▲─────────┘                      │
 │            │ implements                │ depends on                      │
 │            │                           │                                 │
 │   ┌────────┴─────────────────────────┬─┘                                │
 │   │       Application Service        │                                  │
-│   │       (eventService struct)      │                                  │
+│   │       (userService struct)       │                                  │
 │   └──────────────┬───────────────────┘                                  │
 │                  │ uses                                                  │
 │                  ▼                                                       │
 │   ┌──────────────────────────────────┐                                  │
 │   │         Domain Entities          │                                  │
-│   │     (Event, User, Email VO)      │                                  │
+│   │     (User, Email VO)                │                                  │
 │   └──────────────────────────────────┘                                  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -478,30 +475,30 @@ func main() {
 ### Data flow for a CREATE request
 
 ```
-HTTP POST /events
+HTTP POST /users
     │
     ▼
-[1] Inbound Adapter (EventHandler.CreateEvent)
-    │   - Parses JSON → CreateEventRequest (DTO)
-    │   - Translates DTO → entities.Event (domain entity)
+[1] Inbound Adapter (UserHandler.CreateUser)
+    │   - Parses JSON → CreateUserRequest (DTO)
+    │   - Passes primitives (name, email) to the inbound port
     │
     ▼
-[2] Inbound Port (ports.EventService interface)
-    │   - Handler calls eventService.CreateEvent(event)
+[2] Inbound Port (ports.UserService interface)
+    │   - Handler calls userService.CreateUser(name, email)
     │
     ▼
-[3] Application Service (services.eventService)
-    │   - Validates business rules (end > start)
-    │   - Calls outbound port: eventRepo.Create(event)
+[3] Application Service (services.userService)
+    │   - Creates domain entity via entities.NewUser()
+    │   - Calls outbound port: userRepo.Create(user)
     │
     ▼
-[4] Outbound Port (repositories.EventRepository interface)
-    │   - Service calls repo.Create(event)
+[4] Outbound Port (repositories.UserRepository interface)
+    │   - Service calls repo.Create(user)
     │
     ▼
-[5] Outbound Adapter (PostgresEventRepository)
-    │   - Translates entities.Event → EventModel (DB model)
-    │   - Executes INSERT INTO events ...
+[5] Outbound Adapter (PostgresUserRepository)
+    │   - Translates entities.User → UserModel (DB model)
+    │   - Executes INSERT INTO users ...
     │
     ▼
 [6] PostgreSQL Database
@@ -510,13 +507,13 @@ HTTP POST /events
     │
 [5] Outbound Adapter: returns nil (no error)
 [4] Outbound Port: returns nil
-[3] Service: returns *entities.Event
-[2] Inbound Port: returns *entities.Event
-[1] Inbound Adapter: translates entities.Event → EventResponse (DTO)
+[3] Service: returns *entities.User
+[2] Inbound Port: returns *entities.User
+[1] Inbound Adapter: translates entities.User → UserResponse (DTO)
     │   - Writes JSON response with 201 Created
     │
     ▼
-HTTP Response { "id": "...", "title": "..." }
+HTTP Response { "id": "...", "name": "...", "email": "..." }
 ```
 
 ---
@@ -529,17 +526,17 @@ The port/adapter pattern makes testing natural:
 Mock the outbound ports:
 
 ```go
-// Create a mock that implements EventRepository (outbound port)
-type mockEventRepo struct {}
-func (m *mockEventRepo) Create(ctx context.Context, event *entities.Event) error {
+// Create a mock that implements UserRepository (outbound port)
+type mockUserRepo struct {}
+func (m *mockUserRepo) Create(ctx context.Context, user *entities.User) error {
     return nil // simulate success
 }
+// ... other interface methods
 
 // Test the service in isolation
-func TestCreateEvent(t *testing.T) {
-    service := services.NewEventService(&mockEventRepo{})
-    event := entities.NewEvent("Test", ...)
-    result, err := service.CreateEvent(context.Background(), event)
+func TestCreateUser(t *testing.T) {
+    service := services.NewUserService(&mockUserRepo{})
+    result, err := service.CreateUser(context.Background(), "John", "john@example.com")
     assert.NoError(t, err)
 }
 ```
@@ -548,10 +545,10 @@ func TestCreateEvent(t *testing.T) {
 Use the real outbound adapter with a test database:
 
 ```go
-func TestCreateEvent_Integration(t *testing.T) {
+func TestCreateUser_Integration(t *testing.T) {
     db := setupTestDB(t)
-    repo := persistence.NewPostgresEventRepository(db)
-    service := services.NewEventService(repo)
+    repo := persistence.NewPostgresUserRepository(db)
+    service := services.NewUserService(repo)
     router := httpAdapter.SetupRoutes(service)
     // test with httptest
 }
@@ -591,17 +588,17 @@ Hit the real HTTP server running with real database.
 
 **Structs and Methods** ✅
 - **What I learned**: How to define business entities using structs and attach behavior with methods
-- **Implementation**: Created `Event` struct with fields for football events and `NewEvent()` constructor
+- **Implementation**: Created `User` struct with domain validation and `NewUser()` constructor
 - **Key insight**: Struct constructors ensure valid object creation and encapsulate business rules
 
 **Interfaces** ✅
 - **What I learned**: Interfaces define contracts for behavior without implementation details
-- **Implementation**: `EventRepository` (outbound port) and `EventService` (inbound port)
+- **Implementation**: `UserRepository` (outbound port) and `UserService` (inbound port)
 - **Key insight**: Interfaces enable the port/adapter pattern — the foundation of hexagonal architecture
 
 **Error Handling** ✅
 - **What I learned**: Go's explicit error handling and proper error propagation patterns
-- **Implementation**: Custom errors like `ErrInvalidEventDuration` in the service layer
+- **Implementation**: Custom errors like `ErrUserNotFound`, `ErrEmailAlreadyInUse` in the service layer
 - **Key insight**: Errors should be handled at appropriate layers and provide meaningful context
 
 **JSON Handling** ✅
@@ -618,13 +615,13 @@ Hit the real HTTP server running with real database.
 
 **RESTful API Design** ✅
 - **What I learned**: REST principles, resource modeling, and HTTP semantics
-- **Implementation**: `POST /events` for creation, `GET /events/:id` for retrieval
+- **Implementation**: `POST /users` for creation, `GET /users/:id` for retrieval, `PUT /users/:id` for update
 - **Key insight**: HTTP concerns (status codes, JSON) stay in the inbound adapter
 
 **Database Integration** ✅
 - **What I learned**: ORM usage, model mapping, and the repository pattern
 - **Implementation**: GORM with PostgreSQL in the outbound persistence adapter
-- **Key insight**: Database models (`EventModel`) are separate from domain entities (`Event`) — they live in different layers
+- **Key insight**: Database models (`UserModel`) are separate from domain entities (`User`) — they live in different layers
 
 **Dependency Injection** ✅
 - **What I learned**: Manual DI for loose coupling and testability
@@ -635,12 +632,12 @@ Hit the real HTTP server running with real database.
 
 **Ports and Adapters** ✅
 - **What I learned**: Ports are interfaces that define boundaries. Adapters are implementations that connect to the real world
-- **Implementation**: `EventService` (inbound port), `EventRepository` (outbound port), `EventHandler` (inbound adapter), `PostgresEventRepository` (outbound adapter)
+- **Implementation**: `UserService` (inbound port), `UserRepository` (outbound port), `UserHandler` (inbound adapter), `PostgresUserRepository` (outbound adapter)
 - **Key insight**: The direction of the port determines its type. Inbound = outside drives your app. Outbound = your app drives the outside.
 
 **Dependency Inversion** ✅
 - **What I learned**: High-level modules don't depend on low-level modules. Both depend on abstractions.
-- **Implementation**: The service depends on `repositories.EventRepository` interface, not on `PostgresEventRepository`
+- **Implementation**: The service depends on `repositories.UserRepository` interface, not on `PostgresUserRepository`
 - **Key insight**: The interface belongs to the layer that *needs* it (the domain owns the repository interface, the application owns the service interface)
 
 **Layer Isolation** ✅
@@ -682,4 +679,4 @@ When in doubt about where code belongs, ask:
 
 ## 🤝 Contributing to Learning
 
-This document serves as both a learning guide and project documentation. As new features are added and concepts are learned, this guide will be updated to reflect new patterns and insights discovered while building this event service with Hexagonal Architecture.
+This document serves as both a learning guide and project documentation. As new features are added and concepts are learned, this guide will be updated to reflect new patterns and insights discovered while building this project with Hexagonal Architecture.

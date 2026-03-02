@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"event-service/internal/application/services"
-	httpAdapter "event-service/internal/infrastructure/adapters/inbound/http"
-	"event-service/internal/infrastructure/adapters/outbound/persistence"
+	"ductifact/internal/application/services"
+	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
+	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 )
 
 func main() {

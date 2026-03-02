@@ -329,10 +329,10 @@ This checklist provides a structured learning path for mastering backend develop
 ### 🔄 Learning Approach
 - Follow the phases in order for optimal learning progression
 - Practice each concept with hands-on coding
-- Implement features in the event-service to reinforce learning
+- Implement features in the ductifact to reinforce learning
 
 ### 📚 Additional Resources
-- Each topic should be practiced in the context of the event-service
+- Each topic should be practiced in the context of the ductifact
 - Use the examples.http file to test implementations
 - Refer to Go documentation and best practices
 
@@ -349,7 +349,7 @@ This checklist provides a structured learning path for mastering backend develop
 1. Start with Phase 1 if you're new to Go
 2. Skip to Phase 4 if you're comfortable with Go basics
 3. Focus on one phase at a time
-4. Implement learnings in the event-service project
+4. Implement learnings in the ductifact project
 5. Update LEARNING_GUIDE.md with summaries as you progress
 
 Remember: This is a marathon, not a sprint. Focus on understanding concepts deeply rather than rushing through topics.

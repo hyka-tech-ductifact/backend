@@ -2,7 +2,7 @@ package entities
 
 import (
 	"errors"
-	"event-service/internal/domain/valueobjects"
+	"ductifact/internal/domain/valueobjects"
 	"time"
 
 	"github.com/google/uuid"

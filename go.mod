@@ -1,4 +1,4 @@
-module event-service
+module ductifact
 
 go 1.23
 

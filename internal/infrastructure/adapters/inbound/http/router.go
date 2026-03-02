@@ -1,7 +1,7 @@
 package http
 
 import (
-	"event-service/internal/application/ports"
+	"ductifact/internal/application/ports"
 
 	"github.com/gin-gonic/gin"
 )

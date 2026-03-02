@@ -89,14 +89,14 @@ func NewUser(name, email string) (*User, error) {
 }
 ```
 
-### ¿Por qué es diferente al patrón de Event?
+### 💡 Buenas prácticas aplicadas
 
-| Aspecto | Event (actual) | User (mejorado) | Por qué |
-|---------|---------------|-----------------|---------|
-| Tags `json:` en la entidad | ✅ Tiene | ❌ No tiene | Las entidades de dominio no deben conocer el formato de serialización. Eso es responsabilidad del adaptador HTTP (DTOs). |
-| Constructor devuelve error | ❌ `*Event` | ✅ `(*User, error)` | Si la creación puede fallar (validaciones), Go exige devolver error. Un constructor que nunca falla es sospechoso. |
-| Validación en constructor | ❌ No valida nada | ✅ Valida nombre | El dominio se protege a sí mismo. No depende de que el handler o el servicio validen. |
-| Errores como variables | ❌ No define errores | ✅ `var ErrEmptyUserName` | Permite comparar con `errors.Is()` en tests y en capas superiores. |
+| Aspecto | Patrón aplicado | Por qué |
+|---------|----------------|--------|
+| Handler no crea entidades de dominio | ✅ Pasa primitivos al servicio | El handler no debería conocer la estructura interna del dominio. |
+| Manejo de errores | Usa `errors.Is()` para elegir status | 404 para no encontrado, 409 para duplicado, 500 para errores internos. |
+| DTOs usan `string` para IDs | ✅ | En el JSON de respuesta, un UUID siempre es string. Mantener consistencia. |
+| Update pasa punteros | ✅ Pasa `*string` opcionales | El handler solo transporta datos. La lógica de "qué cambió" es del servicio. |
 
 ### 💡 Consejo: ¿campos exportados o no?
 
@@ -149,7 +149,7 @@ import (
 	"errors"
 	"time"
 
-	"event-service/internal/domain/valueobjects"
+	"ductifact/internal/domain/valueobjects"
 
 	"github.com/google/uuid"
 )
@@ -218,7 +218,7 @@ package repositories
 import (
 	"context"
 
-	"event-service/internal/domain/entities"
+	"ductifact/internal/domain/entities"
 
 	"github.com/google/uuid"
 )
@@ -297,7 +297,7 @@ package ports
 import (
 	"context"
 
-	"event-service/internal/domain/entities"
+	"ductifact/internal/domain/entities"
 
 	"github.com/google/uuid"
 )
@@ -311,12 +311,12 @@ type UserService interface {
 }
 ```
 
-### ¿Por qué es diferente al patrón de Event?
+### 💡 Buenas prácticas aplicadas
 
-| Aspecto | Event (actual) | User (mejorado) | Por qué |
-|---------|---------------|-----------------|---------|
-| `CreateUser` recibe | `*entities.User` (entidad completa) | `name, email string` (primitivos) | El handler no debería construir entidades de dominio. Eso es responsabilidad del servicio. Recibir primitivos mantiene al handler ignorante del dominio. |
-| `UpdateUser` recibe | `*entities.User` (entidad completa) | `id` + punteros opcionales `*string` | Los punteros `*string` permiten distinguir "no enviado" (`nil`) de "enviado vacío" (`""`). Es el patrón estándar para *partial updates* en Go. |
+| Aspecto | Patrón aplicado | Por qué |
+|---------|----------------|--------|
+| `CreateUser` recibe | `name, email string` (primitivos) | El handler no debería construir entidades de dominio. Eso es responsabilidad del servicio. Recibir primitivos mantiene al handler ignorante del dominio. |
+| `UpdateUser` recibe | `id` + punteros opcionales `*string` | Los punteros `*string` permiten distinguir "no enviado" (`nil`) de "enviado vacío" (`""`). Es el patrón estándar para *partial updates* en Go. |
 
 ### 💡 Consejo: punteros para campos opcionales en updates
 
@@ -429,8 +429,8 @@ import (
 	"errors"
 	"time"
 
-	"event-service/internal/domain/entities"
-	"event-service/internal/domain/repositories"
+	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
 )
@@ -549,14 +549,14 @@ func (s *userService) CreateUser(ctx context.Context, ...) {
 
 La entidad **no puede** verificar unicidad porque no conoce el repositorio — y no debe conocerlo. Un `User` sabe qué *es* un usuario, no qué *otros usuarios existen*.
 
-### ¿Por qué es mejor que el patrón de Event?
+### 💡 Buenas prácticas aplicadas
 
-| Aspecto | Event (actual) | User (mejorado) | Por qué |
-|---------|---------------|-----------------|---------|
-| ¿Quién construye la entidad? | El handler HTTP | El servicio | La creación de entidades es lógica de dominio. El handler solo conoce primitivos. |
-| ¿Hay chequeo de duplicados? | ❌ No | ✅ Email único | Es una regla de negocio real. Si no lo haces en el servicio, dependes del error críptico de la BD. |
-| ¿Cómo se hace el update? | El handler hace el fetch, modifica y envía la entidad completa | El servicio recibe el ID y solo los campos que cambian | El handler no debería orquestar lógica. Eso es trabajo del servicio. |
-| Errores de aplicación | No define | `ErrEmailAlreadyInUse`, `ErrUserNotFound` | Permiten que el handler decida el HTTP status code apropiado. |
+| Aspecto | Patrón aplicado | Por qué |
+|---------|----------------|--------|
+| ¿Quién construye la entidad? | El servicio | La creación de entidades es lógica de dominio. El handler solo conoce primitivos. |
+| ¿Hay chequeo de duplicados? | ✅ Email único | Es una regla de negocio real. Si no lo haces en el servicio, dependes del error críptico de la BD. |
+| ¿Cómo se hace el update? | El servicio recibe el ID y solo los campos que cambian | El handler no debería orquestar lógica. Eso es trabajo del servicio. |
+| Errores de aplicación | `ErrEmailAlreadyInUse`, `ErrUserNotFound` | Permiten que el handler decida el HTTP status code apropiado. |
 
 ### 💡 Consejo: `NewUserService` retorna `*userService` (concreto), no la interfaz
 
@@ -577,7 +577,7 @@ import (
 	"context"
 	"time"
 
-	"event-service/internal/domain/entities"
+	"ductifact/internal/domain/entities"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -720,8 +720,8 @@ import (
 	"errors"
 	"net/http"
 
-	"event-service/internal/application/ports"
-	"event-service/internal/application/services"
+	"ductifact/internal/application/ports"
+	"ductifact/internal/application/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -837,16 +837,16 @@ func toUserResponse(user *entities.User) *UserResponse {
 }
 ```
 
-> **Nota:** Se necesita importar `"event-service/internal/domain/entities"` para el mapper `toUserResponse`.
+> **Nota:** Se necesita importar `"ductifact/internal/domain/entities"` para el mapper `toUserResponse`.
 
-### ¿Por qué es mejor que el patrón de Event?
+### 💡 Buenas prácticas aplicadas
 
-| Aspecto | Event (actual) | User (mejorado) | Por qué |
-|---------|---------------|-----------------|---------|
-| Handler crea entidad de dominio | ✅ `entities.NewEvent(...)` | ❌ Pasa primitivos al servicio | El handler no debería conocer la estructura interna del dominio. |
-| Manejo de errores | Todo devuelve 400 | Usa `errors.Is()` para elegir status | 404 para no encontrado, 409 para duplicado, 500 para errores internos. |
-| DTOs usan `uuid.UUID` | ✅ | ❌ Usa `string` | En el JSON de respuesta, un UUID siempre es string. Mantener consistencia. |
-| Update pasa punteros | ❌ Handler busca y modifica | ✅ Pasa `*string` opcionales | El handler solo transporta datos. La lógica de "qué cambió" es del servicio. |
+| Aspecto | Patrón aplicado | Por qué |
+|---------|----------------|--------|
+| Handler no crea entidades de dominio | ✅ Pasa primitivos al servicio | El handler no debería conocer la estructura interna del dominio. |
+| Manejo de errores | Usa `errors.Is()` para elegir status | 404 para no encontrado, 409 para duplicado, 500 para errores internos. |
+| DTOs usan `string` para IDs | ✅ | En el JSON de respuesta, un UUID siempre es string. Mantener consistencia. |
+| Update pasa punteros | ✅ Pasa `*string` opcionales | El handler solo transporta datos. La lógica de "qué cambió" es del servicio. |
 
 ### 💡 Consejo: `errors.Is()` para mapear errores a HTTP status
 
@@ -858,23 +858,15 @@ Este es un patrón muy limpio. Los errores de dominio/aplicación se definen com
 
 📁 `internal/infrastructure/adapters/inbound/http/router.go` (modificar)
 
-Añadir el `UserService` como parámetro y registrar las rutas:
+Registrar el `UserService` como parámetro y registrar las rutas:
 
 ```go
-func SetupRoutes(eventService ports.EventService, userService ports.UserService) *gin.Engine {
+func SetupRoutes(userService ports.UserService) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy !!!!"})
 	})
-
-	// Event routes
-	eventHandler := NewEventHandler(eventService)
-	eventRoutes := r.Group("/events")
-	{
-		eventRoutes.POST("", eventHandler.CreateEvent)
-		eventRoutes.GET("/:id", eventHandler.GetEvent)
-	}
 
 	// User routes
 	userHandler := NewUserHandler(userService)
@@ -911,16 +903,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// --- Event wiring ---
-	eventRepo := persistence.NewPostgresEventRepository(db)
-	eventService := services.NewEventService(eventRepo)
-
-	// --- User wiring (new) ---
+	// --- User wiring ---
 	userRepo := persistence.NewPostgresUserRepository(db)
 	userService := services.NewUserService(userRepo)
 
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(eventService, userService)
+	router := httpAdapter.SetupRoutes(userService)
 
 	// ...
 }

@@ -1,4 +1,4 @@
-# Event Service Makefile
+# Ductifact Backend Makefile
 
 .PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e clean db-start db-stop prod-start prod-stop prod-build fmt lint deps
 
@@ -36,17 +36,17 @@ help:
 
 # Compile binary to bin/api
 app-build:
-	@echo "Building event-service..."
+	@echo "Building ductifact..."
 	go build -o bin/api ./cmd/api
 
 # Run the application
 app-run:
-	@echo "Running event-service..."
+	@echo "Running ductifact..."
 	go run ./cmd/api
 
 # Run the application with hot reloading
 app-watch:
-	@echo "Running event-service with hot reloading..."
+	@echo "Running ductifact with hot reloading..."
 	air
 
 # Coverage flag: run with COVERAGE to generate a report (e.g. make test-unit COVERAGE)
@@ -95,7 +95,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf bin/
 	rm -f coverage.out coverage.html
-	rm -f api event-service
+	rm -f api ductifact
 	@echo "Cleaning temporary files and directories..."
 	rm -rf tmp/
 	rm -rf temp/
@@ -123,7 +123,7 @@ clean:
 # Build Docker image
 prod-build:
 	@echo "Building Docker image..."
-	docker build -t event-service .
+	docker build -t ductifact .
 
 # Start app + DB in Docker
 prod-start:

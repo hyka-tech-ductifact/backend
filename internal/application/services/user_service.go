@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"event-service/internal/domain/entities"
-	"event-service/internal/domain/repositories"
+	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
 )

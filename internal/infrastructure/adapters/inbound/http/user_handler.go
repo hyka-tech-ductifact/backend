@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"event-service/internal/application/ports"
-	"event-service/internal/application/services"
-	"event-service/internal/domain/entities"
+	"ductifact/internal/application/ports"
+	"ductifact/internal/application/services"
+	"ductifact/internal/domain/entities"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
