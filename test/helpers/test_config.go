@@ -17,7 +17,7 @@ func LoadTestEnv(t *testing.T) {
 	os.Setenv("DB_PORT", "5432")
 	os.Setenv("DB_USER", "test_user")
 	os.Setenv("DB_PASSWORD", "test_password")
-	os.Setenv("DB_NAME", "event_service_test")
+	os.Setenv("DB_NAME", "microservice_test")
 	os.Setenv("APP_PORT", "8080")
 }
 
@@ -31,6 +31,6 @@ type TestConfig struct {
 func GetTestConfig() *TestConfig {
 	return &TestConfig{
 		BaseURL: "http://localhost:8080",
-		DBURL:   "postgres://test_user:test_password@localhost:5432/event_service_test?sslmode=disable",
+		DBURL:   "postgres://test_user:test_password@localhost:5432/microservice_test?sslmode=disable",
 	}
 }

@@ -50,7 +50,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 
 	// Auto migrate the schema with production models
-	err = db.AutoMigrate(&persistence.EventModel{})
+	err = db.AutoMigrate(&persistence.UserModel{})
 	require.NoError(t, err)
 
 	return db
@@ -61,13 +61,13 @@ func SetupTestRouter(t *testing.T) *gin.Engine {
 	db := SetupTestDB(t)
 
 	// Outbound adapter
-	eventRepo := persistence.NewPostgresEventRepository(db)
+	userRepo := persistence.NewPostgresUserRepository(db)
 
 	// Application service (inbound port)
-	eventService := services.NewEventService(eventRepo)
+	userService := services.NewUserService(userRepo)
 
 	// Inbound adapter: HTTP router
-	router := httpAdapter.SetupRoutes(eventService)
+	router := httpAdapter.SetupRoutes(userService)
 
 	return router
 }

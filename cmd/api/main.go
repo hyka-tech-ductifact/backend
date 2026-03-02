@@ -18,16 +18,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// --- Event wiring ---
-	eventRepo := persistence.NewPostgresEventRepository(db)
-	eventService := services.NewEventService(eventRepo)
-
-	// --- User wiring (new) ---
+	// --- User wiring ---
 	userRepo := persistence.NewPostgresUserRepository(db)
 	userService := services.NewUserService(userRepo)
 
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(eventService, userService)
+	router := httpAdapter.SetupRoutes(userService)
 
 	// ...
 
