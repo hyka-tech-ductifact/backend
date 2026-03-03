@@ -635,7 +635,6 @@ import (
 
 // setupRepo crea el repositorio con una DB limpia para cada test.
 func setupRepo(t *testing.T) *persistence.PostgresUserRepository {
-	helpers.LoadTestEnv(t)
 	db := helpers.SetupTestDB(t)
 	helpers.CleanDB(t, db)
 	return persistence.NewPostgresUserRepository(db)

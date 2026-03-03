@@ -1,8 +1,8 @@
 package entities
 
 import (
-	"errors"
 	"ductifact/internal/domain/valueobjects"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"

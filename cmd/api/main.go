@@ -7,10 +7,13 @@ import (
 	"ductifact/internal/application/services"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	// ...
+	// Load .env file (ignored if not found, e.g. in Docker/CI)
+	_ = godotenv.Load()
 
 	// Database
 	db, err := persistence.NewPostgresConnection()
@@ -29,7 +32,7 @@ func main() {
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
-		port = "8080"
+		log.Fatal("APP_PORT is not set — check your .env file")
 	}
 
 	log.Printf("Server starting on port %s", port)

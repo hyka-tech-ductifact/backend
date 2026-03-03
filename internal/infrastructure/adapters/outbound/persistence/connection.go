@@ -12,28 +12,18 @@ import (
 
 func NewPostgresConnection() (*gorm.DB, error) {
 	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-
 	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5432"
-	}
-
 	user := os.Getenv("DB_USER")
-	if user == "" {
-		user = "postgres"
-	}
-
 	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-
 	dbname := os.Getenv("DB_NAME")
-	if dbname == "" {
-		dbname = "microservice_db"
+
+	// Validate required env vars
+	for key, val := range map[string]string{
+		"DB_HOST": host, "DB_PORT": port, "DB_USER": user, "DB_PASSWORD": password, "DB_NAME": dbname,
+	} {
+		if val == "" {
+			return nil, fmt.Errorf("required environment variable %s is not set — check your .env file", key)
+		}
 	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
