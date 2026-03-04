@@ -26,7 +26,13 @@ var env *e2eEnv
 func TestMain(m *testing.M) {
 	helpers.LoadEnv()
 
-	baseURL := "http://localhost:8080"
+	host := os.Getenv("APP_HOST")
+	port := os.Getenv("APP_PORT")
+	if host == "" || port == "" {
+		fmt.Println("E2E setup failed: APP_HOST or APP_PORT is not set — check your .env file")
+		os.Exit(1)
+	}
+	baseURL := "http://" + host + ":" + port
 
 	if err := waitForAPI(baseURL, 10); err != nil {
 		fmt.Printf("E2E setup failed: %v\n", err)
