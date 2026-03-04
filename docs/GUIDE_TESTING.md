@@ -51,6 +51,39 @@ Cada nivel requiere distinto setup, velocidad y granularidad.
 - **Medio (Integration)**: Necesitan DB real, más lentos, pero validan que la infra funciona.
 - **Cima (E2E)**: Necesitan todo levantado, los más lentos, solo happy paths y flujos críticos.
 
+### ¿Por qué más unitarios y menos E2E?
+
+La intuición dice: *"si el E2E prueba lo que el usuario real usa, ¿por qué no hacer más de esos?"*
+Hay 4 razones prácticas por las que la pirámide pone los unitarios en la base:
+
+**1. Velocidad**
+Los unitarios se ejecutan en milisegundos sin dependencias. Los E2E necesitan DB + app corriendo y cada llamada HTTP tiene overhead de red. Con pocas entidades la diferencia es despreciable, pero a medida que crece el proyecto (500+ tests), un CI con solo E2E puede tardar 10x más.
+
+**2. Diagnóstico preciso**
+Si un E2E falla (`POST /users` devuelve 500), el error puede estar en el handler, el service, el repo, la DB o la conexión — hay que investigar toda la cadena. Si un unitario falla (`TestCreateUser_WithDuplicateEmail`), sabes que el bug está exactamente en `user_service.go`. Los unitarios reducen el tiempo de debugging.
+
+**3. Fragilidad**
+Los E2E dependen de muchas cosas: Docker corriendo, PostgreSQL arriba, app compilada y arrancada, puerto libre, `.env` correcto. Si cualquiera falla, **todos** los E2E fallan. Los unitarios no dependen de nada externo.
+
+**4. Cobertura combinatoria**
+Validar 16 variaciones de email (7 válidos + 9 inválidos) con E2E requiere 16 llamadas HTTP reales, cada una limpiando la DB. Con unitarios se cubren las mismas combinaciones en milisegundos.
+
+### Cada capa responde una pregunta diferente
+
+| Capa | Pregunta que responde | Ejemplo en este proyecto |
+|------|----------------------|--------------------------|
+| **Unit** | ¿La lógica es correcta? | `NewEmail("")` devuelve `ErrInvalidEmail` |
+| **Integration** | ¿Los componentes se conectan bien? | El mapper `toUserModel` preserva todos los campos |
+| **E2E** | ¿El usuario puede usarlo? | `POST /users` → `GET /users/:id` devuelve lo mismo |
+
+### ¿Los E2E hacen redundantes a los unitarios?
+
+**No.** Un test unitario verde **no garantiza** que el sistema funcione (el mapper podría estar roto). Pero un E2E verde **tampoco reemplaza** a los unitarios: sin ellos, cuando algo falla estás buscando la aguja en el pajar.
+
+La clave: los unitarios dan feedback rápido y preciso al desarrollar. Los E2E dan confianza de que las piezas **encajan**. Si los unitarios pasan pero un E2E no, sabes que el bug está en la integración entre componentes — reduces la búsqueda enormemente.
+
+> **Regla práctica**: unitarios para toda la lógica y combinaciones (muchos, baratos). E2E para los flujos principales del usuario (pocos, costosos, pero imprescindibles).
+
 ---
 
 ## 3. Estructura de carpetas
@@ -63,18 +96,19 @@ test/
 │   │   │   └── user_test.go       ← Tests de la entidad User
 │   │   └── valueobjects/
 │   │       └── email_test.go      ← Tests del VO Email
-│   └── application/
-│       └── services/
-│           └── user_service_test.go  ← Tests del servicio con mocks
+│   ├── application/
+│   │   └── services/
+│   │       └── user_service_test.go  ← Tests del servicio con mocks
+│   └── mocks/
+│       └── mock_user_repository.go   ← Mock manual del repositorio
 ├── integration/
 │   └── persistence/
 │       └── postgres_user_repository_test.go  ← Tests del repo con DB real
 ├── e2e/
-│   ├── setup.go                   ← Setup del entorno E2E
-│   └── user_e2e_test.go           ← Tests HTTP completos
+│   ├── setup.go                   ← Health-check + CleanDB
+│   └── user_test.go               ← Tests HTTP puros contra localhost
 └── helpers/
-    ├── test_config.go
-    └── test_utils.go
+    └── setup.go                   ← SetupTestDB, CleanDB, LoadEnv
 ```
 
 > **Nota**: Usamos una carpeta `test/` separada (en lugar de `_test.go` junto al código de producción) para mantener los tests organizados por tipo y evitar que los tests de integración/e2e se mezclen con el código de dominio.

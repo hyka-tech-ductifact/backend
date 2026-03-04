@@ -7,20 +7,17 @@ import (
 	"runtime"
 	"testing"
 
-	"ductifact/internal/application/services"
-	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// loadEnv loads the .env file from the project root.
+// LoadEnv loads the .env file from the project root.
 // It silently does nothing if the file doesn't exist (e.g. in CI where env vars are set externally).
-func loadEnv() {
+func LoadEnv() {
 	_, filename, _, _ := runtime.Caller(0)
 	projectRoot := filepath.Join(filepath.Dir(filename), "..", "..")
 	_ = godotenv.Load(filepath.Join(projectRoot, ".env"))
@@ -29,31 +26,38 @@ func loadEnv() {
 // SetupTestDB creates a PostgreSQL database connection for testing.
 // Reads credentials from the .env file at the project root.
 func SetupTestDB(t *testing.T) *gorm.DB {
-	loadEnv()
+	LoadEnv()
 
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-
-	require.NotEmpty(t, host, "DB_HOST is not set — check your .env file")
-	require.NotEmpty(t, port, "DB_PORT is not set — check your .env file")
-	require.NotEmpty(t, user, "DB_USER is not set — check your .env file")
-	require.NotEmpty(t, password, "DB_PASSWORD is not set — check your .env file")
-	require.NotEmpty(t, dbname, "DB_NAME is not set — check your .env file")
-
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		host, user, password, dbname, port)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	require.NoError(t, err)
-
-	// Auto migrate the schema with production models
-	err = db.AutoMigrate(&persistence.UserModel{})
-	require.NoError(t, err)
+	db, err := ConnectTestDB()
+	require.NoError(t, err, "failed to connect to test DB")
 
 	return db
+}
+
+// ConnectTestDB creates a PostgreSQL connection using env vars.
+// Returns an error instead of calling t.Fatal — safe for use in TestMain.
+func ConnectTestDB() (*gorm.DB, error) {
+	requiredVars := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"}
+	for _, v := range requiredVars {
+		if os.Getenv(v) == "" {
+			return nil, fmt.Errorf("%s is not set — check your .env file", v)
+		}
+	}
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+		os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"), os.Getenv("DB_PORT"))
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open DB: %w", err)
+	}
+
+	if err := db.AutoMigrate(&persistence.UserModel{}); err != nil {
+		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+	}
+
+	return db, nil
 }
 
 // CleanDB truncates all tables to ensure test isolation.
@@ -61,20 +65,4 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 func CleanDB(t *testing.T, db *gorm.DB) {
 	err := db.Exec("TRUNCATE TABLE users RESTART IDENTITY CASCADE").Error
 	require.NoError(t, err)
-}
-
-// SetupTestRouter creates a test router with in-memory database
-func SetupTestRouter(t *testing.T) *gin.Engine {
-	db := SetupTestDB(t)
-
-	// Outbound adapter
-	userRepo := persistence.NewPostgresUserRepository(db)
-
-	// Application service (inbound port)
-	userService := services.NewUserService(userRepo)
-
-	// Inbound adapter: HTTP router
-	router := httpAdapter.SetupRoutes(userService)
-
-	return router
 }
