@@ -59,14 +59,15 @@ app-watch:
 	@echo "Running ductifact with hot reloading..."
 	air
 
-# Test format: testdox (default), pkgname, standard, dots, short, etc.
-TEST_FORMAT ?= testdox
+# Test format: testdox , pkgname (default), standard, dots, short, etc.
+TEST_FORMAT ?= pkgname
 
 define run-tests
 	@if [ -n "$(_COVERAGE)" ]; then \
 		gotestsum --format $(TEST_FORMAT) -- -coverprofile=coverage.out $(1) && \
 		go tool cover -html=coverage.out -o coverage.html && \
-		echo "Coverage report generated: coverage.html"; \
+		echo "Coverage report generated: coverage.html" && \
+		explorer.exe "$$(wslpath -w coverage.html)" || true; \
 	else \
 		gotestsum --format $(TEST_FORMAT) -- $(1); \
 	fi
