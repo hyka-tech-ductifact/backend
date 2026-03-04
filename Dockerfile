@@ -26,7 +26,7 @@ RUN apk --no-cache add ca-certificates
 # Copy the binary from builder stage
 COPY --from=builder /app/app .
 
-# Expose port (must match APP_PORT in .env)
+# Expose port (must match APP_PORT in .env) (8080 is the default)
 ARG APP_PORT=8080
 EXPOSE ${APP_PORT}
 

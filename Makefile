@@ -1,6 +1,6 @@
 # Ductifact Backend Makefile
 
-.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE
+.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE
 
 # Allow COVERAGE to be used as a flag (e.g. make test-unit COVERAGE)
 COVERAGE: ;
@@ -23,6 +23,7 @@ help:
 	@echo "    test-integration   - Run integration tests (requires DB)"
 	@echo "    test-e2e           - Run E2E tests (requires DB + running server)"
 	@echo "    test               - Run all tests"
+	@echo "    test-clean         - Clear Go test cache"
 	@echo ""
 	@echo "    Add COVERAGE to any test target to generate a coverage report:"
 	@echo "    make test-unit COVERAGE"
@@ -92,6 +93,12 @@ test-e2e:
 
 # Run all tests
 test: test-unit test-integration test-e2e
+
+# Clear Go test cache
+test-clean:
+	@echo "Clearing test cache..."
+	go clean -testcache
+	@echo "Test cache cleared!"
 
 # Start database in Docker
 db-start:
