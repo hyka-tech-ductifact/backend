@@ -14,9 +14,9 @@ help:
 	@echo "  Development:"
 	@echo "    db-start       - Start database in Docker"
 	@echo "    db-stop        - Stop database"
-	@echo "    app-watch      - Run app with hot reloading (air)"
-	@echo "    app-run        - Run app without hot reloading"
+	@echo "    app-watch      - Run app with hot reloading (air), compiling and running"
 	@echo "    app-build      - Compile binary to bin/api"
+	@echo "    app-run        - Run app without hot reloading"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test-unit          - Run unit tests (no dependencies needed)"
@@ -34,9 +34,9 @@ help:
 	@echo "             standard-quiet, standard-verbose, pkgname-and-test-fails"
 	@echo ""
 	@echo "  Production:"
+	@echo "    prod-build     - Build Docker images"
 	@echo "    prod-start     - Start app + DB in Docker"
 	@echo "    prod-stop      - Stop production services"
-	@echo "    prod-build     - Build Docker image"
 	@echo ""
 	@echo "  Code quality:"
 	@echo "    fmt            - Format code"
@@ -109,6 +109,8 @@ clean:
 	rm -rf bin/
 	rm -f coverage.out coverage.html
 	rm -f api ductifact
+	@echo "Cleaning test cache..."
+	go clean -testcache
 	@echo "Cleaning temporary files and directories..."
 	rm -rf tmp/
 	rm -rf temp/
@@ -136,7 +138,7 @@ clean:
 # Build Docker image
 prod-build:
 	@echo "Building Docker image..."
-	docker build -t ductifact .
+	docker compose build
 
 # Start app + DB in Docker
 prod-start:
