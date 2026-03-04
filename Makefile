@@ -1,6 +1,11 @@
 # Ductifact Backend Makefile
 
-.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e clean db-start db-stop prod-start prod-stop prod-build fmt lint deps
+.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE
+
+# Allow COVERAGE to be used as a flag (e.g. make test-unit COVERAGE)
+COVERAGE: ;
+	@:
+_COVERAGE := $(filter COVERAGE,$(MAKECMDGOALS))
 
 # Default target
 help:
@@ -22,6 +27,11 @@ help:
 	@echo "    Add COVERAGE to any test target to generate a coverage report:"
 	@echo "    make test-unit COVERAGE"
 	@echo "    make test COVERAGE"
+	@echo ""
+	@echo "    Change test output format with TEST_FORMAT:"
+	@echo "    make test-unit TEST_FORMAT=dots"
+	@echo "    Formats: testdox (default), pkgname, testname, dots, dots-v2,"
+	@echo "             standard-quiet, standard-verbose, pkgname-and-test-fails"
 	@echo ""
 	@echo "  Production:"
 	@echo "    prod-start     - Start app + DB in Docker"
@@ -49,16 +59,16 @@ app-watch:
 	@echo "Running ductifact with hot reloading..."
 	air
 
-# Coverage flag: run with COVERAGE to generate a report (e.g. make test-unit COVERAGE)
-_COVERAGE := $(filter command line,$(origin COVERAGE))
+# Test format: testdox (default), pkgname, standard, dots, short, etc.
+TEST_FORMAT ?= testdox
 
 define run-tests
 	@if [ -n "$(_COVERAGE)" ]; then \
-		go test -v -coverprofile=coverage.out $(1) && \
+		gotestsum --format $(TEST_FORMAT) -- -coverprofile=coverage.out $(1) && \
 		go tool cover -html=coverage.out -o coverage.html && \
 		echo "Coverage report generated: coverage.html"; \
 	else \
-		go test -v $(1); \
+		gotestsum --format $(TEST_FORMAT) -- $(1); \
 	fi
 endef
 
@@ -153,3 +163,4 @@ deps:
 	@echo "Installing dev tools..."
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install gotest.tools/gotestsum@latest
