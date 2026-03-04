@@ -29,9 +29,9 @@
 > **Guía de referencia**: `docs/GUIDE_TESTING.md` — secciones 5.2, 5.3 y 5.4.
 
 ### 1.2 Integration Tests
-- [ ] Helper de limpieza de DB (`CleanDB` en `test/helpers/test_utils.go`)
+- [X] Helper de limpieza de DB (`CleanDB` en `test/helpers/test_utils.go`)
   - Truncar tablas entre tests para aislamiento
-- [ ] Tests de `PostgresUserRepository` (`test/integration/persistence/postgres_user_repository_test.go`)
+- [X] Tests de `PostgresUserRepository` (`test/integration/persistence/postgres_user_repository_test.go`)
   - Create + GetByID → los datos se persisten correctamente
   - GetByEmail → funciona con email existente, falla con email inexistente
   - Update → los cambios se reflejan en la DB
@@ -42,7 +42,7 @@
 > **Requisito**: DB Postgres corriendo (`make db-start`).
 
 ### 1.3 E2E Tests
-- [ ] Tests HTTP completos (`test/e2e/user_e2e_test.go`)
+- [X] Tests HTTP completos (`test/e2e/user_e2e_test.go`)
   - POST /users → 201 + crear y luego GET para verificar persistencia
   - POST /users con email duplicado → 409
   - GET /users/{id} inexistente → 404
@@ -53,10 +53,10 @@
 > **Requisito**: DB + API corriendo (`make db-start` + `make app-watch`).
 
 ### 1.4 Ejecutar y verificar
-- [ ] `make test-unit` pasa ✅
-- [ ] `make test-integration` pasa ✅
-- [ ] `make test-e2e` pasa ✅
-- [ ] `make test` (todos) pasa ✅
+- [X] `make test-unit` pasa ✅
+- [X] `make test-integration` pasa ✅
+- [X] `make test-e2e` pasa ✅
+- [X] `make test` (todos) pasa ✅
 
 ---
 
@@ -98,7 +98,7 @@
   - **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/error_handler.go`
 
 ### 2.6 Versionado de API
-- [ ] Mover las rutas bajo `/api/v1/`
+- [X] Mover las rutas bajo `/api/v1/`
   - Ahora: `POST /users`
   - Después: `POST /api/v1/users`
   - Esto permite en el futuro tener `/api/v2/` sin romper clientes existentes

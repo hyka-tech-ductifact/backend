@@ -10,13 +10,16 @@ import (
 func SetupRoutes(userService ports.UserService) *gin.Engine {
 	r := gin.Default()
 
-	r.GET("/health", func(c *gin.Context) {
+	// API v1
+	v1 := r.Group("/api/v1")
+
+	v1.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy !!!!"})
 	})
 
 	// User routes
 	userHandler := NewUserHandler(userService)
-	userRoutes := r.Group("/users")
+	userRoutes := v1.Group("/users")
 	{
 		userRoutes.POST("", userHandler.CreateUser)
 		userRoutes.GET("/:id", userHandler.GetUser)

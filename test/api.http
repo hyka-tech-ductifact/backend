@@ -1,16 +1,12 @@
 # API Test Suite
-# Unified HTTP requests for testing the API
-# Use with REST Client plugin in VS Code or similar tools
+# Use with REST Client plugin in VS Code
+# Make sure the server is running: make app-watch or make prod-start
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-# Base URL - Change this to match your environment
-# Local development: http://localhost:8080
-# Docker: http://localhost:8080
-# Network: http://192.168.1.10:8080
-@baseUrl = http://localhost:8080
+@baseUrl = http://localhost:8080/api/v1
 
 # =============================================================================
 # HEALTH CHECK
@@ -18,18 +14,13 @@
 
 ### Health Check
 GET {{baseUrl}}/health
-Content-Type: application/json
-
-# =============================================================================
-# USER ENDPOINTS
-# =============================================================================
 
 # =============================================================================
 # USER ENDPOINTS
 # =============================================================================
 
 ### Create User
-POST {{baseUrl}}/api/v1/users
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -37,16 +28,14 @@ Content-Type: application/json
   "name": "John Doe"
 }
 
-### Get User by ID
-GET {{baseUrl}}/api/v1/users/{{user_id}}
-Content-Type: application/json
+### Get User by ID (replace with actual UUID from create response)
+GET {{baseUrl}}/users/{{user_id}}
 
 ### Get User by ID (example with UUID)
-GET {{baseUrl}}/api/v1/users/123e4567-e89b-12d3-a456-426614174000
-Content-Type: application/json
+GET {{baseUrl}}/users/123e4567-e89b-12d3-a456-426614174000
 
 ### Update User
-PUT {{baseUrl}}/api/v1/users/{{user_id}}
+PUT {{baseUrl}}/users/{{user_id}}
 Content-Type: application/json
 
 {
@@ -54,20 +43,12 @@ Content-Type: application/json
   "name": "John Updated"
 }
 
-### Delete User
-DELETE {{baseUrl}}/api/v1/users/{{user_id}}
-Content-Type: application/json
+# =============================================================================
+# CREATE MULTIPLE USERS
+# =============================================================================
 
-### List Users
-GET {{baseUrl}}/api/v1/users
-Content-Type: application/json
-
-### List Users with Pagination
-GET {{baseUrl}}/api/v1/users?limit=5&offset=0
-Content-Type: application/json
-
-### Create Multiple Users for Testing
-POST {{baseUrl}}/api/v1/users
+### Create Alice
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -75,9 +56,8 @@ Content-Type: application/json
   "name": "Alice Smith"
 }
 
-###
-
-POST {{baseUrl}}/api/v1/users
+### Create Bob
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -85,9 +65,8 @@ Content-Type: application/json
   "name": "Bob Johnson"
 }
 
-###
-
-POST {{baseUrl}}/api/v1/users
+### Create Charlie
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -96,11 +75,11 @@ Content-Type: application/json
 }
 
 # =============================================================================
-# USER VALIDATION TESTS
+# VALIDATION TESTS
 # =============================================================================
 
-### Test Invalid Email
-POST {{baseUrl}}/api/v1/users
+### Invalid Email -> 400
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -108,24 +87,24 @@ Content-Type: application/json
   "name": "Test User"
 }
 
-### Test Missing Email Field
-POST {{baseUrl}}/api/v1/users
+### Missing Email -> 400
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
   "name": "Test User"
 }
 
-### Test Missing Name Field
-POST {{baseUrl}}/api/v1/users
+### Missing Name -> 400
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
   "email": "test@example.com"
 }
 
-### Test Empty Email
-POST {{baseUrl}}/api/v1/users
+### Empty Email -> 400
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
@@ -133,53 +112,11 @@ Content-Type: application/json
   "name": "Test User"
 }
 
-### Test Empty Name
-POST {{baseUrl}}/api/v1/users
+### Empty Name -> 400
+POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
   "email": "test@example.com",
   "name": ""
 }
-
-# =============================================================================
-# PERFORMANCE TESTS
-# =============================================================================
-
-### Performance Test User
-POST {{baseUrl}}/api/v1/users
-Content-Type: application/json
-
-{
-  "email": "perf@example.com",
-  "name": "Performance Test User"
-}
-
-# =============================================================================
-# USAGE INSTRUCTIONS
-# =============================================================================
-
-# To use this file with REST Client plugin:
-# 1. Install the REST Client extension in VS Code
-# 2. Make sure the server is running: docker compose up -d
-# 3. Click "Send Request" above any request to execute it
-# 4. Use Ctrl+Alt+R (or Cmd+Alt+R on Mac) to run all requests in the file
-# 5. Use Ctrl+Alt+L (or Cmd+Alt+L on Mac) to run the request under the cursor
-
-# Environment Variables:
-# - Replace {{user_id}} with actual UUID from create user response
-# - Change @baseUrl variable to match your environment
-
-# Testing Workflow:
-# 1. Start with Health Check to verify service is running
-# 2. Create users to get IDs for subsequent tests
-# 3. Test GET operations with the returned IDs
-# 4. Test validation scenarios
-# 5. Test UPDATE and DELETE operations
-# 6. Run performance tests
-
-# Common Test Scenarios:
-# - Happy path: Create → Get → Update → Delete
-# - Validation: Invalid data, missing fields, malformed JSON
-# - Error handling: Non-existent resources, server errors
-# - Performance: Load testing with multiple requests

@@ -61,13 +61,13 @@ func clean(t *testing.T) {
 
 // url builds a full URL using the shared base URL.
 func url(path string) string {
-	return fmt.Sprintf("%s%s", env.baseURL, path)
+	return fmt.Sprintf("%s/api/v1%s", env.baseURL, path)
 }
 
 // waitForAPI polls /health until the API responds 200 or retries are exhausted.
 func waitForAPI(baseURL string, maxRetries int) error {
 	for i := range maxRetries {
-		resp, err := http.Get(baseURL + "/health")
+		resp, err := http.Get(baseURL + "/api/v1/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			return nil
