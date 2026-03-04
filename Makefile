@@ -64,8 +64,10 @@ TEST_FORMAT ?= pkgname
 
 define run-tests
 	@if [ -n "$(_COVERAGE)" ]; then \
-		gotestsum --format $(TEST_FORMAT) -- -coverprofile=coverage.out $(1) && \
+		gotestsum --format $(TEST_FORMAT) -- -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
+		go tool cover -func=coverage.out && \
 		go tool cover -html=coverage.out -o coverage.html && \
+		echo "" && \
 		echo "Coverage report generated: coverage.html" && \
 		explorer.exe "$$(wslpath -w coverage.html)" || true; \
 	else \
