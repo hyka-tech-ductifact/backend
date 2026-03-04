@@ -16,7 +16,6 @@ func TestE2E_Health(t *testing.T) {
 	clean(t)
 
 	resp := helpers.GetJSON(t, url("/health"))
-	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
