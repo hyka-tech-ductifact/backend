@@ -98,7 +98,7 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := uuid.Parse(c.Param("client_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
 		return
@@ -128,7 +128,7 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := uuid.Parse(c.Param("client_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
 		return
@@ -166,7 +166,7 @@ func (h *ClientHandler) DeleteClient(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := uuid.Parse(c.Param("client_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
 		return

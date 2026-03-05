@@ -22,8 +22,8 @@ func SetupRoutes(userService ports.UserService, clientService ports.ClientServic
 	userRoutes := v1.Group("/users")
 	{
 		userRoutes.POST("", userHandler.CreateUser)
-		userRoutes.GET("/:id", userHandler.GetUser)
-		userRoutes.PUT("/:id", userHandler.UpdateUser)
+		userRoutes.GET("/:user_id", userHandler.GetUser)
+		userRoutes.PUT("/:user_id", userHandler.UpdateUser)
 	}
 
 	// Client routes (nested under users — a client belongs to a user)
@@ -32,9 +32,9 @@ func SetupRoutes(userService ports.UserService, clientService ports.ClientServic
 	{
 		clientRoutes.POST("", clientHandler.CreateClient)
 		clientRoutes.GET("", clientHandler.ListClients)
-		clientRoutes.GET("/:id", clientHandler.GetClient)
-		clientRoutes.PUT("/:id", clientHandler.UpdateClient)
-		clientRoutes.DELETE("/:id", clientHandler.DeleteClient)
+		clientRoutes.GET("/:client_id", clientHandler.GetClient)
+		clientRoutes.PUT("/:client_id", clientHandler.UpdateClient)
+		clientRoutes.DELETE("/:client_id", clientHandler.DeleteClient)
 	}
 
 	return r

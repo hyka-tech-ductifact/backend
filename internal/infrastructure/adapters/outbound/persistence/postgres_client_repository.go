@@ -20,6 +20,9 @@ type ClientModel struct {
 	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
+
+	// GORM association to UserModel for FK constraint and cascade delete.
+	User UserModel `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
 func (ClientModel) TableName() string {
