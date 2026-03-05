@@ -135,7 +135,7 @@
 **Objetivo**: Proteger la API para que solo usuarios autenticados puedan usarla.
 
 ### 4.1 Elegir estrategia de auth
-- [ ] Decidir entre:
+- [X] Decidir entre:
   - **JWT (JSON Web Tokens)**: El usuario hace login, recibe un token, y lo envía en cada request. El backend valida el token sin consultar la DB. Es stateless y el más común para APIs REST.
   - **Sessions**: El servidor guarda la sesión en DB/Redis. Más simple pero stateful.
   - **OAuth2 / OIDC con provider externo**: Delegas el login a Google, GitHub, Auth0, etc. Más complejo pero no gestionas contraseñas.
