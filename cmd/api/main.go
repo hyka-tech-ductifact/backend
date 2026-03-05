@@ -25,8 +25,12 @@ func main() {
 	userRepo := persistence.NewPostgresUserRepository(db)
 	userService := services.NewUserService(userRepo)
 
+	// --- Client wiring ---
+	clientRepo := persistence.NewPostgresClientRepository(db)
+	clientService := services.NewClientService(clientRepo, userRepo)
+
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(userService)
+	router := httpAdapter.SetupRoutes(userService, clientService)
 
 	// ...
 

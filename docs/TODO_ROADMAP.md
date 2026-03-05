@@ -10,18 +10,18 @@
 **Objetivo**: Tener la entidad User completamente testeada antes de avanzar con más features.
 
 ### 1.1 Unit Tests
-- [ ] Tests del Value Object `Email` (`test/unit/domain/valueobjects/email_test.go`)
+- [X] Tests del Value Object `Email` (`test/unit/domain/valueobjects/email_test.go`)
   - Emails válidos (con puntos, con +, con subdominios)
   - Emails inválidos (vacío, sin @, sin dominio, con espacios)
   - Verificar que devuelve `ErrInvalidEmail` específico
-- [ ] Tests de la Entity `User` (`test/unit/domain/entities/user_test.go`)
+- [X] Tests de la Entity `User` (`test/unit/domain/entities/user_test.go`)
   - Creación con datos válidos → user con ID, timestamps
   - Nombre vacío → `ErrEmptyUserName`
   - Email inválido → `ErrInvalidEmail`
   - Dos users generan IDs distintos
-- [ ] Mock del repositorio (`test/unit/mocks/mock_user_repository.go`)
+- [X] Mock del repositorio (`test/unit/mocks/mock_user_repository.go`)
   - Mock manual con campos de tipo función (patrón idiomático en Go)
-- [ ] Tests del `UserService` (`test/unit/application/services/user_service_test.go`)
+- [X] Tests del `UserService` (`test/unit/application/services/user_service_test.go`)
   - `CreateUser`: happy path, email duplicado, nombre vacío, fallo del repo
   - `GetUserByID`: user existente, user no encontrado
   - `UpdateUser`: actualizar nombre, actualizar email, email duplicado, user no encontrado
@@ -111,22 +111,22 @@
 **Objetivo**: Aplicar todo lo aprendido con User a una nueva entidad. Consolidar el patrón.
 
 ### 3.1 Elegir la entidad
-- [ ] Decidir qué entidad necesita el negocio (ej: `Project`, `Organization`, `Task`...)
-  - Lo importante es que tenga **relación con User** para practicar foreign keys y queries más complejas
-  - Ejemplo: un `Project` pertenece a un `User` (creador)
+- [X] Decidir qué entidad necesita el negocio (ej: `Project`, `Organization`, `Task`...)
+  - Se eligió `Client` — un cliente con solo un nombre, perteneciente a un User (relación 1:N)
+  - Dos usuarios pueden tener un cliente con el mismo nombre, pero son entidades independientes
 
 ### 3.2 Implementar siguiendo el mismo patrón
-- [ ] Domain: Entity + Value Objects + Repository interface
-- [ ] Application: Service + Port interface
-- [ ] Infrastructure: Handler + DTOs + PostgresRepository + Router
-- [ ] Wiring en `main.go`
+- [X] Domain: Entity + Value Objects + Repository interface
+- [X] Application: Service + Port interface
+- [X] Infrastructure: Handler + DTOs + PostgresRepository + Router
+- [X] Wiring en `main.go`
 
 ### 3.3 Tests de la segunda entidad
-- [ ] Unit tests (entity, value objects, service con mocks)
-- [ ] Integration tests (repository)
-- [ ] E2E tests (flujo HTTP completo)
+- [X] Unit tests (entity, value objects, service con mocks)
+- [X] Integration tests (repository)
+- [X] E2E tests (flujo HTTP completo)
 
-> **Clave**: Esta vez debería ir mucho más rápido porque ya tienes el patrón claro. Si tarda lo mismo que User, revisa qué puedes abstraer.
+> **Guía de referencia**: `docs/GUIDE_CLIENT_ENTITY.md` — explicación detallada de todas las decisiones.
 
 ---
 

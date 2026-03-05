@@ -53,7 +53,7 @@ func ConnectTestDB() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 
-	if err := db.AutoMigrate(&persistence.UserModel{}); err != nil {
+	if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 	}
 
@@ -62,7 +62,8 @@ func ConnectTestDB() (*gorm.DB, error) {
 
 // CleanDB truncates all tables to ensure test isolation.
 // Call this at the beginning of each integration test.
+// Order matters: clients references users, so truncate clients first.
 func CleanDB(t *testing.T, db *gorm.DB) {
-	err := db.Exec("TRUNCATE TABLE users RESTART IDENTITY CASCADE").Error
+	err := db.Exec("TRUNCATE TABLE clients, users RESTART IDENTITY CASCADE").Error
 	require.NoError(t, err)
 }

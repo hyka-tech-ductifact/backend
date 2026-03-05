@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRoutes configures the HTTP router.
-func SetupRoutes(userService ports.UserService) *gin.Engine {
+func SetupRoutes(userService ports.UserService, clientService ports.ClientService) *gin.Engine {
 	r := gin.Default()
 
 	// API v1
@@ -24,6 +24,17 @@ func SetupRoutes(userService ports.UserService) *gin.Engine {
 		userRoutes.POST("", userHandler.CreateUser)
 		userRoutes.GET("/:id", userHandler.GetUser)
 		userRoutes.PUT("/:id", userHandler.UpdateUser)
+	}
+
+	// Client routes (nested under users — a client belongs to a user)
+	clientHandler := NewClientHandler(clientService)
+	clientRoutes := userRoutes.Group("/:user_id/clients")
+	{
+		clientRoutes.POST("", clientHandler.CreateClient)
+		clientRoutes.GET("", clientHandler.ListClients)
+		clientRoutes.GET("/:id", clientHandler.GetClient)
+		clientRoutes.PUT("/:id", clientHandler.UpdateClient)
+		clientRoutes.DELETE("/:id", clientHandler.DeleteClient)
 	}
 
 	return r

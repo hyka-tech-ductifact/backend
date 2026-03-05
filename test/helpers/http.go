@@ -32,6 +32,16 @@ func PutJSON(t *testing.T, url string, body any) *http.Response {
 	return resp
 }
 
+// DeleteJSON sends a DELETE request and returns the response.
+func DeleteJSON(t *testing.T, url string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
 // GetJSON sends a GET request and returns the response.
 func GetJSON(t *testing.T, url string) *http.Response {
 	t.Helper()
@@ -49,4 +59,13 @@ func ParseBody(t *testing.T, resp *http.Response) map[string]any {
 	err := json.NewDecoder(resp.Body).Decode(&body)
 	require.NoError(t, err)
 	return body
+}
+
+// ParseBodyArray decodes the response body as a JSON array into the provided slice.
+// It closes the response body after reading.
+func ParseBodyArray(t *testing.T, resp *http.Response, target any) {
+	t.Helper()
+	defer resp.Body.Close()
+	err := json.NewDecoder(resp.Body).Decode(target)
+	require.NoError(t, err)
 }
