@@ -22,7 +22,7 @@ func setupClientRepo(t *testing.T) (*persistence.PostgresClientRepository, *pers
 
 // createTestUser is a helper that creates and persists a user for FK tests.
 func createTestUser(t *testing.T, userRepo *persistence.PostgresUserRepository) *entities.User {
-	user, err := entities.NewUser("Test User", "testuser_"+uuid.New().String()[:8]+"@example.com")
+	user, err := entities.NewUser("Test User", "testuser_"+uuid.New().String()[:8]+"@example.com", "securepass123")
 	require.NoError(t, err)
 	require.NoError(t, userRepo.Create(context.Background(), user))
 	return user

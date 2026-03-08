@@ -29,7 +29,7 @@ func TestPostgresUserRepository_Create_And_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a valid user using the domain constructor
-	user, err := entities.NewUser("Juan", "juan@example.com")
+	user, err := entities.NewUser("Juan", "juan@example.com", "securepass123")
 	require.NoError(t, err)
 
 	// CREATE
@@ -55,7 +55,7 @@ func TestPostgresUserRepository_GetByEmail(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user, _ := entities.NewUser("Juan", "juan@example.com")
+	user, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestPostgresUserRepository_Update(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user, _ := entities.NewUser("Juan", "juan@example.com")
+	user, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
 
@@ -119,11 +119,11 @@ func TestPostgresUserRepository_Create_DuplicateEmail_Fails(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user1, _ := entities.NewUser("Juan", "same@example.com")
+	user1, _ := entities.NewUser("Juan", "same@example.com", "securepass123")
 	err := repo.Create(ctx, user1)
 	require.NoError(t, err)
 
-	user2, _ := entities.NewUser("Pedro", "same@example.com")
+	user2, _ := entities.NewUser("Pedro", "same@example.com", "securepass123")
 	err = repo.Create(ctx, user2)
 
 	// The DB must reject the duplicate email via UNIQUE constraint
@@ -138,9 +138,9 @@ func TestPostgresUserRepository_Create_MultipleUsers(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user1, _ := entities.NewUser("Juan", "juan@example.com")
-	user2, _ := entities.NewUser("Pedro", "pedro@example.com")
-	user3, _ := entities.NewUser("Maria", "maria@example.com")
+	user1, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	user2, _ := entities.NewUser("Pedro", "pedro@example.com", "securepass123")
+	user3, _ := entities.NewUser("Maria", "maria@example.com", "securepass123")
 
 	require.NoError(t, repo.Create(ctx, user1))
 	require.NoError(t, repo.Create(ctx, user2))
@@ -168,7 +168,7 @@ func TestPostgresUserRepository_Mapper_PreservesAllFields(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	original, _ := entities.NewUser("Juan García", "juan.garcia@example.com")
+	original, _ := entities.NewUser("Juan García", "juan.garcia@example.com", "securepass123")
 	err := repo.Create(ctx, original)
 	require.NoError(t, err)
 

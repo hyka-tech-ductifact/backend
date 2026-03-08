@@ -15,8 +15,9 @@ import (
 func createUserForClients(t *testing.T, name, email string) string {
 	t.Helper()
 	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  name,
-		"email": email,
+		"name":     name,
+		"email":    email,
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)

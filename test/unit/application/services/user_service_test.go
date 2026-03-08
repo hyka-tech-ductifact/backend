@@ -26,7 +26,7 @@ func TestCreateUser_WithValidData_ReturnsUser(t *testing.T) {
 	svc := services.NewUserService(mockRepo)
 
 	// ACT
-	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com")
+	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestCreateUser_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	svc := services.NewUserService(mockRepo)
 
 	// ACT
-	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com")
+	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)
@@ -63,7 +63,7 @@ func TestCreateUser_WithEmptyName_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{}
 	svc := services.NewUserService(mockRepo)
 
-	user, err := svc.CreateUser(context.Background(), "", "juan@example.com")
+	user, err := svc.CreateUser(context.Background(), "", "juan@example.com", "securepass123")
 
 	assert.Nil(t, user)
 	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
@@ -73,7 +73,7 @@ func TestCreateUser_WithInvalidEmail_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{}
 	svc := services.NewUserService(mockRepo)
 
-	user, err := svc.CreateUser(context.Background(), "Juan", "not-an-email")
+	user, err := svc.CreateUser(context.Background(), "Juan", "not-an-email", "securepass123")
 
 	assert.Nil(t, user)
 	assert.Error(t, err)
@@ -90,7 +90,7 @@ func TestCreateUser_WhenRepoFails_ReturnsError(t *testing.T) {
 	svc := services.NewUserService(mockRepo)
 
 	// ACT
-	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com")
+	user, err := svc.CreateUser(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)

@@ -15,11 +15,12 @@ import (
 // UserModel is the GORM-specific database representation.
 // It is NOT a domain entity. It lives here because only this adapter cares about it.
 type UserModel struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Name      string    `gorm:"not null"`
-	Email     string    `gorm:"uniqueIndex;not null"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name         string    `gorm:"not null"`
+	Email        string    `gorm:"uniqueIndex;not null"`
+	PasswordHash string    `gorm:"column:password_hash;not null;default:''"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (UserModel) TableName() string {
@@ -67,20 +68,22 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User
 
 func toUserModel(user *entities.User) *UserModel {
 	return &UserModel{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+		ID:           user.ID,
+		Name:         user.Name,
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 }
 
 func toUserEntity(model *UserModel) *entities.User {
 	return &entities.User{
-		ID:        model.ID,
-		Name:      model.Name,
-		Email:     model.Email,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:           model.ID,
+		Name:         model.Name,
+		Email:        model.Email,
+		PasswordHash: model.PasswordHash,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
 	}
 }

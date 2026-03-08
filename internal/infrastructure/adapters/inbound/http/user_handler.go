@@ -15,8 +15,9 @@ import (
 // --- DTOs (HTTP-specific, not domain objects) ---
 
 type CreateUserRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Email string `json:"email" binding:"required,email"`
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 type UpdateUserRequest struct {
@@ -48,7 +49,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	// Pass primitives to the service — the handler does NOT create domain entities.
-	user, err := h.userService.CreateUser(c.Request.Context(), req.Name, req.Email)
+	user, err := h.userService.CreateUser(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, services.ErrEmailAlreadyInUse) {

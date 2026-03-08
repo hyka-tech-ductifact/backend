@@ -36,9 +36,9 @@ func NewUserService(userRepo repositories.UserRepository) *userService {
 // 1. Build the domain entity (which validates name + email).
 // 2. Check email uniqueness (business rule).
 // 3. Persist via repository.
-func (s *userService) CreateUser(ctx context.Context, name, email string) (*entities.User, error) {
+func (s *userService) CreateUser(ctx context.Context, name, email, password string) (*entities.User, error) {
 	// Step 1: Domain entity validates its own invariants
-	user, err := entities.NewUser(name, email)
+	user, err := entities.NewUser(name, email, password)
 	if err != nil {
 		return nil, err
 	}

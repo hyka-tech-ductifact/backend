@@ -28,8 +28,9 @@ func TestE2E_CreateUser_Success(t *testing.T) {
 	clean(t)
 
 	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Juan",
-		"email": "juan@example.com",
+		"name":     "Juan",
+		"email":    "juan@example.com",
+		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -44,7 +45,8 @@ func TestE2E_CreateUser_MissingName_Returns400(t *testing.T) {
 	clean(t)
 
 	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"email": "juan@example.com",
+		"email":    "juan@example.com",
+		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -54,8 +56,9 @@ func TestE2E_CreateUser_InvalidEmail_Returns400(t *testing.T) {
 	clean(t)
 
 	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Juan",
-		"email": "not-an-email",
+		"name":     "Juan",
+		"email":    "not-an-email",
+		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -66,16 +69,18 @@ func TestE2E_CreateUser_DuplicateEmail_Returns409(t *testing.T) {
 
 	// First user
 	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Juan",
-		"email": "same@example.com",
+		"name":     "Juan",
+		"email":    "same@example.com",
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	resp.Body.Close()
 
 	// Second user with same email
 	resp = helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Pedro",
-		"email": "same@example.com",
+		"name":     "Pedro",
+		"email":    "same@example.com",
+		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -98,8 +103,9 @@ func TestE2E_GetUser_Success(t *testing.T) {
 
 	// Create a user first
 	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "María",
-		"email": "maria@example.com",
+		"name":     "María",
+		"email":    "maria@example.com",
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
@@ -143,8 +149,9 @@ func TestE2E_UpdateUser_Name_Success(t *testing.T) {
 
 	// Create user
 	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Juan",
-		"email": "juan@example.com",
+		"name":     "Juan",
+		"email":    "juan@example.com",
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
@@ -168,8 +175,9 @@ func TestE2E_UpdateUser_Email_Success(t *testing.T) {
 
 	// Create user
 	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Juan",
-		"email": "old@example.com",
+		"name":     "Juan",
+		"email":    "old@example.com",
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
@@ -192,13 +200,13 @@ func TestE2E_UpdateUser_DuplicateEmail_Returns409(t *testing.T) {
 
 	// Create two users
 	resp1 := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name": "Juan", "email": "juan@example.com",
+		"name": "Juan", "email": "juan@example.com", "password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, resp1.StatusCode)
 	resp1.Body.Close()
 
 	resp2 := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name": "Pedro", "email": "pedro@example.com",
+		"name": "Pedro", "email": "pedro@example.com", "password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, resp2.StatusCode)
 	created := helpers.ParseBody(t, resp2)
@@ -241,8 +249,9 @@ func TestE2E_FullFlow_Create_Get_Update_Get(t *testing.T) {
 
 	// 1. Create
 	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":  "Ana",
-		"email": "ana@example.com",
+		"name":     "Ana",
+		"email":    "ana@example.com",
+		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
