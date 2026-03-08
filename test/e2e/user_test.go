@@ -22,78 +22,18 @@ func TestE2E_Health(t *testing.T) {
 	assert.Equal(t, "healthy !!!!", body["status"])
 }
 
-// ─── Create User ─────────────────────────────────────────────────────────────
-
-func TestE2E_CreateUser_Success(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-
-	assert.Equal(t, http.StatusCreated, resp.StatusCode)
-	body := helpers.ParseBody(t, resp)
-
-	assert.NotEmpty(t, body["id"])
-	assert.Equal(t, "Juan", body["name"])
-	assert.Equal(t, "juan@example.com", body["email"])
-}
-
-func TestE2E_CreateUser_MissingName_Returns400(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-}
-
-func TestE2E_CreateUser_InvalidEmail_Returns400(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Juan",
-		"email":    "not-an-email",
-		"password": "securepass123",
-	})
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-}
-
-func TestE2E_CreateUser_DuplicateEmail_Returns409(t *testing.T) {
-	clean(t)
-
-	// First user
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Juan",
-		"email":    "same@example.com",
-		"password": "securepass123",
+// registerUser is a helper that registers a user and returns (id, token).
+func registerUser(t *testing.T, name, email, password string) (string, string) {
+	t.Helper()
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+		"name":     name,
+		"email":    email,
+		"password": password,
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	resp.Body.Close()
-
-	// Second user with same email
-	resp = helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Pedro",
-		"email":    "same@example.com",
-		"password": "securepass123",
-	})
-
-	assert.Equal(t, http.StatusConflict, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["error"], "email already in use")
-}
-
-func TestE2E_CreateUser_EmptyBody_Returns400(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{})
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	user := body["user"].(map[string]any)
+	return user["id"].(string), body["token"].(string)
 }
 
 // ─── Get User ────────────────────────────────────────────────────────────────
@@ -101,15 +41,7 @@ func TestE2E_CreateUser_EmptyBody_Returns400(t *testing.T) {
 func TestE2E_GetUser_Success(t *testing.T) {
 	clean(t)
 
-	// Create a user first
-	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "María",
-		"email":    "maria@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, createResp.StatusCode)
-	created := helpers.ParseBody(t, createResp)
-	id := created["id"].(string)
+	id, _ := registerUser(t, "María", "maria@example.com", "securepass123")
 
 	// Get the user
 	resp := helpers.GetJSON(t, url("/users/"+id))
@@ -147,15 +79,7 @@ func TestE2E_GetUser_InvalidID_Returns400(t *testing.T) {
 func TestE2E_UpdateUser_Name_Success(t *testing.T) {
 	clean(t)
 
-	// Create user
-	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, createResp.StatusCode)
-	created := helpers.ParseBody(t, createResp)
-	id := created["id"].(string)
+	id, _ := registerUser(t, "Juan", "juan@example.com", "securepass123")
 
 	// Update name only
 	resp := helpers.PutJSON(t, url("/users/"+id), map[string]string{
@@ -173,15 +97,7 @@ func TestE2E_UpdateUser_Name_Success(t *testing.T) {
 func TestE2E_UpdateUser_Email_Success(t *testing.T) {
 	clean(t)
 
-	// Create user
-	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Juan",
-		"email":    "old@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, createResp.StatusCode)
-	created := helpers.ParseBody(t, createResp)
-	id := created["id"].(string)
+	id, _ := registerUser(t, "Juan", "old@example.com", "securepass123")
 
 	// Update email only
 	resp := helpers.PutJSON(t, url("/users/"+id), map[string]string{
@@ -199,18 +115,8 @@ func TestE2E_UpdateUser_DuplicateEmail_Returns409(t *testing.T) {
 	clean(t)
 
 	// Create two users
-	resp1 := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name": "Juan", "email": "juan@example.com", "password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, resp1.StatusCode)
-	resp1.Body.Close()
-
-	resp2 := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name": "Pedro", "email": "pedro@example.com", "password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, resp2.StatusCode)
-	created := helpers.ParseBody(t, resp2)
-	pedroID := created["id"].(string)
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+	pedroID, _ := registerUser(t, "Pedro", "pedro@example.com", "securepass123")
 
 	// Try to update Pedro's email to Juan's
 	resp := helpers.PutJSON(t, url("/users/"+pedroID), map[string]string{
@@ -244,21 +150,11 @@ func TestE2E_UpdateUser_InvalidID_Returns400(t *testing.T) {
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────
 
-func TestE2E_FullFlow_Create_Get_Update_Get(t *testing.T) {
+func TestE2E_FullFlow_Register_Get_Update_Get(t *testing.T) {
 	clean(t)
 
-	// 1. Create
-	createResp := helpers.PostJSON(t, url("/users"), map[string]string{
-		"name":     "Ana",
-		"email":    "ana@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, createResp.StatusCode)
-	created := helpers.ParseBody(t, createResp)
-	id := created["id"].(string)
-
-	assert.Equal(t, "Ana", created["name"])
-	assert.Equal(t, "ana@example.com", created["email"])
+	// 1. Register
+	id, _ := registerUser(t, "Ana", "ana@example.com", "securepass123")
 
 	// 2. Get — verify persisted
 	getResp1 := helpers.GetJSON(t, url("/users/"+id))

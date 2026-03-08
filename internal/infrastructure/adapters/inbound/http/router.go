@@ -7,7 +7,11 @@ import (
 )
 
 // SetupRoutes configures the HTTP router.
-func SetupRoutes(userService ports.UserService, clientService ports.ClientService) *gin.Engine {
+func SetupRoutes(
+	userService ports.UserService,
+	clientService ports.ClientService,
+	authService ports.AuthService,
+) *gin.Engine {
 	r := gin.Default()
 
 	// API v1
@@ -16,6 +20,16 @@ func SetupRoutes(userService ports.UserService, clientService ports.ClientServic
 	v1.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy !!!!"})
 	})
+
+	// --- Public routes (no auth required) ---
+
+	// Auth routes
+	authHandler := NewAuthHandler(authService)
+	authRoutes := v1.Group("/auth")
+	{
+		authRoutes.POST("/register", authHandler.Register)
+		authRoutes.POST("/login", authHandler.Login)
+	}
 
 	// User routes
 	userHandler := NewUserHandler(userService)

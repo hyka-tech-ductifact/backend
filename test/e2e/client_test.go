@@ -10,18 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- Helper: create a user and return their ID ---
+// --- Helper: register a user via /auth/register and return their ID ---
 
 func createUserForClients(t *testing.T, name, email string) string {
 	t.Helper()
-	resp := helpers.PostJSON(t, url("/users"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
 		"name":     name,
 		"email":    email,
 		"password": "securepass123",
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	return body["id"].(string)
+	user := body["user"].(map[string]any)
+	return user["id"].(string)
 }
 
 // ─── Create Client ───────────────────────────────────────────────────────────

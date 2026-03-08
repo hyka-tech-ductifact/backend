@@ -7,6 +7,7 @@ import (
 	"ductifact/internal/application/services"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
+	"ductifact/internal/infrastructure/auth"
 
 	"github.com/joho/godotenv"
 )
@@ -29,8 +30,12 @@ func main() {
 	clientRepo := persistence.NewPostgresClientRepository(db)
 	clientService := services.NewClientService(clientRepo, userRepo)
 
+	// --- Auth wiring ---
+	tokenProvider := auth.NewJWTProvider()
+	authService := services.NewAuthService(userRepo, tokenProvider)
+
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(userService, clientService)
+	router := httpAdapter.SetupRoutes(userService, clientService, authService)
 
 	// ...
 
