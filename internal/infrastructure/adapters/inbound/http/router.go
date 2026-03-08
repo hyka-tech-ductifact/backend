@@ -21,7 +21,6 @@ func SetupRoutes(userService ports.UserService, clientService ports.ClientServic
 	userHandler := NewUserHandler(userService)
 	userRoutes := v1.Group("/users")
 	{
-		userRoutes.POST("", userHandler.CreateUser)
 		userRoutes.GET("/:user_id", userHandler.GetUser)
 		userRoutes.PUT("/:user_id", userHandler.UpdateUser)
 	}

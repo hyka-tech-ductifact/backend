@@ -14,12 +14,6 @@ import (
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
-type CreateUserRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-}
-
 type UpdateUserRequest struct {
 	Name  *string `json:"name" binding:"omitempty"`
 	Email *string `json:"email" binding:"omitempty,email"`
@@ -39,27 +33,6 @@ type UserHandler struct {
 
 func NewUserHandler(userService ports.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
-}
-
-func (h *UserHandler) CreateUser(c *gin.Context) {
-	var req CreateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Pass primitives to the service — the handler does NOT create domain entities.
-	user, err := h.userService.CreateUser(c.Request.Context(), req.Name, req.Email, req.Password)
-	if err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, services.ErrEmailAlreadyInUse) {
-			status = http.StatusConflict
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, toUserResponse(user))
 }
 
 func (h *UserHandler) GetUser(c *gin.Context) {
