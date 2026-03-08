@@ -17,6 +17,7 @@ help:
 	@echo "    app-watch      - Run app with hot reloading (air), compiling and running"
 	@echo "    app-build      - Compile binary to bin/api"
 	@echo "    app-run        - Run app without hot reloading"
+	@echo "    dev            - Build, start DB and run with hot reload"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test-unit          - Run unit tests (no dependencies needed)"
@@ -44,6 +45,9 @@ help:
 	@echo "    lint           - Lint code"
 	@echo "    deps           - Install dependencies"
 	@echo "    clean          - Remove build artifacts"
+
+# Quick dev shortcut: build, start DB and run with hot reload
+dev: app-build db-start app-watch
 
 # Compile binary to bin/api
 app-build:
