@@ -1,7 +1,9 @@
-package middleware
+package helpers
 
 import (
 	"errors"
+
+	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,12 +19,12 @@ var ErrUserIDNotInContext = errors.New("user ID not found in context")
 // Usage:
 //
 //	func (h *UserHandler) GetMe(c *gin.Context) {
-//	    userID, err := middleware.GetUserIDFromContext(c)
+//	    userID, err := helpers.GetUserIDFromContext(c)
 //	    if err != nil { ... }
 //	    // userID is guaranteed to be the authenticated user
 //	}
 func GetUserIDFromContext(c *gin.Context) (uuid.UUID, error) {
-	value, exists := c.Get(string(UserIDKey))
+	value, exists := c.Get(string(middleware.UserIDKey))
 	if !exists {
 		return uuid.Nil, ErrUserIDNotInContext
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ductifact/internal/application/ports"
+	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 	"ductifact/test/unit/mocks"
 
@@ -29,7 +30,7 @@ func setupRouter(tokenProvider ports.TokenProvider) *gin.Engine {
 	r := gin.New()
 
 	r.GET("/protected", middleware.AuthMiddleware(tokenProvider), func(c *gin.Context) {
-		userID, err := middleware.GetUserIDFromContext(c)
+		userID, err := helpers.GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -171,7 +172,7 @@ func TestGetUserIDFromContext_WithoutMiddleware_ReturnsError(t *testing.T) {
 	r := gin.New()
 
 	r.GET("/unprotected", func(c *gin.Context) {
-		_, err := middleware.GetUserIDFromContext(c)
+		_, err := helpers.GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
@@ -199,7 +200,7 @@ func TestGetUserIDFromContext_WithWrongType_ReturnsError(t *testing.T) {
 	r.GET("/bad-context", func(c *gin.Context) {
 		c.Set(string(middleware.UserIDKey), "not-a-uuid") // wrong type
 
-		_, err := middleware.GetUserIDFromContext(c)
+		_, err := helpers.GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return

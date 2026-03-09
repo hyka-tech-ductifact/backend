@@ -7,7 +7,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
+	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -41,7 +41,7 @@ func NewClientHandler(clientService usecases.ClientService) *ClientHandler {
 
 // CreateClient handles POST /users/me/clients
 func (h *ClientHandler) CreateClient(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -71,7 +71,7 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 
 // ListClients handles GET /users/me/clients
 func (h *ClientHandler) ListClients(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -93,7 +93,7 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 
 // GetClient handles GET /users/me/clients/:client_id
 func (h *ClientHandler) GetClient(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -123,7 +123,7 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 
 // UpdateClient handles PUT /users/me/clients/:client_id
 func (h *ClientHandler) UpdateClient(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -161,7 +161,7 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 
 // DeleteClient handles DELETE /users/me/clients/:client_id
 func (h *ClientHandler) DeleteClient(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return

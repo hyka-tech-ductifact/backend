@@ -7,7 +7,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
+	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,7 +37,7 @@ func NewUserHandler(userService usecases.UserService) *UserHandler {
 
 // GetMe handles GET /users/me — returns the authenticated user's profile.
 func (h *UserHandler) GetMe(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -58,7 +58,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 
 // UpdateMe handles PUT /users/me — updates the authenticated user's profile.
 func (h *UserHandler) UpdateMe(c *gin.Context) {
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := helpers.GetUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
