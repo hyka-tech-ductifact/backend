@@ -1,10 +1,8 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
-	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -45,11 +43,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 
 	user, err := h.userService.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
-		if errors.Is(err, services.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		helpers.HandleError(c, err)
 		return
 	}
 
@@ -72,14 +66,7 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 
 	user, err := h.userService.UpdateUser(c.Request.Context(), userID, req.Name, req.Email)
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrUserNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, services.ErrEmailAlreadyInUse):
-			status = http.StatusConflict
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 

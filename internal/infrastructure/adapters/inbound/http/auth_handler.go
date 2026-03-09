@@ -1,13 +1,10 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
-	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
-	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/valueobjects"
+	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,18 +46,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, token, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrEmailTaken):
-			status = http.StatusConflict
-		case errors.Is(err, entities.ErrEmptyUserName):
-			status = http.StatusBadRequest
-		case errors.Is(err, valueobjects.ErrPasswordTooShort),
-			errors.Is(err, valueobjects.ErrPasswordEmpty),
-			errors.Is(err, valueobjects.ErrInvalidEmail):
-			status = http.StatusBadRequest
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 
@@ -79,11 +65,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user, token, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		helpers.HandleError(c, err)
 		return
 	}
 

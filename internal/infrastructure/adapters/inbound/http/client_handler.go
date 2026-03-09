@@ -1,10 +1,8 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
-	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -55,14 +53,7 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 
 	client, err := h.clientService.CreateClient(c.Request.Context(), req.Name, userID)
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrUserNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, entities.ErrEmptyClientName):
-			status = http.StatusBadRequest
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 
@@ -107,14 +98,7 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 
 	client, err := h.clientService.GetClientByID(c.Request.Context(), id, userID)
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrClientNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, services.ErrClientNotOwned):
-			status = http.StatusForbidden
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 
@@ -143,16 +127,7 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 
 	client, err := h.clientService.UpdateClient(c.Request.Context(), id, userID, req.Name)
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrClientNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, services.ErrClientNotOwned):
-			status = http.StatusForbidden
-		case errors.Is(err, entities.ErrEmptyClientName):
-			status = http.StatusBadRequest
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 
@@ -174,14 +149,7 @@ func (h *ClientHandler) DeleteClient(c *gin.Context) {
 	}
 
 	if err := h.clientService.DeleteClient(c.Request.Context(), id, userID); err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, services.ErrClientNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, services.ErrClientNotOwned):
-			status = http.StatusForbidden
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		helpers.HandleError(c, err)
 		return
 	}
 
