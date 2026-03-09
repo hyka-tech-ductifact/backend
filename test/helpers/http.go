@@ -50,6 +50,58 @@ func GetJSON(t *testing.T, url string) *http.Response {
 	return resp
 }
 
+// --- Authenticated versions (with Bearer token) ---
+
+// AuthGetJSON sends GET with Authorization: Bearer <token>.
+func AuthGetJSON(t *testing.T, url, token string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// AuthPostJSON sends POST with Authorization: Bearer <token>.
+func AuthPostJSON(t *testing.T, url, token string, body any) *http.Response {
+	t.Helper()
+	b, err := json.Marshal(body)
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(b))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// AuthPutJSON sends PUT with Authorization: Bearer <token>.
+func AuthPutJSON(t *testing.T, url, token string, body any) *http.Response {
+	t.Helper()
+	b, err := json.Marshal(body)
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// AuthDeleteJSON sends DELETE with Authorization: Bearer <token>.
+func AuthDeleteJSON(t *testing.T, url, token string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
 // ParseBody decodes the response body as JSON into a map.
 // It closes the response body after reading.
 func ParseBody(t *testing.T, resp *http.Response) map[string]any {

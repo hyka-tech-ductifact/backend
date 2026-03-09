@@ -7,9 +7,9 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // --- DTOs (HTTP-specific, not domain objects) ---
@@ -35,14 +35,15 @@ func NewUserHandler(userService usecases.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
-func (h *UserHandler) GetUser(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("user_id"))
+// GetMe handles GET /users/me — returns the authenticated user's profile.
+func (h *UserHandler) GetMe(c *gin.Context) {
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	user, err := h.userService.GetUserByID(c.Request.Context(), id)
+	user, err := h.userService.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, services.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -55,10 +56,11 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, toUserResponse(user))
 }
 
-func (h *UserHandler) UpdateUser(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("user_id"))
+// UpdateMe handles PUT /users/me — updates the authenticated user's profile.
+func (h *UserHandler) UpdateMe(c *gin.Context) {
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -68,8 +70,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	// Pass optional fields as pointers — the service handles the logic.
-	user, err := h.userService.UpdateUser(c.Request.Context(), id, req.Name, req.Email)
+	user, err := h.userService.UpdateUser(c.Request.Context(), userID, req.Name, req.Email)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {

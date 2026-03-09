@@ -36,15 +36,14 @@ func registerUser(t *testing.T, name, email, password string) (string, string) {
 	return user["id"].(string), body["token"].(string)
 }
 
-// ─── Get User ────────────────────────────────────────────────────────────────
+// ─── Get User (via /users/me) ────────────────────────────────────────────────
 
-func TestE2E_GetUser_Success(t *testing.T) {
+func TestE2E_GetMe_Success(t *testing.T) {
 	clean(t)
 
-	id, _ := registerUser(t, "María", "maria@example.com", "securepass123")
+	id, token := registerUser(t, "María", "maria@example.com", "securepass123")
 
-	// Get the user
-	resp := helpers.GetJSON(t, url("/users/"+id))
+	resp := helpers.AuthGetJSON(t, url("/users/me"), token)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
@@ -54,35 +53,30 @@ func TestE2E_GetUser_Success(t *testing.T) {
 	assert.Equal(t, "maria@example.com", body["email"])
 }
 
-func TestE2E_GetUser_NotFound_Returns404(t *testing.T) {
+func TestE2E_GetMe_NoToken_Returns401(t *testing.T) {
 	clean(t)
 
-	resp := helpers.GetJSON(t, url("/users/00000000-0000-0000-0000-000000000000"))
+	resp := helpers.GetJSON(t, url("/users/me"))
 
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["error"], "user not found")
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestE2E_GetUser_InvalidID_Returns400(t *testing.T) {
+func TestE2E_GetMe_InvalidToken_Returns401(t *testing.T) {
 	clean(t)
 
-	resp := helpers.GetJSON(t, url("/users/not-a-uuid"))
+	resp := helpers.AuthGetJSON(t, url("/users/me"), "invalid-token")
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["error"], "invalid user ID")
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-// ─── Update User ─────────────────────────────────────────────────────────────
+// ─── Update User (via /users/me) ─────────────────────────────────────────────
 
-func TestE2E_UpdateUser_Name_Success(t *testing.T) {
+func TestE2E_UpdateMe_Name_Success(t *testing.T) {
 	clean(t)
 
-	id, _ := registerUser(t, "Juan", "juan@example.com", "securepass123")
+	id, token := registerUser(t, "Juan", "juan@example.com", "securepass123")
 
-	// Update name only
-	resp := helpers.PutJSON(t, url("/users/"+id), map[string]string{
+	resp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{
 		"name": "Juan Carlos",
 	})
 
@@ -94,13 +88,12 @@ func TestE2E_UpdateUser_Name_Success(t *testing.T) {
 	assert.Equal(t, "juan@example.com", body["email"]) // email unchanged
 }
 
-func TestE2E_UpdateUser_Email_Success(t *testing.T) {
+func TestE2E_UpdateMe_Email_Success(t *testing.T) {
 	clean(t)
 
-	id, _ := registerUser(t, "Juan", "old@example.com", "securepass123")
+	_, token := registerUser(t, "Juan", "old@example.com", "securepass123")
 
-	// Update email only
-	resp := helpers.PutJSON(t, url("/users/"+id), map[string]string{
+	resp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{
 		"email": "new@example.com",
 	})
 
@@ -111,15 +104,15 @@ func TestE2E_UpdateUser_Email_Success(t *testing.T) {
 	assert.Equal(t, "new@example.com", body["email"])
 }
 
-func TestE2E_UpdateUser_DuplicateEmail_Returns409(t *testing.T) {
+func TestE2E_UpdateMe_DuplicateEmail_Returns409(t *testing.T) {
 	clean(t)
 
 	// Create two users
 	registerUser(t, "Juan", "juan@example.com", "securepass123")
-	pedroID, _ := registerUser(t, "Pedro", "pedro@example.com", "securepass123")
+	_, pedroToken := registerUser(t, "Pedro", "pedro@example.com", "securepass123")
 
 	// Try to update Pedro's email to Juan's
-	resp := helpers.PutJSON(t, url("/users/"+pedroID), map[string]string{
+	resp := helpers.AuthPutJSON(t, url("/users/me"), pedroToken, map[string]string{
 		"email": "juan@example.com",
 	})
 
@@ -128,36 +121,26 @@ func TestE2E_UpdateUser_DuplicateEmail_Returns409(t *testing.T) {
 	assert.Contains(t, body["error"], "email already in use")
 }
 
-func TestE2E_UpdateUser_NotFound_Returns404(t *testing.T) {
+func TestE2E_UpdateMe_NoToken_Returns401(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PutJSON(t, url("/users/00000000-0000-0000-0000-000000000000"), map[string]string{
+	resp := helpers.PutJSON(t, url("/users/me"), map[string]string{
 		"name": "Ghost",
 	})
 
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-}
-
-func TestE2E_UpdateUser_InvalidID_Returns400(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PutJSON(t, url("/users/not-a-uuid"), map[string]string{
-		"name": "Test",
-	})
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────
 
-func TestE2E_FullFlow_Register_Get_Update_Get(t *testing.T) {
+func TestE2E_FullFlow_Register_GetMe_UpdateMe_GetMe(t *testing.T) {
 	clean(t)
 
 	// 1. Register
-	id, _ := registerUser(t, "Ana", "ana@example.com", "securepass123")
+	id, token := registerUser(t, "Ana", "ana@example.com", "securepass123")
 
-	// 2. Get — verify persisted
-	getResp1 := helpers.GetJSON(t, url("/users/"+id))
+	// 2. GetMe — verify persisted
+	getResp1 := helpers.AuthGetJSON(t, url("/users/me"), token)
 	assert.Equal(t, http.StatusOK, getResp1.StatusCode)
 	fetched1 := helpers.ParseBody(t, getResp1)
 
@@ -165,8 +148,8 @@ func TestE2E_FullFlow_Register_Get_Update_Get(t *testing.T) {
 	assert.Equal(t, "Ana", fetched1["name"])
 	assert.Equal(t, "ana@example.com", fetched1["email"])
 
-	// 3. Update name and email
-	updateResp := helpers.PutJSON(t, url("/users/"+id), map[string]string{
+	// 3. UpdateMe — name and email
+	updateResp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{
 		"name":  "Ana María",
 		"email": "anamaria@example.com",
 	})
@@ -177,8 +160,8 @@ func TestE2E_FullFlow_Register_Get_Update_Get(t *testing.T) {
 	assert.Equal(t, "Ana María", updated["name"])
 	assert.Equal(t, "anamaria@example.com", updated["email"])
 
-	// 4. Get — verify update persisted
-	getResp2 := helpers.GetJSON(t, url("/users/"+id))
+	// 4. GetMe — verify update persisted
+	getResp2 := helpers.AuthGetJSON(t, url("/users/me"), token)
 	assert.Equal(t, http.StatusOK, getResp2.StatusCode)
 	fetched2 := helpers.ParseBody(t, getResp2)
 

@@ -35,7 +35,7 @@ func main() {
 	authService := services.NewAuthService(userRepo, tokenProvider)
 
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(userService, clientService, authService)
+	router := httpAdapter.SetupRoutes(userService, clientService, authService, tokenProvider)
 
 	// ...
 

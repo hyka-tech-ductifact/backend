@@ -7,6 +7,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,11 +39,11 @@ func NewClientHandler(clientService usecases.ClientService) *ClientHandler {
 	return &ClientHandler{clientService: clientService}
 }
 
-// CreateClient handles POST /users/:user_id/clients
+// CreateClient handles POST /users/me/clients
 func (h *ClientHandler) CreateClient(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("user_id"))
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -68,11 +69,11 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 	c.JSON(http.StatusCreated, toClientResponse(client))
 }
 
-// ListClients handles GET /users/:user_id/clients
+// ListClients handles GET /users/me/clients
 func (h *ClientHandler) ListClients(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("user_id"))
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -90,11 +91,11 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetClient handles GET /users/:user_id/clients/:id
+// GetClient handles GET /users/me/clients/:client_id
 func (h *ClientHandler) GetClient(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("user_id"))
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -120,11 +121,11 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 	c.JSON(http.StatusOK, toClientResponse(client))
 }
 
-// UpdateClient handles PUT /users/:user_id/clients/:id
+// UpdateClient handles PUT /users/me/clients/:client_id
 func (h *ClientHandler) UpdateClient(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("user_id"))
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -158,11 +159,11 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 	c.JSON(http.StatusOK, toClientResponse(client))
 }
 
-// DeleteClient handles DELETE /users/:user_id/clients/:id
+// DeleteClient handles DELETE /users/me/clients/:client_id
 func (h *ClientHandler) DeleteClient(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("user_id"))
+	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 

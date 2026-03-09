@@ -1,27 +1,30 @@
 package http
 
 import (
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/usecases"
+	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes configures the HTTP router.
+// SetupRoutes configures the HTTP router with public and protected route groups.
+// Protected routes require a valid JWT in the Authorization header.
 func SetupRoutes(
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
+	tokenProvider ports.TokenProvider,
 ) *gin.Engine {
 	r := gin.Default()
 
-	// API v1
 	v1 := r.Group("/api/v1")
+
+	// --- Public routes (no auth required) ---
 
 	v1.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy !!!!"})
 	})
-
-	// --- Public routes (no auth required) ---
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)
@@ -31,17 +34,22 @@ func SetupRoutes(
 		authRoutes.POST("/login", authHandler.Login)
 	}
 
-	// User routes
+	// --- Protected routes (auth required) ---
+
+	protected := v1.Group("")
+	protected.Use(middleware.AuthMiddleware(tokenProvider))
+
+	// User routes — userID comes from the JWT token, not the URL
 	userHandler := NewUserHandler(userService)
-	userRoutes := v1.Group("/users")
+	userRoutes := protected.Group("/users")
 	{
-		userRoutes.GET("/:user_id", userHandler.GetUser)
-		userRoutes.PUT("/:user_id", userHandler.UpdateUser)
+		userRoutes.GET("/me", userHandler.GetMe)
+		userRoutes.PUT("/me", userHandler.UpdateMe)
 	}
 
-	// Client routes (nested under users — a client belongs to a user)
+	// Client routes — always "my" clients (userID from token)
 	clientHandler := NewClientHandler(clientService)
-	clientRoutes := userRoutes.Group("/:user_id/clients")
+	clientRoutes := protected.Group("/users/me/clients")
 	{
 		clientRoutes.POST("", clientHandler.CreateClient)
 		clientRoutes.GET("", clientHandler.ListClients)
