@@ -2,6 +2,9 @@ package http
 
 import (
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
@@ -11,6 +14,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,7 +39,34 @@ func SetupRoutes(
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 
-	r := gin.Default()
+	// --- Create router WITHOUT default middlewares ---
+	r := gin.New()
+
+	// --- Register middlewares in correct order ---
+	// 1. Request ID: first, so all logs include the ID
+	r.Use(middleware.RequestIDMiddleware())
+
+	// 2. Logger: second, to log each request with the ID
+	r.Use(middleware.LoggerMiddleware())
+
+	// 3. Recovery: third, to catch panics from anything below
+	r.Use(middleware.RecoveryMiddleware())
+
+	// 4. CORS: fourth, before any business logic
+	// CORS_ORIGINS is a comma-separated list of allowed origins (e.g. "http://localhost:3000,http://localhost:5173")
+	allowedOrigins := strings.Split(os.Getenv("CORS_ORIGINS"), ",")
+	for i := range allowedOrigins {
+		allowedOrigins[i] = strings.TrimSpace(allowedOrigins[i])
+	}
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Request-ID"},
+		ExposeHeaders:    []string{"X-Request-ID"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	v1 := r.Group("/api/v1")
 
