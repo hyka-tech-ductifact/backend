@@ -220,7 +220,7 @@ func CleanDB(t *testing.T, db *gorm.DB) {
 |------|---------|-----------|
 | Domain | `internal/domain/entities/client.go` | Entidad + constructor + validación |
 | Domain | `internal/domain/repositories/client_repository.go` | Interfaz del repositorio (outbound port) |
-| Application | `internal/application/ports/client_service.go` | Interfaz del servicio (inbound port) |
+| Application | `internal/application/usecases/client_service.go` | Interfaz del servicio (use case) |
 | Application | `internal/application/services/client_service.go` | Implementación del servicio |
 | Infrastructure | `internal/infrastructure/adapters/outbound/persistence/postgres_client_repository.go` | Repositorio PostgreSQL + model + mappers |
 | Infrastructure | `internal/infrastructure/adapters/inbound/http/client_handler.go` | Handler HTTP + DTOs + mappers |

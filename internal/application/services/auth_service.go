@@ -17,7 +17,7 @@ var (
 	ErrEmailTaken         = errors.New("email already registered")
 )
 
-// authService implements ports.AuthService.
+// authService implements usecases.AuthService.
 type authService struct {
 	userRepo      repositories.UserRepository
 	tokenProvider ports.TokenProvider

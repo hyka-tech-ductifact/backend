@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
+	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/valueobjects"
 
@@ -33,10 +33,10 @@ type AuthResponse struct {
 // --- Handler ---
 
 type AuthHandler struct {
-	authService ports.AuthService
+	authService usecases.AuthService
 }
 
-func NewAuthHandler(authService ports.AuthService) *AuthHandler {
+func NewAuthHandler(authService usecases.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 

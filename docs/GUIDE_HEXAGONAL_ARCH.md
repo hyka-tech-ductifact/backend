@@ -241,12 +241,12 @@ type UserRepository interface {
 >
 > **Rule:** Can import `domain/`. Cannot import `infrastructure/`. Does not know about HTTP, databases, or any framework.
 
-#### 2.1 Inbound Port (`application/ports/`)
+#### 2.1 Use Cases (`application/usecases/`)
 
-The inbound port is the **interface that defines what the application can do**. Inbound adapters (HTTP handlers, gRPC, CLI) depend on this interface.
+The use case is the **interface that defines what the application can do**. Inbound adapters (HTTP handlers, gRPC, CLI) depend on this interface.
 
 ```go
-// application/ports/user_service.go
+// application/usecases/user_service.go
 type UserService interface {
     CreateUser(ctx context.Context, name, email string) (*entities.User, error)
     GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
@@ -292,7 +292,7 @@ func (s *userService) CreateUser(ctx context.Context, name, email string) (*enti
 ```
 
 **Key points:**
-- Implements `ports.UserService` (the inbound port)
+- Implements `usecases.UserService` (the inbound port)
 - Depends on `repositories.UserRepository` (the outbound port) — **never** on `PostgresUserRepository`
 - Contains **application-level** business rules (validation, orchestration)
 - The struct is **unexported** (`userService`, not `UserService`) — the outside world interacts through the port interface, enforcing the contract
@@ -326,7 +326,7 @@ type UserResponse struct {
 }
 
 type UserHandler struct {
-    userService ports.UserService  // depends on INBOUND PORT, not concrete service
+    userService usecases.UserService  // depends on INBOUND PORT, not concrete service
 }
 
 func (h *UserHandler) CreateUser(c *gin.Context) {
@@ -344,7 +344,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 **Key points:**
 - DTOs (`CreateUserRequest`, `UserResponse`) live **here**, not in domain or application — they are HTTP-specific concerns with `json:` and `binding:` tags
-- Depends on `ports.UserService` (the inbound port interface), NOT on `*services.userService`
+- Depends on `usecases.UserService` (the inbound port interface), NOT on `*services.userService`
 - Handles HTTP-specific concerns: status codes, JSON parsing, error formatting
 - Translates between the HTTP world and the domain world
 - Does NOT contain business logic — only translation and delegation
@@ -466,9 +466,10 @@ func main() {
 | `domain/entities` | Standard library only | Everything else |
 | `domain/valueobjects` | Standard library only | Everything else |
 | `domain/repositories` | `domain/entities` | `application/`, `infrastructure/` |
+| `application/usecases` | `domain/entities` | `infrastructure/` |
 | `application/ports` | `domain/entities` | `infrastructure/` |
-| `application/services` | `domain/entities`, `domain/repositories`, `application/ports` | `infrastructure/` |
-| `infrastructure/adapters/inbound` | `application/ports`, `domain/entities` | `application/services`, `outbound/` |
+| `application/services` | `domain/entities`, `domain/repositories`, `application/usecases`, `application/ports` | `infrastructure/` |
+| `infrastructure/adapters/inbound` | `application/usecases`, `domain/entities` | `application/services`, `outbound/` |
 | `infrastructure/adapters/outbound` | `domain/entities`, `domain/repositories` | `application/`, `inbound/` |
 | `cmd/api/main.go` | **Everything** (composition root) | — |
 
@@ -483,7 +484,7 @@ HTTP POST /users
     │   - Passes primitives (name, email) to the inbound port
     │
     ▼
-[2] Inbound Port (ports.UserService interface)
+[2] Use Case (usecases.UserService interface)
     │   - Handler calls userService.CreateUser(name, email)
     │
     ▼
@@ -669,7 +670,7 @@ When in doubt about where code belongs, ask:
 |----------|--------|
 | Is it a business rule? | → `domain/` |
 | Is it orchestration of business operations? | → `application/services/` |
-| Does it define what the app can do? | → `application/ports/` (inbound port) |
+| Does it define what the app can do? | → `application/usecases/` (use case interface) |
 | Does it define what the app needs? | → `domain/repositories/` (outbound port) |
 | Does it receive external input? | → `infrastructure/adapters/inbound/` |
 | Does it talk to an external system? | → `infrastructure/adapters/outbound/` |

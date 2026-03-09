@@ -496,10 +496,10 @@ CREATE TABLE IF NOT EXISTS users (
 
 ### 8.1 Puerto de entrada (interface)
 
-📁 `internal/application/ports/auth_service.go`
+📁 `internal/application/usecases/auth_service.go`
 
 ```go
-package ports
+package usecases
 
 import (
 	"context"
@@ -571,7 +571,7 @@ var (
 	ErrEmailTaken         = errors.New("email already registered")
 )
 
-// authService implements ports.AuthService.
+// authService implements usecases.AuthService.
 type authService struct {
 	userRepo      repositories.UserRepository
 	tokenProvider ports.TokenProvider
@@ -789,8 +789,8 @@ import (
 	"errors"
 	"net/http"
 
-	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
+	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/valueobjects"
 
@@ -818,10 +818,10 @@ type AuthResponse struct {
 // --- Handler ---
 
 type AuthHandler struct {
-	authService ports.AuthService
+	authService usecases.AuthService
 }
 
-func NewAuthHandler(authService ports.AuthService) *AuthHandler {
+func NewAuthHandler(authService usecases.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
@@ -1019,9 +1019,9 @@ Ahora dividimos las rutas en **públicas** (sin auth) y **protegidas** (con auth
 
 ```go
 func SetupRoutes(
-	userService ports.UserService,
-	clientService ports.ClientService,
-	authService ports.AuthService,
+	userService usecases.UserService,
+	clientService usecases.ClientService,
+	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 ) *gin.Engine {
 	r := gin.Default()
@@ -1385,8 +1385,8 @@ func TestE2E_ProtectedRoute_InvalidToken_401(t *testing.T) {
 | Capa | Archivo | Propósito |
 |------|---------|-----------|
 | Domain | `internal/domain/valueobjects/password.go` | Value Object: validación + hashing |
-| Application | `internal/application/ports/auth_service.go` | Inbound port: interface del auth service |
-| Application | `internal/application/ports/token_provider.go` | Outbound port: interface para generar/validar tokens |
+| Application | `internal/application/usecases/auth_service.go` | Use case: interface del auth service |
+| Application | `internal/application/ports/token_provider.go` | Outbound port: interface para generar/validar tokens (technical port) |
 | Application | `internal/application/services/auth_service.go` | Implementación del servicio de auth |
 | Infrastructure | `internal/infrastructure/auth/jwt_provider.go` | Adapter: implementación JWT del TokenProvider |
 | Infrastructure | `internal/infrastructure/adapters/inbound/http/auth_handler.go` | Handler HTTP: register + login |

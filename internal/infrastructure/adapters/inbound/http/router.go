@@ -1,16 +1,16 @@
 package http
 
 import (
-	"ductifact/internal/application/ports"
+	"ductifact/internal/application/usecases"
 
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRoutes configures the HTTP router.
 func SetupRoutes(
-	userService ports.UserService,
-	clientService ports.ClientService,
-	authService ports.AuthService,
+	userService usecases.UserService,
+	clientService usecases.ClientService,
+	authService usecases.AuthService,
 ) *gin.Engine {
 	r := gin.Default()
 

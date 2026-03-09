@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
+	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 
 	"github.com/gin-gonic/gin"
@@ -31,10 +31,10 @@ type ClientResponse struct {
 // --- Handler ---
 
 type ClientHandler struct {
-	clientService ports.ClientService
+	clientService usecases.ClientService
 }
 
-func NewClientHandler(clientService ports.ClientService) *ClientHandler {
+func NewClientHandler(clientService usecases.ClientService) *ClientHandler {
 	return &ClientHandler{clientService: clientService}
 }
 

@@ -18,7 +18,7 @@ var (
 	ErrClientNotOwned = errors.New("client does not belong to this user")
 )
 
-// clientService implements ports.ClientService.
+// clientService implements usecases.ClientService.
 // Unexported struct: can only be created via NewClientService.
 type clientService struct {
 	clientRepo repositories.ClientRepository

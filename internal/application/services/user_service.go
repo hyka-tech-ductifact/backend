@@ -18,7 +18,7 @@ var (
 	ErrUserNotFound      = errors.New("user not found")
 )
 
-// userService implements ports.UserService.
+// userService implements usecases.UserService.
 // Unexported struct: can only be created via NewUserService.
 type userService struct {
 	userRepo repositories.UserRepository

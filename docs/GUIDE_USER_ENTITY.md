@@ -287,12 +287,12 @@ En Go, las interfaces deben ser **lo más pequeñas posible**. Si tu caso de uso
 
 ## Paso 4 — Puerto de entrada (Service interface)
 
-📁 `internal/application/ports/user_service.go`
+📁 `internal/application/usecases/user_service.go`
 
-El puerto de entrada define **qué operaciones expone tu aplicación al mundo exterior**. Los adaptadores de entrada (HTTP handlers, CLI, gRPC) dependen de esta interfaz.
+El caso de uso define **qué operaciones expone tu aplicación al mundo exterior**. Los adaptadores de entrada (HTTP handlers, CLI, gRPC) dependen de esta interfaz.
 
 ```go
-package ports
+package usecases
 
 import (
 	"context"
@@ -442,7 +442,7 @@ var (
 	ErrUserNotFound      = errors.New("user not found")
 )
 
-// userService implements ports.UserService.
+// userService implements usecases.UserService.
 // Unexported struct: can only be created via NewUserService.
 type userService struct {
 	userRepo repositories.UserRepository
@@ -560,7 +560,7 @@ La entidad **no puede** verificar unicidad porque no conoce el repositorio — y
 
 ### 💡 Consejo: `NewUserService` retorna `*userService` (concreto), no la interfaz
 
-En Go idiomático, los constructores retornan el **tipo concreto**, no la interfaz. ¿Por qué? Porque las interfaces pertenecen al consumidor. El router/main asignará el concreto a la interfaz `ports.UserService` — ahí es donde el compilador verifica que implementa todos los métodos.
+En Go idiomático, los constructores retornan el **tipo concreto**, no la interfaz. ¿Por qué? Porque las interfaces pertenecen al consumidor. El router/main asignará el concreto a la interfaz `usecases.UserService` — ahí es donde el compilador verifica que implementa todos los métodos.
 
 ---
 
@@ -720,8 +720,8 @@ import (
 	"errors"
 	"net/http"
 
-	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
+	"ductifact/internal/application/usecases"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -748,10 +748,10 @@ type UserResponse struct {
 // --- Handler ---
 
 type UserHandler struct {
-	userService ports.UserService
+	userService usecases.UserService
 }
 
-func NewUserHandler(userService ports.UserService) *UserHandler {
+func NewUserHandler(userService usecases.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
@@ -861,7 +861,7 @@ Este es un patrón muy limpio. Los errores de dominio/aplicación se definen com
 Registrar el `UserService` como parámetro y registrar las rutas:
 
 ```go
-func SetupRoutes(userService ports.UserService) *gin.Engine {
+func SetupRoutes(userService usecases.UserService) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
@@ -955,7 +955,7 @@ Siempre usar `TIMESTAMPTZ` (con timezone). `TIMESTAMP` sin timezone puede causar
 | 1  | 🔵 Dominio | `internal/domain/entities/user.go` | **Modificar** (añadir validación, quitar json tags) |
 | 2  | 🔵 Dominio | `internal/domain/valueobjects/email.go` | Ya existe ✅ (mejorar error opcionalmente) |
 | 3  | 🔵 Dominio | `internal/domain/repositories/user_repository.go` | **Crear** |
-| 4  | 🟢 Aplicación | `internal/application/ports/user_service.go` | **Crear** |
+| 4  | 🟢 Aplicación | `internal/application/usecases/user_service.go` | **Crear** |
 | 5  | 🟢 Aplicación | `internal/application/services/user_service.go` | **Crear** |
 | 6  | 🟠 Infraestructura | `internal/infrastructure/adapters/outbound/persistence/postgres_user_repository.go` | **Crear** |
 | 7  | 🟠 Infraestructura | `internal/infrastructure/adapters/inbound/http/user_handler.go` | **Crear** |
