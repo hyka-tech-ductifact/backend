@@ -568,7 +568,7 @@ En Go idiomático, los constructores retornan el **tipo concreto**, no la interf
 
 📁 `internal/infrastructure/adapters/outbound/persistence/postgres_user_repository.go`
 
-Este adaptador **implementa** la interfaz `UserRepository` con PostgreSQL + GORM.
+Este adaptador **implementa** la interfaz `UserRepository` con PostgreSQL + GORM. A diferencia del handler (adaptador inbound), el adaptador outbound sí implementa una interfaz. Esto es porque la aplicación define qué necesita del mundo exterior ("necesito algo que pueda guardar usuarios") y el adaptador satisface ese contrato.
 
 ```go
 package persistence
@@ -712,6 +712,8 @@ Con constraints en la BD, es **físicamente imposible** que existan datos invál
 📁 `internal/infrastructure/adapters/inbound/http/user_handler.go`
 
 El handler traduce HTTP → servicio de aplicación. No conoce la base de datos ni las entidades de dominio (solo los DTOs).
+
+> 💡 **¿Por qué se llama "adaptador" si no implementa ninguna interfaz?** Porque "adaptador" no significa "implementa una interfaz". Significa **"traduce entre dos mundos"**. El handler traduce entre el mundo HTTP (JSON, status codes, headers) y el mundo de la aplicación (primitivos, entidades de dominio). Los adaptadores outbound (como el repositorio PostgreSQL) sí implementan una interfaz porque la aplicación define el contrato de lo que necesita. Los adaptadores inbound, en cambio, **consumen** la interfaz del caso de uso — no la implementan.
 
 ```go
 package http

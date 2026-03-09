@@ -545,7 +545,7 @@ type TokenClaims struct {
 
 Porque así el `AuthService` y el middleware de auth no dependen de `golang-jwt/jwt`. Si mañana quieres cambiar la librería de JWT, o usar tokens opacos, o pasar a PASETO, solo cambias el adapter que implementa `TokenProvider`.
 
-Esto sigue el patrón de la arquitectura hexagonal: **el dominio/aplicación define la interface (port), la infraestructura la implementa (adapter)**.
+Esto sigue el patrón de la arquitectura hexagonal: **el dominio/aplicación define la interface (port), la infraestructura la implementa (adapter)**. Nota: esto aplica a los **outbound ports** (como `TokenProvider` y `UserRepository`), donde la aplicación define lo que necesita y el adaptador lo implementa. Los adaptadores inbound (como los handlers HTTP) funcionan al revés: **consumen** la interfaz del caso de uso, no la implementan.
 
 ### 8.3 Implementación del servicio
 

@@ -95,6 +95,15 @@ The rule is simple: **everything points inward**. Adapters know about ports, but
 - **Inbound adapters (driving):** They *drive* your application. They receive an external stimulus (HTTP request, CLI command, message) and translate it into a call to the application core.
 - **Outbound adapters (driven):** Your application *drives* them. When your business logic needs to persist data or call an external service, it uses an outbound port, and the adapter does the actual work.
 
+> ⚠️ **Important asymmetry:** "Adapter" does NOT mean "implements an interface". The word "adapter" means **translates between two worlds**. Outbound adapters happen to implement an interface (the outbound port), but inbound adapters do NOT implement any interface — they **consume** one (the use case). Both are adapters because both translate between external formats and the application core.
+>
+> | | Inbound Adapter (driving) | Outbound Adapter (driven) |
+> |---|---|---|
+> | **Who initiates?** | The outside world → your app | Your app → the outside world |
+> | **Implements an interface?** | ❌ No — **consumes** the use case interface | ✅ Yes — **implements** the repository interface |
+> | **Why is it an adapter?** | Translates HTTP ↔ Application | Translates Application ↔ SQL |
+> | **Example** | `ClientHandler` uses `usecases.ClientService` | `PostgresClientRepo` implements `repositories.ClientRepository` |
+
 ---
 
 ## 📁 Project Structure
@@ -350,6 +359,8 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 - Does NOT contain business logic — only translation and delegation
 - Passes **primitives** to the service, not domain entities
 
+> 💡 **Note:** The handler does NOT implement any interface. It is an "adapter" because it **translates** between the HTTP world (JSON, status codes, headers) and the application world (primitives, domain entities). It **consumes** the use case interface — it does not implement it. The service (inside the hexagon) is the one that implements the use case interface.
+
 #### 3.2 Outbound Adapters (`adapters/outbound/persistence/`)
 
 Outbound adapters **implement the outbound ports** defined in the domain. They translate between domain objects and external system formats (SQL rows, API calls, etc.).
@@ -390,6 +401,8 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*en
 - Translates between domain entities and database models in both directions
 - Contains ALL database-specific code (SQL, GORM queries, connection handling)
 - If you switch from PostgreSQL to MongoDB, you only change this adapter — nothing else changes
+
+> 💡 **Note:** Unlike inbound adapters, outbound adapters **do implement an interface** (the outbound port). This is because the application defines what it needs from the outside world (`"I need something that can save users"`) and the outbound adapter satisfies that contract. The application controls the contract; the adapter obeys.
 
 ---
 
@@ -432,11 +445,11 @@ func main() {
 │   │  Inbound Adapter│         │ Outbound Adapter │                      │
 │   │  (HTTP Handler) │         │ (PostgreSQL Repo)│                      │
 │   └────────┬────────┘         └────────▲─────────┘                      │
-│            │ depends on                │ implements                      │
+│            │ consumes                  │ implements                      │
 │            ▼                           │                                 │
 │   ┌─────────────────┐         ┌───────┴──────────┐                      │
-│   │  Inbound Port   │         │  Outbound Port   │                      │
-│   │  (UserService  │         │  (UserRepository│                      │
+│   │  Use Case        │         │  Outbound Port   │                      │
+│   │  (UserService   │         │  (UserRepository│                      │
 │   │   interface)    │         │   interface)      │                      │
 │   └────────▲────────┘         └────────▲─────────┘                      │
 │            │ implements                │ depends on                      │
@@ -632,9 +645,9 @@ Hit the real HTTP server running with real database.
 #### 3. Hexagonal Architecture
 
 **Ports and Adapters** ✅
-- **What I learned**: Ports are interfaces that define boundaries. Adapters are implementations that connect to the real world
-- **Implementation**: `UserService` (inbound port), `UserRepository` (outbound port), `UserHandler` (inbound adapter), `PostgresUserRepository` (outbound adapter)
-- **Key insight**: The direction of the port determines its type. Inbound = outside drives your app. Outbound = your app drives the outside.
+- **What I learned**: Ports are interfaces that define boundaries. Adapters translate between the external world and the application core — but they work asymmetrically. Inbound adapters **consume** a port (use case interface), outbound adapters **implement** a port (repository interface). Both are adapters because both translate between two worlds.
+- **Implementation**: `UserService` (use case), `UserRepository` (outbound port), `UserHandler` (inbound adapter — consumes the use case), `PostgresUserRepository` (outbound adapter — implements the repository)
+- **Key insight**: "Adapter" means "translator", not "interface implementor". The direction determines the relationship: inbound adapters call into the hexagon, outbound adapters are called by the hexagon.
 
 **Dependency Inversion** ✅
 - **What I learned**: High-level modules don't depend on low-level modules. Both depend on abstractions.
