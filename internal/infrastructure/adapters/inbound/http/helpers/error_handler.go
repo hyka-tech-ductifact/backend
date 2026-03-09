@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,5 +53,7 @@ func HandleError(c *gin.Context, err error) {
 	}
 
 	// Unknown error → 500 (don't expose internal details)
+	// Log the real error so we can debug it. The client only sees a generic message.
+	log.Printf("[ERROR] unhandled error: %v (path: %s %s)", err, c.Request.Method, c.Request.URL.Path)
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 }

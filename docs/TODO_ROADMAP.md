@@ -1,11 +1,11 @@
 # Roadmap del Backend — TODO
 
-> Estado actual: Entidad User implementada (entity, value object, service, handler, repository, Docker, Makefile).
+> Estado actual: Fases 1–4 completadas. Infraestructura HTTP con middlewares, segunda entidad (Client), autenticación JWT.
 > Fecha de inicio: Marzo 2026
 
 ---
 
-## Fase 1 — Testing de User ⬅️ ESTÁS AQUÍ
+## Fase 1 — Testing de User ✅
 
 **Objetivo**: Tener la entidad User completamente testeada antes de avanzar con más features.
 
@@ -60,39 +60,39 @@
 
 ---
 
-## Fase 2 — Mejoras de Infraestructura HTTP
+## Fase 2 — Mejoras de Infraestructura HTTP ✅
 
 **Objetivo**: Hacer la API más robusta y profesional antes de añadir más entidades.
 
 ### 2.1 Middleware de logging
-- [ ] Crear middleware que loguee cada request: método, path, status code, duración
+- [X] Crear middleware que loguee cada request: método, path, status code, duración
   - **¿Qué es un middleware?** Es una función que se ejecuta **antes y/o después** de cada request HTTP. Es como un filtro o interceptor. En Gin se registra con `r.Use(middleware)`.
   - Ejemplo: cada vez que alguien llama a `POST /users`, el middleware loguea: `POST /users → 201 (23ms)`
   - Gin ya tiene un logger por defecto (`gin.Default()` lo incluye), pero querrás personalizarlo para que el formato sea consistente con tus logs de aplicación
   - **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/logger.go`
 
 ### 2.2 Middleware de recovery
-- [ ] Crear middleware que capture panics y devuelva 500 en vez de crashear el servidor
+- [X] Crear middleware que capture panics y devuelva 500 en vez de crashear el servidor
   - Si un handler tiene un bug y hace `panic`, sin recovery el servidor muere. Con el middleware, devuelve un 500 limpio y sigue funcionando
   - Gin ya incluye uno con `gin.Default()`, pero puedes personalizarlo para loguear el stack trace
   - **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/recovery.go`
 
 ### 2.3 Middleware de CORS
-- [ ] Configurar CORS para que el frontend (en otro dominio/puerto) pueda llamar a la API
+- [X] Configurar CORS para que el frontend (en otro dominio/puerto) pueda llamar a la API
   - **¿Qué es CORS?** Cuando el frontend corre en `localhost:3000` y la API en `localhost:8080`, el navegador bloquea las requests por seguridad. CORS le dice al navegador "sí, deja pasar requests desde ese origen"
   - Sin esto, el frontend no puede llamar a tu API desde el navegador
   - Librería recomendada: `github.com/gin-contrib/cors`
   - **Dónde**: Configurar en `router.go`
 
 ### 2.4 Middleware de request ID
-- [ ] Añadir un UUID único a cada request para trazabilidad
+- [X] Añadir un UUID único a cada request para trazabilidad
   - Cada request que entra recibe un ID (ej: `X-Request-ID: abc-123`). Si algo falla, puedes buscar ese ID en los logs y ver toda la traza
   - El ID se propaga a través del `context.Context` a servicios y repositorios
   - Muy útil para debugging en producción
   - **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/request_id.go`
 
 ### 2.5 Manejo de errores centralizado
-- [ ] Crear un middleware o helper que mapee errores de dominio a status HTTP de forma consistente
+- [X] Crear un middleware o helper que mapee errores de dominio a status HTTP de forma consistente
   - Ahora mismo el mapping está en cada handler (`ErrEmailAlreadyInUse → 409`, `ErrUserNotFound → 404`). Cuando tengas 10 entidades, repetirás ese switch en cada handler
   - La idea es centralizar: un solo lugar que sabe que `ErrNotFound → 404`, `ErrConflict → 409`, etc.
   - **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/error_handler.go`
@@ -106,7 +106,7 @@
 
 ---
 
-## Fase 3 — Segunda Entidad
+## Fase 3 — Segunda Entidad ✅
 
 **Objetivo**: Aplicar todo lo aprendido con User a una nueva entidad. Consolidar el patrón.
 
@@ -130,7 +130,7 @@
 
 ---
 
-## Fase 4 — Autenticación y Autorización
+## Fase 4 — Autenticación y Autorización ✅
 
 **Objetivo**: Proteger la API para que solo usuarios autenticados puedan usarla.
 
@@ -142,30 +142,32 @@
   - **Recomendación para empezar**: JWT propio, y más adelante integrar un provider externo si lo necesitas.
 
 ### 4.2 Implementar registro y login
-- [ ] Endpoint `POST /auth/register` → crear usuario con contraseña (hash con bcrypt)
-- [ ] Endpoint `POST /auth/login` → validar credenciales, devolver JWT
-- [ ] Añadir campo `PasswordHash` a la entidad User (o crear entidad `Credentials` separada)
-- [ ] Value Object para `Password` (mínimo 8 chars, etc.)
+- [X] Endpoint `POST /auth/register` → crear usuario con contraseña (hash con bcrypt)
+- [X] Endpoint `POST /auth/login` → validar credenciales, devolver JWT
+- [X] Añadir campo `PasswordHash` a la entidad User (o crear entidad `Credentials` separada)
+- [X] Value Object para `Password` (mínimo 8 chars, etc.)
 
 ### 4.3 Middleware de autenticación
-- [ ] Crear middleware que:
+- [X] Crear middleware que:
   1. Lee el header `Authorization: Bearer <token>`
   2. Valida el JWT (firma, expiración)
   3. Extrae el `userID` del token y lo pone en el `context.Context`
   4. Si el token es inválido, devuelve 401
-- [ ] Aplicar el middleware a las rutas protegidas (todo menos `/auth/*` y `/health`)
-- [ ] **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/auth.go`
+- [X] Aplicar el middleware a las rutas protegidas (todo menos `/auth/*` y `/health`)
+- [X] **Dónde**: `internal/infrastructure/adapters/inbound/http/middleware/auth.go`
 
 ### 4.4 Autorización básica
-- [ ] Verificar que un usuario solo puede modificar **sus propios datos**
-  - Ejemplo: `PUT /users/{id}` solo funciona si `id` == el usuario del token
-  - Esto se puede hacer en el middleware o en el servicio
-- [ ] Definir roles si es necesario (admin, user) — solo si el negocio lo requiere
+- [X] Verificar que un usuario solo puede modificar **sus propios datos**
+  - Rutas cambiadas a `/users/me` y `/users/me/clients` — el userID viene del JWT, no de la URL
+  - Los clients se validan con `ErrClientNotOwned` en el servicio
+- [X] Definir roles si es necesario (admin, user) — no necesario por ahora, se usa ownership
 
 ### 4.5 Tests de auth
-- [ ] Unit tests: validación de JWT, hash de passwords
-- [ ] Integration tests: registro + login contra DB
-- [ ] E2E tests: flujo completo (register → login → acceder ruta protegida → 401 sin token)
+- [X] Unit tests: validación de JWT, hash de passwords
+- [X] Integration tests: registro + login contra DB
+- [X] E2E tests: flujo completo (register → login → acceder ruta protegida → 401 sin token)
+
+> **Guía de referencia**: `docs/GUIDE_AUTH_JWT.md` — explicación detallada de todas las decisiones.
 
 ---
 
@@ -237,11 +239,11 @@
 ## Resumen visual del orden
 
 ```
-Fase 1  ██████████░░░░░░░░░░  Testing de User        ⬅️ AHORA
-Fase 2  ░░░░░░░░░░░░░░░░░░░░  Middleware + Infra HTTP
-Fase 3  ░░░░░░░░░░░░░░░░░░░░  Segunda entidad
-Fase 4  ░░░░░░░░░░░░░░░░░░░░  Autenticación
-Fase 5  ░░░░░░░░░░░░░░░░░░░░  API Contracts
+Fase 1  ████████████████████  Testing de User        ✅
+Fase 2  ████████████████████  Middleware + Infra HTTP ✅
+Fase 3  ████████████████████  Segunda entidad         ✅
+Fase 4  ████████████████████  Autenticación           ✅
+Fase 5  ░░░░░░░░░░░░░░░░░░░░  API Contracts          ⬅️ SIGUIENTE
 Fase 6  ░░░░░░░░░░░░░░░░░░░░  Observabilidad
 Fase 7  ░░░░░░░░░░░░░░░░░░░░  CI/CD
 ```
