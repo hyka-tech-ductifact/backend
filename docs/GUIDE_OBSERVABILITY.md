@@ -22,9 +22,10 @@
 5. [Pilar 2 — Health check mejorado](#5-pilar-2--health-check-mejorado)
    - 5.1 [¿Qué es un buen health check?](#51-qué-es-un-buen-health-check)
    - 5.2 [Liveness vs Readiness](#52-liveness-vs-readiness)
-   - 5.3 [Paso 1 — Exponer `*sql.DB` desde la conexión](#53-paso-1--exponer-sqldb-desde-la-conexión)
-   - 5.4 [Paso 2 — Crear el health handler](#54-paso-2--crear-el-health-handler)
-   - 5.5 [Paso 3 — Registrar la ruta](#55-paso-3--registrar-la-ruta)
+   - 5.3 [Paso 1 — Definir el port `HealthChecker`](#53-paso-1--definir-el-port-healthchecker)
+   - 5.4 [Paso 2 — Implementar el adapter `PostgresHealthChecker`](#54-paso-2--implementar-el-adapter-postgreshealthchecker)
+   - 5.5 [Paso 3 — Crear el health handler](#55-paso-3--crear-el-health-handler)
+   - 5.6 [Paso 4 — Registrar la ruta e inyectar desde `main.go`](#56-paso-4--registrar-la-ruta-e-inyectar-desde-maingo)
 6. [Bonus — Graceful shutdown](#6-bonus--graceful-shutdown)
 7. [Pilar 3 — Métricas (visión futura)](#7-pilar-3--métricas-visión-futura)
 8. [Resumen de archivos modificados y creados](#8-resumen-de-archivos-modificados-y-creados)
@@ -600,19 +601,88 @@ En entornos orquestados (Docker Compose con health check, Kubernetes), hay dos t
 
 Para nuestro caso (un solo servicio con Docker Compose), **un solo endpoint `/health` que verifique la DB es suficiente**. Si más adelante migramos a Kubernetes, separamos en `/healthz` (liveness) y `/readyz` (readiness).
 
-### 5.3 Paso 1 — Exponer `*sql.DB` desde la conexión
+### 5.3 Paso 1 — Definir el port `HealthChecker`
 
-GORM envuelve la conexión real de Go (`*sql.DB`). Necesitamos acceder a ella para hacer `db.Ping()`.
+Antes de crear el handler, necesitamos una **interfaz** (port) para verificar la salud de la infraestructura. ¿Por qué? Porque el handler HTTP vive en la capa `inbound`, y **no debe conocer GORM, ni `*sql.DB`, ni ningún detalle de la base de datos**. Si pasásemos `*gorm.DB` al handler, romperíamos la arquitectura hexagonal: la capa HTTP tendría un import directo a la librería de persistencia.
 
-GORM ya proporciona un método para esto:
+La solución es el mismo patrón que ya usamos con `TokenProvider` y los repositorios: definir una interfaz en `ports/` e implementarla en `persistence/`.
 
-```go
-sqlDB, err := db.DB()  // db is *gorm.DB → returns *sql.DB
+```
+┌─────────────────────┐
+│   health_handler.go  │  ← solo conoce ports.HealthChecker
+│   (inbound/http)     │
+└─────────┬───────────┘
+          │ usa la interfaz
+          ▼
+┌─────────────────────┐
+│  ports/              │
+│  health_checker.go   │  ← interfaz: Ping(ctx) error
+└─────────┬───────────┘
+          │ implementada por
+          ▼
+┌─────────────────────┐
+│  persistence/        │
+│  health_checker.go   │  ← usa *gorm.DB internamente
+└─────────────────────┘
 ```
 
-No necesitamos cambiar `connection.go`. Lo usaremos directamente en el health handler.
+**Archivo**: `internal/application/ports/health_checker.go`
 
-### 5.4 Paso 2 — Crear el health handler
+```go
+package ports
+
+import "context"
+
+// HealthChecker is the outbound port for verifying infrastructure health.
+// It is defined as an interface so the HTTP layer doesn't depend on
+// a specific database library — the implementation lives in infrastructure.
+type HealthChecker interface {
+	Ping(ctx context.Context) error
+}
+```
+
+**¿Por qué `context.Context` como parámetro?** Porque `Ping` puede ser una operación de red (TCP al servidor de la DB). Si el request HTTP ya venció (timeout o cancel), no tiene sentido seguir esperando la respuesta del ping. Pasar el contexto permite cancelación y timeouts automáticos.
+
+### 5.4 Paso 2 — Implementar el adapter `PostgresHealthChecker`
+
+Ahora creamos la implementación concreta que usa GORM. Este archivo vive en `persistence/` porque conoce los detalles de la base de datos.
+
+**Archivo**: `internal/infrastructure/adapters/outbound/persistence/health_checker.go`
+
+```go
+package persistence
+
+import (
+	"context"
+
+	"gorm.io/gorm"
+)
+
+// PostgresHealthChecker implements ports.HealthChecker using GORM.
+type PostgresHealthChecker struct {
+	db *gorm.DB
+}
+
+// NewPostgresHealthChecker creates a new PostgresHealthChecker.
+func NewPostgresHealthChecker(db *gorm.DB) *PostgresHealthChecker {
+	return &PostgresHealthChecker{db: db}
+}
+
+// Ping verifies the database connection is alive.
+func (h *PostgresHealthChecker) Ping(ctx context.Context) error {
+	sqlDB, err := h.db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
+}
+```
+
+**Nota**: Usamos `PingContext(ctx)` en lugar de `Ping()` para que una cancelación del request HTTP se propague hasta la conexión TCP al servidor de la DB.
+
+### 5.5 Paso 3 — Crear el health handler
+
+Ahora el handler solo depende de la interfaz `ports.HealthChecker`, no de GORM ni de `*sql.DB`.
 
 **Archivo**: `internal/infrastructure/adapters/inbound/http/health_handler.go`
 
@@ -623,22 +693,23 @@ import (
 	"net/http"
 	"time"
 
+	"ductifact/internal/application/ports"
+
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // HealthHandler provides health check endpoints for the API.
 type HealthHandler struct {
-	db        *gorm.DB
-	startTime time.Time
+	healthChecker ports.HealthChecker
+	startTime     time.Time
 }
 
 // NewHealthHandler creates a new HealthHandler.
 // Call this at application startup and pass the time the app started.
-func NewHealthHandler(db *gorm.DB, startTime time.Time) *HealthHandler {
+func NewHealthHandler(healthChecker ports.HealthChecker, startTime time.Time) *HealthHandler {
 	return &HealthHandler{
-		db:        db,
-		startTime: startTime,
+		healthChecker: healthChecker,
+		startTime:     startTime,
 	}
 }
 
@@ -663,19 +734,7 @@ func NewHealthHandler(db *gorm.DB, startTime time.Time) *HealthHandler {
 func (h *HealthHandler) Check(c *gin.Context) {
 	uptime := time.Since(h.startTime).Round(time.Second).String()
 
-	// Verify database connectivity
-	sqlDB, err := h.db.DB()
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status":   "unhealthy",
-			"uptime":   uptime,
-			"database": "error",
-			"error":    err.Error(),
-		})
-		return
-	}
-
-	if err := sqlDB.Ping(); err != nil {
+	if err := h.healthChecker.Ping(c.Request.Context()); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":   "unhealthy",
 			"uptime":   uptime,
@@ -695,20 +754,21 @@ func (h *HealthHandler) Check(c *gin.Context) {
 
 **Decisiones de diseño:**
 
-1. **`*gorm.DB` como dependencia**: El handler recibe la conexión a la DB, no el `*sql.DB` directamente. Así si mañana quieres verificar más cosas de GORM, ya lo tienes.
-2. **`startTime`**: Lo pasa `main.go` al crear el handler. Es más limpio que un global.
-3. **Status 503 Service Unavailable**: Es el código HTTP correcto cuando el servicio no puede funcionar. Los orquestadores (Kubernetes, load balancers) entienden que 503 = "dejá de enviarle tráfico".
-4. **No exponemos info sensible**: No mostramos string de conexión, contraseñas, ni detalles internos del error de DB más allá del mensaje.
+1. **`ports.HealthChecker` como dependencia**: El handler **no importa GORM**. Solo conoce una interfaz con `Ping(ctx) error`. Esto es la clave de la arquitectura hexagonal — las dependencias apuntan hacia adentro (dominio/ports), nunca hacia afuera (infraestructura concreta).
+2. **`c.Request.Context()`**: Propagamos el contexto del request HTTP al ping. Si el cliente cierra la conexión, el ping se cancela automáticamente.
+3. **`startTime`**: Lo pasa `main.go` al crear el handler. Es más limpio que un global.
+4. **Status 503 Service Unavailable**: Es el código HTTP correcto cuando el servicio no puede funcionar. Los orquestadores (Kubernetes, load balancers) entienden que 503 = "dejá de enviarle tráfico".
+5. **No exponemos info sensible**: No mostramos string de conexión, contraseñas, ni detalles internos del error de DB más allá del mensaje.
 
-### 5.5 Paso 3 — Registrar la ruta
+### 5.6 Paso 4 — Registrar la ruta e inyectar desde `main.go`
 
-En `router.go`, necesitas pasar `*gorm.DB` al setup de rutas para poder crear el health handler.
+En `router.go`, recibimos `ports.HealthChecker` (no `*gorm.DB`). Fíjate que `router.go` no necesita importar `gorm.io/gorm` en absoluto.
 
 **Cambiar la firma de `SetupRoutes`:**
 
 ```go
 func SetupRoutes(
-	db *gorm.DB,
+	healthChecker ports.HealthChecker,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
@@ -716,22 +776,36 @@ func SetupRoutes(
 ) *gin.Engine {
 ```
 
-**Reemplazar el health check inline:**
+**Registrar el health handler:**
 
 ```go
 // --- Public routes (no auth required) ---
 
-healthHandler := NewHealthHandler(db, time.Now())
+healthHandler := NewHealthHandler(healthChecker, time.Now())
 v1.GET("/health", healthHandler.Check)
 ```
 
-**En `main.go`**, pasar `db` al router:
+**En `main.go`**, crear el adapter y pasarlo al router:
 
 ```go
-router := httpAdapter.SetupRoutes(db, userService, clientService, authService, tokenProvider)
+// --- Health checker ---
+healthChecker := persistence.NewPostgresHealthChecker(db)
+
+// --- HTTP server ---
+router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider)
 ```
 
-**¿Por qué `time.Now()` aquí y no en `main.go`?** Porque el router se crea durante el arranque, así que `time.Now()` en ese punto captura el momento de inicio. Si quieres más precisión, puedes capturar el tiempo al principio de `main()` y pasarlo como parámetro.
+**El flujo de inyección completo queda así:**
+
+```
+main.go
+  ├── persistence.NewPostgresHealthChecker(db)   → crea el adapter concreto
+  └── httpAdapter.SetupRoutes(healthChecker, ...) → pasa como ports.HealthChecker
+        └── NewHealthHandler(healthChecker, ...)  → el handler solo ve la interfaz
+              └── h.healthChecker.Ping(ctx)       → llama al método de la interfaz
+```
+
+**¿Por qué `time.Now()` en el router y no en `main.go`?** Porque el router se crea durante el arranque, así que `time.Now()` en ese punto captura el momento de inicio. Si quieres más precisión, puedes capturar el tiempo al principio de `main()` y pasarlo como parámetro.
 
 ---
 
@@ -777,6 +851,7 @@ import (
 )
 
 func main() {
+	// Load .env file (ignored if not found, e.g. in Docker/CI)
 	_ = godotenv.Load()
 
 	// --- Logger ---
@@ -790,18 +865,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- Wiring ---
+	// --- User wiring ---
 	userRepo := persistence.NewPostgresUserRepository(db)
 	userService := services.NewUserService(userRepo)
 
+	// --- Client wiring ---
 	clientRepo := persistence.NewPostgresClientRepository(db)
 	clientService := services.NewClientService(clientRepo, userRepo)
 
+	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider()
 	authService := services.NewAuthService(userRepo, tokenProvider)
 
+	// --- Health checker ---
+	healthChecker := persistence.NewPostgresHealthChecker(db)
+
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(db, userService, clientService, authService, tokenProvider)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
@@ -853,7 +933,7 @@ func main() {
 **Flujo de lo que pasa:**
 
 ```
-1. main() arranca → crea logger, DB, servicios, router
+1. main() arranca → crea logger, DB, servicios, healthChecker, router
 2. srv.ListenAndServe() corre en una goroutine
 3. main() se queda bloqueado en <-quit (esperando señal)
 4. Llega SIGINT (Ctrl+C) o SIGTERM (docker stop)
@@ -897,18 +977,20 @@ Cuando llegue el momento (posiblemente con CI/CD o al tener un entorno de produc
 | Archivo | Propósito |
 |---------|----------|
 | `internal/infrastructure/logging/logger.go` | Fábrica del logger configurado |
-| `internal/infrastructure/adapters/inbound/http/health_handler.go` | Health check con DB ping |
+| `internal/application/ports/health_checker.go` | Port (interfaz) para verificar salud de la infraestructura |
+| `internal/infrastructure/adapters/outbound/persistence/health_checker.go` | Adapter que implementa `HealthChecker` usando GORM |
+| `internal/infrastructure/adapters/inbound/http/health_handler.go` | Health check HTTP handler |
 
 ### Archivos modificados
 
 | Archivo | Cambio |
 |---------|--------|
-| `cmd/api/main.go` | Inicializar slog, pasar DB al router, graceful shutdown |
+| `cmd/api/main.go` | Inicializar slog, crear `PostgresHealthChecker`, graceful shutdown |
 | `middleware/logger.go` | `log.Printf` → `slog.LogAttrs` con niveles |
 | `middleware/recovery.go` | `log.Printf` → `slog.Error` |
 | `helpers/error_handler.go` | `log.Printf` → `slog.Error` |
 | `persistence/connection.go` | `log.Printf` → `slog.Warn` |
-| `router.go` | Recibir `*gorm.DB`, usar `HealthHandler` |
+| `router.go` | Recibir `ports.HealthChecker`, usar `HealthHandler` |
 
 ### Variables de entorno nuevas
 
@@ -945,14 +1027,16 @@ Sigue este orden. Después de cada paso, verifica que `make test` siga pasando.
 - [ ] **Paso 5**: Migrar `helpers/error_handler.go` → `slog`
 - [ ] **Paso 6**: Migrar `persistence/connection.go` → `slog`
 - [ ] **Paso 7**: Verificar que no queda ningún `log.Printf` en el proyecto (`grep -r "log\." --include="*.go" internal/ cmd/`)
-- [ ] **Paso 8**: Crear `health_handler.go` con DB ping
-- [ ] **Paso 9**: Modificar `router.go` — recibir `*gorm.DB`, usar health handler
-- [ ] **Paso 10**: Modificar `main.go` — pasar `db` al router
-- [ ] **Paso 11**: Implementar graceful shutdown en `main.go`
-- [ ] **Paso 12**: Agregar `LOG_LEVEL` y `LOG_FORMAT` al `.env`
-- [ ] **Paso 13**: `make test` pasa ✅
-- [ ] **Paso 14**: Probar manualmente — arrancar la app, hacer requests, verificar formato de logs
-- [ ] **Paso 15**: Probar health check con DB arriba (`/health` → 200) y DB abajo (`/health` → 503)
+- [ ] **Paso 8**: Crear `ports/health_checker.go` (interfaz `HealthChecker`)
+- [ ] **Paso 9**: Crear `persistence/health_checker.go` (`PostgresHealthChecker`)
+- [ ] **Paso 10**: Crear `health_handler.go` usando `ports.HealthChecker`
+- [ ] **Paso 11**: Modificar `router.go` — recibir `ports.HealthChecker`, usar health handler
+- [ ] **Paso 12**: Modificar `main.go` — crear `PostgresHealthChecker`, pasarlo al router
+- [ ] **Paso 13**: Implementar graceful shutdown en `main.go`
+- [ ] **Paso 14**: Agregar `LOG_LEVEL` y `LOG_FORMAT` al `.env`
+- [ ] **Paso 15**: `make test` pasa ✅
+- [ ] **Paso 16**: Probar manualmente — arrancar la app, hacer requests, verificar formato de logs
+- [ ] **Paso 17**: Probar health check con DB arriba (`/health` → 200) y DB abajo (`/health` → 503)
 
 ---
 
