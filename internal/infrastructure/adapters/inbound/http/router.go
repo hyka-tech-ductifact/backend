@@ -21,6 +21,7 @@ import (
 // SetupRoutes configures the HTTP router with public and protected route groups.
 // Protected routes require a valid JWT in the Authorization header.
 func SetupRoutes(
+	healthChecker ports.HealthChecker,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
@@ -72,9 +73,8 @@ func SetupRoutes(
 
 	// --- Public routes (no auth required) ---
 
-	v1.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "healthy !!!!"})
-	})
+	healthHandler := NewHealthHandler(healthChecker, time.Now())
+	v1.GET("/health", healthHandler.Check)
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)

@@ -40,8 +40,11 @@ func main() {
 	tokenProvider := auth.NewJWTProvider()
 	authService := services.NewAuthService(userRepo, tokenProvider)
 
+	// --- Health checker ---
+	healthChecker := persistence.NewPostgresHealthChecker(db)
+
 	// --- HTTP ---
-	router := httpAdapter.SetupRoutes(userService, clientService, authService, tokenProvider)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
