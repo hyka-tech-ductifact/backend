@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // SetupRoutes configures the HTTP router with public and protected route groups.
@@ -53,7 +54,10 @@ func SetupRoutes(
 	// 3. Recovery: third, to catch panics from anything below
 	r.Use(middleware.RecoveryMiddleware())
 
-	// 4. CORS: fourth, before any business logic
+	// 4. Metrics: fourth, to record request count and latency
+	r.Use(middleware.MetricsMiddleware())
+
+	// 5. CORS: fifth, before any business logic
 	// CORS_ORIGINS is a comma-separated list of allowed origins (e.g. "http://localhost:3000,http://localhost:5173")
 	allowedOrigins := strings.Split(os.Getenv("CORS_ORIGINS"), ",")
 	for i := range allowedOrigins {
@@ -75,6 +79,7 @@ func SetupRoutes(
 
 	healthHandler := NewHealthHandler(healthChecker, time.Now())
 	v1.GET("/health", healthHandler.Check)
+	v1.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)
