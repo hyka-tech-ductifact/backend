@@ -19,7 +19,7 @@ func TestE2E_Health(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Equal(t, "healthy !!!!", body["status"])
+	assert.Equal(t, "healthy", body["status"])
 }
 
 // registerUser is a helper that registers a user and returns (id, token).

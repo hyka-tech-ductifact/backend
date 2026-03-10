@@ -218,21 +218,50 @@
 
 **Objetivo**: Automatizar la validación y el despliegue.
 
-### 7.1 GitHub Actions
-- [ ] Workflow que en cada PR ejecute:
+### 7.1 GitHub Actions (CI — Continuous Integration)
+- [ ] Workflow `.github/workflows/ci.yml` que en cada PR ejecute:
   1. `go vet ./...` (análisis estático)
   2. `go test ./test/unit/...` (unit tests)
   3. Levantar DB en Docker + `go test ./test/integration/...` (integration tests)
   4. Levantar DB + API + `go test ./test/e2e/...` (E2E tests)
   5. `golangci-lint run` (linter)
+  6. Contract tests si se implementaron en Fase 5
 
 ### 7.2 Docker optimizado
 - [ ] Multi-stage Dockerfile (ya lo tienes, pero verificar que es óptimo)
 - [ ] Build cache para que las dependencias no se descarguen en cada build
+- [ ] `.dockerignore` actualizado para excluir tests, docs, tmp
 
-### 7.3 Despliegue
-- [ ] Definir dónde desplegar (Railway, Fly.io, AWS, GCP...)
+### 7.3 Despliegue (CD — Continuous Deployment)
+- [ ] Decidir plataforma de despliegue:
+  - **PaaS** (Railway, Fly.io, Render): más simple, no necesitas reverse proxy, ellos gestionan HTTPS y dominios. Ideal para empezar.
+  - **VPS propio** (DigitalOcean, Hetzner): más control, más barato a largo plazo, pero configuras todo tú.
 - [ ] Configurar deploy automático desde `main`
+
+### 7.4 Infraestructura de producción (solo si VPS propio)
+
+Si eliges VPS, necesitas un **reverse proxy** (Nginx, Traefik o Caddy) como punto de entrada único que gestione todo el tráfico:
+
+```
+Internet (puerto 80/443)
+    │
+    ▼
+  Nginx  ←── reverse proxy
+    │
+    ├── /api/v1/*        → backend  (Go, :8080)
+    ├── /api/v1/metrics  → ❌ bloqueado desde internet
+    └── /*               → frontend (React/Next.js, :3000)
+```
+
+- [ ] Crear directorio `infra/` (o `deploy/`) en la raíz del monorepo con:
+  - `docker-compose.prod.yml` — orquesta todos los servicios (API + DB + frontend + Nginx)
+  - `nginx/nginx.conf` — reglas de routing, bloqueo de `/metrics`, HTTPS
+  - `prometheus/prometheus.yml` — config de scraping (si se decide usar Prometheus + Grafana)
+- [ ] Configurar HTTPS con Let's Encrypt (certbot o integrado en Caddy/Traefik)
+- [ ] Configurar Nginx para bloquear `/metrics` y `/health` desde internet (solo accesibles por red interna Docker)
+- [ ] Variables de entorno de producción (`LOG_LEVEL=info`, `LOG_FORMAT=json`, `GIN_MODE=release`)
+
+> **Nota**: Si eliges PaaS (Railway, Fly.io), el paso 7.4 no aplica — la plataforma hace de proxy por ti y gestiona HTTPS automáticamente. Solo necesitas configurar las env vars de producción.
 
 ---
 
