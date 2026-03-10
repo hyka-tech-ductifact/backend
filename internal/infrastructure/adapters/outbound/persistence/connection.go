@@ -2,7 +2,7 @@ package persistence
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"gorm.io/driver/postgres"
@@ -39,7 +39,7 @@ func NewPostgresConnection() (*gorm.DB, error) {
 
 	if os.Getenv("AUTO_MIGRATE") == "true" {
 		if err := db.AutoMigrate(&UserModel{}, &ClientModel{}); err != nil {
-			log.Printf("Failed to migrate database: %v", err)
+			slog.Warn("auto-migration failed", "error", err)
 		}
 	}
 

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 
@@ -23,10 +23,10 @@ func RecoveryMiddleware() gin.HandlerFunc {
 				requestID := GetRequestIDFromContext(c)
 
 				// Log the panic with stack trace for debugging
-				log.Printf("[req:%s] PANIC recovered: %v\n%s",
-					requestID,
-					r,
-					debug.Stack(),
+				slog.Error("panic recovered",
+					"request_id", requestID,
+					"panic", r,
+					"stack", string(debug.Stack()),
 				)
 
 				// Return a clean 500 to the client (don't expose internal details)
