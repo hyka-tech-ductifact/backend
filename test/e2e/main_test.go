@@ -2,10 +2,8 @@ package e2e
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"testing"
-	"time"
 
 	"ductifact/test/helpers"
 
@@ -34,7 +32,7 @@ func TestMain(m *testing.M) {
 	}
 	baseURL := "http://" + host + ":" + port
 
-	if err := waitForAPI(baseURL, 10); err != nil {
+	if err := helpers.WaitForAPI(baseURL, 10); err != nil {
 		fmt.Printf("E2E setup failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -62,20 +60,4 @@ func clean(t *testing.T) {
 // url builds a full URL using the shared base URL.
 func url(path string) string {
 	return fmt.Sprintf("%s/api/v1%s", env.baseURL, path)
-}
-
-// waitForAPI polls /health until the API responds 200 or retries are exhausted.
-func waitForAPI(baseURL string, maxRetries int) error {
-	for i := range maxRetries {
-		resp, err := http.Get(baseURL + "/api/v1/health")
-		if err == nil && resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
-			return nil
-		}
-		if i == maxRetries-1 {
-			return fmt.Errorf("API not ready at %s after %d retries — is the server running? (make app-run)", baseURL, maxRetries)
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	return fmt.Errorf("API not ready at %s", baseURL)
 }

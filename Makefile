@@ -22,6 +22,7 @@ help:
 	@echo "  Testing:"
 	@echo "    test-unit          - Run unit tests (no dependencies needed)"
 	@echo "    test-integration   - Run integration tests (requires DB)"
+	@echo "    test-contract      - Run contract tests (requires DB + running server)"
 	@echo "    test-e2e           - Run E2E tests (requires DB + running server)"
 	@echo "    test               - Run all tests"
 	@echo "    test-clean         - Clear Go test cache"
@@ -90,13 +91,18 @@ test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,./test/integration/...)
 
+# Run contract tests — requires DB + server running (make db-start && make app-run)
+test-contract:
+	@echo "Running contract tests..."
+	$(call run-tests,./test/contract/...)
+
 # Run E2E tests — requires DB + server running (make db-start && make app-run)
 test-e2e:
 	@echo "Running E2E tests..."
 	$(call run-tests,./test/e2e/...)
 
 # Run all tests
-test: test-unit test-integration test-e2e
+test: test-unit test-integration test-contract test-e2e
 
 # Clear Go test cache
 test-clean:

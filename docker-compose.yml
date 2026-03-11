@@ -34,6 +34,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - APP_PORT=${APP_PORT}
+      - CONTRACT_VERSION=${CONTRACT_VERSION}
     depends_on:
       postgres:
         condition: service_healthy
