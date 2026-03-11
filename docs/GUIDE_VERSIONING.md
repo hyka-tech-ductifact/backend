@@ -8,7 +8,8 @@
 5. [Sincronización entre contracts y backend](#5-sincronización-entre-contracts-y-backend)
 6. [Workflow completo: ejemplo real](#6-workflow-completo-ejemplo-real)
 7. [¿Necesito ramas por versión de API?](#7-necesito-ramas-por-versión-de-api)
-8. [Resumen práctico](#8-resumen-práctico)
+8. [Contract version en el health endpoint](#8-contract-version-en-el-health-endpoint)
+9. [Resumen práctico](#9-resumen-práctico)
 
 ---
 
@@ -278,7 +279,73 @@ Las ramas son para **desarrollo** (feature branches), no para versiones de la AP
 
 ---
 
-## 8. Resumen práctico
+## 8. Contract version en el health endpoint
+
+### ¿Por qué?
+
+Cuando hay **apps móviles** (iOS/Android), no puedes obligar a todos los usuarios a actualizar al mismo tiempo. Hay versiones antiguas "en la naturaleza" que siguen haciendo requests a tu API.
+
+El health endpoint incluye `contract_version` para que los clientes puedan saber **qué versión del contrato está implementando el backend** sin necesidad de autenticarse.
+
+### Response
+
+```json
+GET /api/v1/health
+
+{
+  "status": "healthy",
+  "uptime": "2h35m10s",
+  "database": "connected",
+  "contract_version": "1.0.0"
+}
+```
+
+### Configuración
+
+La versión del contrato se lee de la variable de entorno `CONTRACT_VERSION`:
+
+```bash
+# En .env o en el entorno de deploy
+CONTRACT_VERSION=1.0.0
+```
+
+Si no está definida, el valor por defecto es `"1.0.0"`.
+
+### ¿Cómo lo usa una app móvil?
+
+```
+App v2.0 (necesita contract >= 1.3.0)
+  │
+  ├─ GET /api/v1/health
+  │    → contract_version: "1.5.0"   ✅ compatible, continuar normalmente
+  │    → contract_version: "1.1.0"   ⚠️ puede que falten campos, mostrar aviso
+  │    → contract_version: "2.0.0"   ❌ breaking change, pedir actualización
+  │
+  └─ La lógica de compatibilidad la decide el cliente (la app)
+```
+
+### Reglas de compatibilidad
+
+```
+Mismo MAJOR → compatible (campos nuevos se ignoran si no se conocen)
+Mayor MINOR → el client puede tener campos que no existen aún en el server
+Mayor MAJOR → INCOMPATIBLE, la app debería mostrar "actualiza la app"
+```
+
+### ¿Cuándo actualizar CONTRACT_VERSION?
+
+Cada vez que hagas deploy de un cambio que modifica la API:
+
+```
+1. Actualizar el spec en contracts/ (openapi.yaml info.version)
+2. Implementar en backend/
+3. Actualizar CONTRACT_VERSION en el .env de producción al deployar
+4. El valor debe coincidir con el spec version de openapi.yaml
+```
+
+---
+
+## 9. Resumen práctico
 
 ### Tabla de decisiones
 

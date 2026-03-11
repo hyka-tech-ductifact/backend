@@ -77,7 +77,7 @@ func SetupRoutes(
 
 	// --- Public routes (no auth required) ---
 
-	healthHandler := NewHealthHandler(healthChecker, time.Now())
+	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractVersion())
 	v1.GET("/health", healthHandler.Check)
 	v1.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
@@ -114,4 +114,15 @@ func SetupRoutes(
 	}
 
 	return r
+}
+
+// contractVersion returns the API contract version from the environment.
+// Panics at startup if CONTRACT_VERSION is not set — this is intentional
+// to prevent deploying with incorrect version info.
+func contractVersion() string {
+	v := os.Getenv("CONTRACT_VERSION")
+	if v == "" {
+		panic("CONTRACT_VERSION environment variable is required but not set")
+	}
+	return v
 }

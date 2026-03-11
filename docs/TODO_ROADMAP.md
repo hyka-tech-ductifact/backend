@@ -176,16 +176,16 @@
 **Objetivo**: Definir el contrato formal de la API cuando el frontend esté listo para consumirla.
 
 ### 5.1 Crear el OpenAPI spec
-- [ ] Escribir `contracts/openapi/openapi.yaml` con todos los endpoints implementados
+- [X] Escribir `contracts/openapi/openapi.yaml` con todos los endpoints implementados
   - Incluir los schemas de request/response de todas las entidades
   - Incluir los endpoints de auth
   - Incluir todos los status codes posibles y sus responses
   - Seguir el enfoque **contract-first** (la guía ya está en `docs/GUIDE_CONTRACTS.md`)
 
 ### 5.2 Contract tests en el backend
-- [ ] Helper de validación (`test/contract/contract_helper.go`)
-- [ ] Contract tests para cada endpoint (`test/contract/user_contract_test.go`, etc.)
-- [ ] Verificar: status codes, campos requeridos, tipos de datos
+- [X] Helper de validación (`test/contract/contract_helper.go`)
+- [X] Contract tests para cada endpoint (`test/contract/auth_contract_test.go`, `user_contract_test.go`, `client_contract_test.go`, `health_contract_test.go`)
+- [X] Verificar: status codes, campos requeridos, tipos de datos
 
 ### 5.3 Integrar con el frontend
 - [ ] Frontend genera tipos TypeScript desde el spec
@@ -199,18 +199,18 @@
 **Objetivo**: Poder saber qué pasa en producción cuando algo falla.
 
 ### 6.1 Logging estructurado
-- [ ] Reemplazar `log.Printf` por un logger estructurado (ej: `slog` de la stdlib de Go 1.21+, o `zerolog`)
+- [X] Reemplazar `log.Printf` por un logger estructurado (ej: `slog` de la stdlib de Go 1.21+, o `zerolog`)
   - **¿Qué es logging estructurado?** En vez de `log.Printf("user created: %s", id)` haces `logger.Info("user created", "user_id", id, "email", email)`. Los logs salen en JSON, lo que permite buscarlos y filtrarlos en herramientas como Grafana/Loki.
   - Ejemplo de output: `{"level":"info","msg":"user created","user_id":"abc-123","email":"juan@ex.com","time":"2026-03-03T10:00:00Z"}`kiy
 
 ### 6.2 Health check mejorado
-- [ ] Que `/health` también verifique la conexión a la DB
+- [X] Que `/health` también verifique la conexión a la DB
   - Ahora devuelve siempre "healthy". Debería hacer un `db.Ping()` y devolver "unhealthy" si la DB no responde
   - Útil para que Docker/Kubernetes sepa si tu servicio realmente funciona
 
 ### 6.3 Métricas (opcional, más adelante)
-- [ ] Exponer métricas Prometheus: requests/segundo, latencias, errores
-- [ ] Esto es para cuando tengas monitoreo real en producción
+- [X] Exponer métricas Prometheus: requests/segundo, latencias, errores
+- [X] Esto es para cuando tengas monitoreo real en producción
 
 ---
 
