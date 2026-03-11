@@ -161,6 +161,21 @@ prod-build:
 prod-start:
 	@echo "Starting production services..."
 	docker compose up -d
+	@echo "Waiting for app to start..."
+	@sleep 3
+	@if [ "$$(docker inspect -f '{{.State.Running}}' microservice_app 2>/dev/null)" != "true" ]; then \
+		echo "\n❌ App container is not running. Logs:"; \
+		docker compose logs --tail=30 app; \
+		exit 1; \
+	fi
+	@restart_count=$$(docker inspect -f '{{.RestartCount}}' microservice_app 2>/dev/null); \
+	if [ "$$restart_count" -gt 0 ] 2>/dev/null; then \
+		echo "\n❌ App crashed and restarted $$restart_count time(s). Logs:"; \
+		docker compose logs --tail=30 app; \
+		exit 1; \
+	fi
+	@echo "✓ Services running. App logs:"
+	@docker compose logs --tail=10 app
 
 # Stop production services
 prod-stop:
