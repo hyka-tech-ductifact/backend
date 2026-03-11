@@ -14,12 +14,15 @@ The goal is to keep `main` always in a deployable state, while giving QA a stabl
 ## 1) Branches and naming
 
 - `main`: integration branch; always expected to be deployable.
+- `release`: tracks what's in production; hotfixes go here. There is only
+  one `release` branch at any time — it always points to the current
+  production version. Version history is preserved by tags, not by branches.
 - Topic branches (short-lived):
   - `feat/<short-topic>`
   - `fix/<short-topic>`
   - `chore/<short-topic>`
   - `docs/<short-topic>`
-  - `hotfix/<short-topic>` (only for urgent production fixes)
+  - `hotfix/<short-topic>` (only for urgent production fixes — targets `release`, not `main`)
 
 Examples:
 
@@ -134,49 +137,137 @@ Use **SemVer** tags:
 
 ### Release flow (promote `main` to production)
 
-When staging is approved by QA, create an annotated tag from `main`:
+When staging is approved by QA, create a tag and update the `release` branch:
 
 ```bash
 git checkout main
 git pull
 
+# Tag the release
 git tag -a v0.4.0 -m "Release v0.4.0"
 git push origin v0.4.0
+
+# First release? Create the branch. Otherwise, fast-forward it.
+git checkout -B release v0.4.0
+git push origin release --force-with-lease
 ```
 
-Production should deploy from the tag (`v0.4.0`), not from “latest `main`”.
+Production deploys from the tag (`v0.4.0`), not from "latest `main`".
+The `release` branch exists so that hotfixes can be applied without
+pulling in unvalidated code from `main` (see section 7).
+
+> `git checkout -B release v0.4.0` creates the branch if it doesn't exist,
+> or resets it to the tag if it already exists. This way there's always
+> a single `release` branch pointing to the current production version.
 
 ---
 
-## 7) Hotfixes (urgent production issues)
+## 7) Release branch and hotfixes
 
-A hotfix is a small, focused change for an urgent production problem.
+### Why a release branch?
 
-### Hotfix flow
+When you tag `v0.4.0` and deploy to production, `main` keeps moving forward
+with new PRs that QA hasn't validated yet. If a production bug appears, you
+can't tag from `main` — it contains unvalidated code.
 
-1) Create the hotfix branch from the production tag (or the exact production commit).
-2) Fix, test, PR.
-3) Squash merge into `main`.
-4) Tag a new PATCH release and deploy it.
+The `release` branch is a single, long-lived branch that always tracks
+what's in production. Hotfixes go there, get tagged, and production deploys
+from those tags. Meanwhile, `main` keeps evolving independently.
+
+Version history is preserved by **tags** (v0.4.0, v0.4.1, v0.5.0...), not
+by branch names. There's never more than one `release` branch.
+
+```
+main:      A ── B ── C ── H1' ── H2' ── D ── E
+                                                ↑
+                                           QA validates
+                                           tag v0.5.0
+                                           release branch moves here
+
+release:   v0.4.0 ── H1 ── H2              v0.5.0
+                      ↑      ↑              ↑
+                   v0.4.1  v0.4.2     (branch reset to v0.5.0)
+
+(H1', H2' = hotfixes merged back into main so they're not lost)
+(tags v0.4.0, v0.4.1, v0.4.2 remain in git history forever)
+```
+
+### Lifecycle of the release branch
+
+1. QA validates staging → tag `v0.4.0` on `main` → `release` points here
+2. Production deploys from the tag
+3. If production breaks → hotfix on `release` → tag `v0.4.1`
+4. More hotfixes? → same branch → tag `v0.4.2`, `v0.4.3`, etc.
+5. QA validates the next batch on staging → tag `v0.5.0` → `release` resets to `v0.5.0`
+6. Old tags (v0.4.x) stay in git for history and rollback
+
+### Hotfix flow (single hotfix)
+
+1. Branch from `release` (not from `main`)
+2. Fix, test, PR into `release`
+3. Tag the new PATCH version on `release`
+4. Merge the fix back into `main` so it's not lost
 
 ```bash
-git fetch --tags
+# 1. Create the hotfix branch from the release branch
+git fetch origin
+git checkout -b hotfix/fix-login-500 origin/release
 
-git checkout -b hotfix/fix-login-500 v0.4.0
-# edit, test...
-
+# 2. Fix and test
 git add -A
 git commit -m "fix: prevent login 500 when user missing"
-
 git push -u origin hotfix/fix-login-500
-# open PR -> squash merge into main
 
-git checkout main
+# 3. Open PR → merge into release (not main!)
+#    After merge:
+git checkout release
 git pull
 
+# 4. Tag the hotfix release on the release branch
 git tag -a v0.4.1 -m "Hotfix v0.4.1"
 git push origin v0.4.1
+# → Production deploys v0.4.1 (only v0.4.0 + the fix, no unvalidated code)
+
+# 5. Merge the fix back into main
+git checkout main
+git pull
+git merge release
+git push origin main
+# → Staging gets updated with the fix too
 ```
+
+### Multiple hotfixes
+
+If another production bug appears before the next release, repeat the same
+process — hotfixes accumulate on `release`:
+
+```bash
+git checkout -b hotfix/fix-signup-timeout origin/release
+# fix, test, PR into release
+
+git checkout release
+git pull
+git tag -a v0.4.2 -m "Hotfix v0.4.2"
+git push origin v0.4.2
+
+# Merge back into main
+git checkout main
+git pull
+git merge release
+git push origin main
+```
+
+The `release` branch accumulates hotfixes until the next release from
+`main` resets it (see section 6, release flow).
+
+### Summary: where does each thing go?
+
+| Situation | Branch from | PR target | Tag on | Deploys to |
+|-----------|-------------|-----------|--------|------------|
+| New feature / fix | `main` | `main` | — | staging |
+| New release | — | — | `main` | production |
+| Hotfix | `release` | `release` | `release` | production |
+| Hotfix backport | — | `main` | — | staging |
 
 ---
 

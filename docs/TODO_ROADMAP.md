@@ -233,14 +233,14 @@
 - [ ] `.dockerignore` actualizado para excluir tests, docs, tmp
 
 ### 7.3 Despliegue (CD — Continuous Deployment)
-- [ ] Decidir plataforma de despliegue:
-  - **PaaS** (Railway, Fly.io, Render): más simple, no necesitas reverse proxy, ellos gestionan HTTPS y dominios. Ideal para empezar.
-  - **VPS propio** (DigitalOcean, Hetzner): más control, más barato a largo plazo, pero configuras todo tú.
+- [X] Decidir plataforma de despliegue:
+  - ~~**PaaS** (Railway, Fly.io, Render)~~
+  - **VPS propio — Hetzner CX22** (2 vCPU, 4GB RAM, ~€4.35/mes): más control, más barato, aprovecha Prometheus/Grafana
 - [ ] Configurar deploy automático desde `main`
 
-### 7.4 Infraestructura de producción (solo si VPS propio)
+### 7.4 Infraestructura de producción (Hetzner VPS)
 
-Si eliges VPS, necesitas un **reverse proxy** (Nginx, Traefik o Caddy) como punto de entrada único que gestione todo el tráfico:
+Con VPS propio, necesitas un **reverse proxy** (Nginx) como punto de entrada único que gestione todo el tráfico:
 
 ```
 Internet (puerto 80/443)
@@ -261,7 +261,8 @@ Internet (puerto 80/443)
 - [ ] Configurar Nginx para bloquear `/metrics` y `/health` desde internet (solo accesibles por red interna Docker)
 - [ ] Variables de entorno de producción (`LOG_LEVEL=info`, `LOG_FORMAT=json`, `GIN_MODE=release`)
 
-> **Nota**: Si eliges PaaS (Railway, Fly.io), el paso 7.4 no aplica — la plataforma hace de proxy por ti y gestiona HTTPS automáticamente. Solo necesitas configurar las env vars de producción.
+> **Guía de referencia**: `docs/GUIDE_CI.md` — CI con GitHub Actions (workflow, Docker optimizado, .dockerignore).
+> **Guía de referencia**: `docs/GUIDE_CD.md` — CD a Hetzner VPS (setup del VPS, Nginx, HTTPS, docker-compose.prod.yml).
 
 ---
 
