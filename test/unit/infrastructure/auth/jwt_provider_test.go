@@ -3,6 +3,7 @@ package auth_test
 import (
 	"testing"
 
+	"ductifact/internal/config"
 	"ductifact/internal/infrastructure/auth"
 
 	"github.com/google/uuid"
@@ -10,12 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// helper creates a JWTProvider with JWT_SECRET set for the test scope.
-// t.Setenv automatically restores the original value when the test ends.
+var testJWTConfig = config.JWT{
+	Secret: "test-secret-key-at-least-32-chars!!",
+}
+
+// helper creates a JWTProvider with a test secret.
 func newTestProvider(t *testing.T) *auth.JWTProvider {
 	t.Helper()
-	t.Setenv("JWT_SECRET", "test-secret-key-at-least-32-chars!!")
-	return auth.NewJWTProvider()
+	return auth.NewJWTProvider(testJWTConfig)
 }
 
 // =============================================================================
@@ -23,18 +26,14 @@ func newTestProvider(t *testing.T) *auth.JWTProvider {
 // =============================================================================
 
 func TestNewJWTProvider_WithoutSecret_Panics(t *testing.T) {
-	t.Setenv("JWT_SECRET", "")
-
 	assert.Panics(t, func() {
-		auth.NewJWTProvider()
+		auth.NewJWTProvider(config.JWT{Secret: ""})
 	})
 }
 
 func TestNewJWTProvider_WithSecret_DoesNotPanic(t *testing.T) {
-	t.Setenv("JWT_SECRET", "a-valid-secret-for-testing-purposes")
-
 	assert.NotPanics(t, func() {
-		auth.NewJWTProvider()
+		auth.NewJWTProvider(config.JWT{Secret: "a-valid-secret-for-testing-purposes"})
 	})
 }
 
@@ -81,15 +80,13 @@ func TestValidateToken_WithValidToken_ReturnsClaims(t *testing.T) {
 
 func TestValidateToken_WithInvalidSignature_ReturnsError(t *testing.T) {
 	// Generate with one secret
-	t.Setenv("JWT_SECRET", "secret-key-one-at-least-32-chars!")
-	provider1 := auth.NewJWTProvider()
+	provider1 := auth.NewJWTProvider(config.JWT{Secret: "secret-key-one-at-least-32-chars!"})
 
 	token, err := provider1.GenerateToken(uuid.New(), "juan@example.com")
 	require.NoError(t, err)
 
 	// Validate with a different secret
-	t.Setenv("JWT_SECRET", "secret-key-two-at-least-32-chars!")
-	provider2 := auth.NewJWTProvider()
+	provider2 := auth.NewJWTProvider(config.JWT{Secret: "secret-key-two-at-least-32-chars!"})
 
 	claims, err := provider2.ValidateToken(token)
 

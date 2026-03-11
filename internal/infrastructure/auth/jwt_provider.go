@@ -2,10 +2,10 @@ package auth
 
 import (
 	"errors"
-	"os"
 	"time"
 
 	"ductifact/internal/application/ports"
+	"ductifact/internal/config"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -22,17 +22,15 @@ type JWTProvider struct {
 }
 
 // NewJWTProvider creates a new JWTProvider.
-// The secret key is read from the environment variable JWT_SECRET.
-// It panics if JWT_SECRET is not set — this is intentional to prevent
-// running in production with a weak or missing secret.
-func NewJWTProvider() *JWTProvider {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		panic("JWT_SECRET environment variable is required but not set")
+// The secret key comes from the config (originally JWT_SECRET env var).
+// Panics if the secret is empty — this is a programming error.
+func NewJWTProvider(cfg config.JWT) *JWTProvider {
+	if cfg.Secret == "" {
+		panic("JWT secret cannot be empty")
 	}
 
 	return &JWTProvider{
-		secretKey:     []byte(secret),
+		secretKey:     []byte(cfg.Secret),
 		tokenDuration: 24 * time.Hour, // Token expires in 24 hours
 	}
 }

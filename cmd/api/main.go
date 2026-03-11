@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ductifact/internal/application/services"
+	"ductifact/internal/config"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/internal/infrastructure/auth"
@@ -22,12 +23,15 @@ func main() {
 	// Load .env file (ignored if not found, e.g. in Docker/CI)
 	_ = godotenv.Load()
 
+	// --- Configuration (panics on missing required vars) ---
+	cfg := config.Load()
+
 	// --- Logger ---
-	logger := logging.NewLogger()
+	logger := logging.NewLogger(cfg.Log)
 	slog.SetDefault(logger)
 
 	// --- Database ---
-	db, err := persistence.NewPostgresConnection()
+	db, err := persistence.NewPostgresConnection(cfg.Database)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -42,20 +46,16 @@ func main() {
 	clientService := services.NewClientService(clientRepo, userRepo)
 
 	// --- Auth wiring ---
-	tokenProvider := auth.NewJWTProvider()
+	tokenProvider := auth.NewJWTProvider(cfg.JWT)
 	authService := services.NewAuthService(userRepo, tokenProvider)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS, cfg.Contract)
 
-	port := os.Getenv("APP_PORT")
-	if port == "" {
-		slog.Error("APP_PORT is not set — check your .env file")
-		os.Exit(1)
-	}
+	port := cfg.App.Port
 
 	srv := &http.Server{
 		Addr:    ":" + port,

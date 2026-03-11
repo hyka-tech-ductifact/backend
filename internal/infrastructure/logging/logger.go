@@ -3,24 +3,25 @@ package logging
 import (
 	"log/slog"
 	"os"
+
+	"ductifact/internal/config"
 )
 
-// NewLogger creates a configured slog.Logger based on the environment.
+// NewLogger creates a configured slog.Logger based on the provided config.
 //
-// In production (LOG_FORMAT=json), it outputs JSON lines for machine parsing.
+// In production (Format="json"), it outputs JSON lines for machine parsing.
 // In development (default), it outputs human-readable text.
 //
-// The log level is controlled by LOG_LEVEL env var (debug, info, warn, error).
-// Defaults to "info" if not set.
-func NewLogger() *slog.Logger {
-	level := parseLevel(os.Getenv("LOG_LEVEL"))
+// The log level is controlled by cfg.Level (debug, info, warn, error).
+func NewLogger(cfg config.Log) *slog.Logger {
+	level := parseLevel(cfg.Level)
 
 	opts := &slog.HandlerOptions{
 		Level: level,
 	}
 
 	var handler slog.Handler
-	if os.Getenv("LOG_FORMAT") == "json" {
+	if cfg.Format == "json" {
 		handler = slog.NewJSONHandler(os.Stdout, opts)
 	} else {
 		handler = slog.NewTextHandler(os.Stdout, opts)

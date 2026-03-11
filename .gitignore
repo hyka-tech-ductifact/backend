@@ -56,7 +56,7 @@ temp/
 /dist/
 
 # Go build artifacts
-api
+/api
 *.exe
 
 # Docker

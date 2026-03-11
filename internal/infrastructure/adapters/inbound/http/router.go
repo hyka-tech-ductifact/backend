@@ -2,13 +2,12 @@ package http
 
 import (
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
+	"ductifact/internal/config"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/valueobjects"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -27,6 +26,8 @@ func SetupRoutes(
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
+	corsCfg config.CORS,
+	contractCfg config.Contract,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
@@ -58,14 +59,8 @@ func SetupRoutes(
 	r.Use(middleware.MetricsMiddleware())
 
 	// 5. CORS: fifth, before any business logic
-	// CORS_ORIGINS is a comma-separated list of allowed origins (e.g. "http://localhost:3000,http://localhost:5173")
-	allowedOrigins := strings.Split(os.Getenv("CORS_ORIGINS"), ",")
-	for i := range allowedOrigins {
-		allowedOrigins[i] = strings.TrimSpace(allowedOrigins[i])
-	}
-
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowOrigins:     corsCfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Request-ID"},
 		ExposeHeaders:    []string{"X-Request-ID"},
@@ -77,7 +72,7 @@ func SetupRoutes(
 
 	// --- Public routes (no auth required) ---
 
-	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractVersion())
+	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractCfg.Version)
 	v1.GET("/health", healthHandler.Check)
 	v1.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
@@ -114,15 +109,4 @@ func SetupRoutes(
 	}
 
 	return r
-}
-
-// contractVersion returns the API contract version from the environment.
-// Panics at startup if CONTRACT_VERSION is not set — this is intentional
-// to prevent deploying with incorrect version info.
-func contractVersion() string {
-	v := os.Getenv("CONTRACT_VERSION")
-	if v == "" {
-		panic("CONTRACT_VERSION environment variable is required but not set")
-	}
-	return v
 }
