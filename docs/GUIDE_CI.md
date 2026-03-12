@@ -268,7 +268,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/contracts
-          path: ../contracts
+          path: contracts
 
       - name: Start Postgres
         run: docker compose -f docker-compose.dev.yml up -d --wait postgres
@@ -418,10 +418,12 @@ El código usa la ruta relativa `../../../contracts/openapi/bundled.yaml` desde 
   uses: actions/checkout@v4
   with:
     repository: ${{ github.repository_owner }}/contracts
-    path: ../contracts                         # same relative position as local
+    path: contracts                            # inside workspace root
 ```
 
-`actions/checkout` permite hacer checkout de **múltiples repos** en el mismo job. El segundo checkout no sobrescribe el primero porque usa `path: ../contracts` — lo coloca un nivel arriba del workspace, exactamente donde la ruta relativa lo espera.
+`actions/checkout` permite hacer checkout de **múltiples repos** en el mismo job. El segundo checkout no sobrescribe el primero porque usa `path: contracts` — lo coloca dentro del workspace en `backend/contracts/`.
+
+> **Importante**: GitHub Actions **no permite** hacer checkout fuera del workspace (`path: ../contracts` falla con un error de seguridad). Por eso se coloca dentro del repo. El código de `DefaultSpecPath()` ya tiene un fallback que busca `../../contracts/openapi/bundled.yaml` desde `test/contract/`, que resuelve a la raíz del repo — exactamente donde queda `contracts/`.
 
 `${{ github.repository_owner }}` se resuelve al owner del repo actual (tu usuario u organización), así que no necesitas hardcodear el nombre.
 
@@ -432,7 +434,7 @@ El código usa la ruta relativa `../../../contracts/openapi/bundled.yaml` desde 
   uses: actions/checkout@v4
   with:
     repository: ${{ github.repository_owner }}/contracts
-    path: ../contracts
+    path: contracts
     token: ${{ secrets.CONTRACTS_PAT }}        # only needed if contracts is private
 ```
 

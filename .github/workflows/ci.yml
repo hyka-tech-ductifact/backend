@@ -97,7 +97,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/contracts
-          path: ../contracts
+          path: contracts
 
       - name: Start Postgres
         run: make db-start
