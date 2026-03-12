@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"ductifact/internal/config"
 	"ductifact/test/helpers"
 
 	"gorm.io/gorm"
@@ -24,13 +25,8 @@ var env *e2eEnv
 func TestMain(m *testing.M) {
 	helpers.LoadEnv()
 
-	host := os.Getenv("APP_HOST")
-	port := os.Getenv("APP_PORT")
-	if host == "" || port == "" {
-		fmt.Println("E2E setup failed: APP_HOST or APP_PORT is not set — check your .env file")
-		os.Exit(1)
-	}
-	baseURL := "http://" + host + ":" + port
+	cfg := config.Load()
+	baseURL := "http://" + cfg.App.Host + ":" + cfg.App.Port
 
 	if err := helpers.WaitForAPI(baseURL, 10); err != nil {
 		fmt.Printf("E2E setup failed: %v\n", err)

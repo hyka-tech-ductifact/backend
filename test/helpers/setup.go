@@ -3,12 +3,12 @@ package helpers
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
+	"ductifact/internal/config"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 
 	"github.com/joho/godotenv"
@@ -39,24 +39,19 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 // ConnectTestDB creates a PostgreSQL connection using env vars.
 // Returns an error instead of calling t.Fatal — safe for use in TestMain.
 func ConnectTestDB() (*gorm.DB, error) {
-	requiredVars := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"}
-	for _, v := range requiredVars {
-		if os.Getenv(v) == "" {
-			return nil, fmt.Errorf("%s is not set — check your .env file", v)
-		}
-	}
+	cfg := config.Load()
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"), os.Getenv("DB_PORT"))
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.Database.DSN()), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 
-	if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
-		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+	// AutoMigrate only when configured (local dev).
+	// In CI, init.sql is the source of truth for the schema.
+	if cfg.Database.AutoMigrate {
+		if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
+			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+		}
 	}
 
 	return db, nil

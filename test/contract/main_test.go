@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"ductifact/internal/config"
 	"ductifact/test/contract"
 	"ductifact/test/helpers"
 
@@ -25,13 +26,8 @@ var env *contractEnv
 func TestMain(m *testing.M) {
 	helpers.LoadEnv()
 
-	host := os.Getenv("APP_HOST")
-	port := os.Getenv("APP_PORT")
-	if host == "" || port == "" {
-		fmt.Println("Contract test setup failed: APP_HOST or APP_PORT not set — check .env")
-		os.Exit(1)
-	}
-	baseURL := "http://" + host + ":" + port
+	cfg := config.Load()
+	baseURL := "http://" + cfg.App.Host + ":" + cfg.App.Port
 
 	if err := helpers.WaitForAPI(baseURL, 10); err != nil {
 		fmt.Printf("Contract test setup failed: %v\n", err)

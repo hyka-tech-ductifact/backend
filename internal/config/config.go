@@ -27,6 +27,7 @@ type Config struct {
 
 // App holds general application settings.
 type App struct {
+	Host string // Hostname/IP the API is reachable on (used by tests)
 	Port string // TCP port the HTTP server listens on
 }
 
@@ -75,6 +76,7 @@ type Contract struct {
 func Load() Config {
 	return Config{
 		App: App{
+			Host: optional("APP_HOST", "localhost"),
 			Port: required("APP_PORT"),
 		},
 		Database: Database{
