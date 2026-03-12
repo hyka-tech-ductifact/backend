@@ -268,6 +268,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/contracts
+          ref: v${{ env.CONTRACT_VERSION }}
           path: contracts
 
       - name: Start Postgres
@@ -418,10 +419,30 @@ El código usa la ruta relativa `../../../contracts/openapi/bundled.yaml` desde 
   uses: actions/checkout@v4
   with:
     repository: ${{ github.repository_owner }}/contracts
+    ref: v${{ env.CONTRACT_VERSION }}          # pin to the version backend implements
     path: contracts                            # inside workspace root
 ```
 
-`actions/checkout` permite hacer checkout de **múltiples repos** en el mismo job. El segundo checkout no sobrescribe el primero porque usa `path: contracts` — lo coloca dentro del workspace en `backend/contracts/`.
+**¿Por qué `ref: v${{ env.CONTRACT_VERSION }}`?** El backend declara qué versión del contrato implementa vía `CONTRACT_VERSION` (ej: `1.0.0`). CI hace checkout del tag `v1.0.0` del repo `contracts/`. Así los tests validan que el backend cumple **exactamente la versión que dice implementar**, no la última versión del spec (que podría tener campos nuevos que el backend aún no soporta).
+
+El flujo queda así:
+```
+contracts/ repo:  v1.0.0 ──── v1.1.0 ──── v2.0.0
+                    │
+backend/ repo:    CONTRACT_VERSION="1.0.0"
+                    │
+CI:               checkout contracts@v1.0.0 → run contract tests
+```
+
+Cuando se actualiza el contrato:
+1. El equipo publica una nueva versión en `contracts/` (ej: tag `v1.1.0`)
+2. Un dev actualiza `CONTRACT_VERSION` en el backend a `"1.1.0"`
+3. Ajusta el código para cumplir los nuevos campos/endpoints
+4. CI descarga automáticamente `contracts@v1.1.0` y valida
+
+> **Prerequisito**: el repo `contracts/` debe tener tags semver con prefijo `v` (ej: `v1.0.0`). Si usas otro formato de tags, ajusta el `ref:` del checkout.
+
+`actions/checkout` permite hacer checkout de **múltiples repos** en el mismo job. El segundo checkout no sobrescribe el primero porque usa `path: contracts` — lo coloca dentro del workspace.
 
 > **Importante**: GitHub Actions **no permite** hacer checkout fuera del workspace (`path: ../contracts` falla con un error de seguridad). Por eso se coloca dentro del repo. El código de `DefaultSpecPath()` ya tiene un fallback que busca `../../contracts/openapi/bundled.yaml` desde `test/contract/`, que resuelve a la raíz del repo — exactamente donde queda `contracts/`.
 
@@ -434,6 +455,7 @@ El código usa la ruta relativa `../../../contracts/openapi/bundled.yaml` desde 
   uses: actions/checkout@v4
   with:
     repository: ${{ github.repository_owner }}/contracts
+    ref: v${{ env.CONTRACT_VERSION }}
     path: contracts
     token: ${{ secrets.CONTRACTS_PAT }}        # only needed if contracts is private
 ```
