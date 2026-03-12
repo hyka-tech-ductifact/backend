@@ -101,6 +101,12 @@ jobs:
           ref: v${{ env.CONTRACT_VERSION }}
           path: contracts
 
+      - name: Bundle OpenAPI spec
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/contracts/openapi:/spec \
+            redocly/cli bundle /spec/openapi.yaml -o /spec/bundled.yaml
+
       - name: Start Postgres
         run: make db-start
 
