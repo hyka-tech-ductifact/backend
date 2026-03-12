@@ -1,0 +1,159 @@
+name: CI
+
+# ─── When it runs ───────────────────────────────────────────
+# - PRs to main: new features and fixes (deploys to staging after merge)
+# - PRs to release: hotfixes for production (see CONTRIBUTING.md §7)
+# - Push to main/release: final validation after merge
+# - workflow_call: allows CD to re-run CI before deploying (see cd.yml)
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main, release]
+  workflow_call:
+
+# ─── Shared environment variables ────────────────────────────
+# Postgres runs via docker-compose.dev.yml (single source of truth
+# for image version, healthcheck, init.sql, and ports).
+env:
+  GO_VERSION: "1.24"
+  DB_USER: ci_user
+  DB_PASSWORD: ci_password
+  DB_NAME: ci_db
+  DB_HOST: localhost
+  DB_PORT: "5432"
+  APP_PORT: "8080"
+  JWT_SECRET: ci-test-secret-at-least-32-characters-long
+  CORS_ORIGINS: "*"
+  CONTRACT_VERSION: "1.0.0"
+  LOG_LEVEL: error
+  LOG_FORMAT: text
+
+# ─── Jobs ────────────────────────────────────────────────────
+jobs:
+
+  # ── 1. Lint + static analysis ──────────────────────────────
+  lint:
+    name: Lint & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Lint
+        run: make lint
+
+  # ── 2. Unit tests ─────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Run unit tests
+        run: make test-unit RACE
+
+  # ── 3. Integration tests (need Postgres) ──────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: make db-start
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Run integration tests
+        run: make test-integration RACE
+
+  # ── 4. Contract tests (need Postgres + running API) ────────
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: make db-start
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Build and start API server
+        run: |
+          make app-build
+          ./bin/api &
+          sleep 3
+
+      - name: Run contract tests
+        run: make test-contract RACE
+
+  # ── 5. E2E tests (need Postgres + running API) ────────────
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: make db-start
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Build and start API server
+        run: |
+          make app-build
+          ./bin/api &
+          sleep 3
+
+      - name: Run E2E tests
+        run: make test-e2e RACE
+
+  # ── 6. Docker smoke test ─────────────────────────────────────
+  docker-smoke:
+    name: Docker Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: make prod-build
+
+      - name: Start containers
+        run: make prod-start
+
+      - name: Health check
+        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/health
+
+      - name: Teardown
+        if: always()
+        run: make prod-stop

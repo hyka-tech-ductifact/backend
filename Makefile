@@ -1,11 +1,18 @@
 # Ductifact Backend Makefile
 
-.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE
+.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE RACE
 
 # Allow COVERAGE to be used as a flag (e.g. make test-unit COVERAGE)
 COVERAGE: ;
 	@:
 _COVERAGE := $(filter COVERAGE,$(MAKECMDGOALS))
+
+# Allow RACE to be used as a flag (e.g. make test-unit RACE)
+# CI sets RACE=1 as env var; locally you can also use: make test-unit RACE
+RACE: ;
+	@:
+_RACE := $(or $(filter RACE,$(MAKECMDGOALS)),$(if $(filter 1,$(RACE)),RACE))
+_RACE_FLAG := $(if $(_RACE),-race,)
 
 # Default target
 help:
@@ -26,6 +33,9 @@ help:
 	@echo "    test-e2e           - Run E2E tests (requires DB + running server)"
 	@echo "    test               - Run all tests"
 	@echo "    test-clean         - Clear Go test cache"
+	@echo ""
+	@echo "    Add RACE to enable the race detector (slower, used in CI):"
+	@echo "    make test-unit RACE"
 	@echo ""
 	@echo "    Add COVERAGE to any test target to generate a coverage report:"
 	@echo "    make test-unit COVERAGE"
@@ -70,14 +80,14 @@ TEST_FORMAT ?= pkgname
 
 define run-tests
 	@if [ -n "$(_COVERAGE)" ]; then \
-		gotestsum --format $(TEST_FORMAT) -- -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
+		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
 		go tool cover -func=coverage.out && \
 		go tool cover -html=coverage.out -o coverage.html && \
 		echo "" && \
 		echo "Coverage report generated: coverage.html" && \
 		explorer.exe "$$(wslpath -w coverage.html)" || true; \
 	else \
-		gotestsum --format $(TEST_FORMAT) -- $(1); \
+		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 $(1); \
 	fi
 endef
 
@@ -113,7 +123,7 @@ test-clean:
 # Start database in Docker
 db-start:
 	@echo "Starting database..."
-	docker compose -f docker-compose.dev.yml up -d
+	docker compose -f docker-compose.dev.yml up -d --wait
 
 # Stop database
 db-stop:
@@ -190,6 +200,7 @@ fmt:
 # Lint code
 lint:
 	@echo "Linting code..."
+	go vet ./...
 	golangci-lint run
 
 # Install dependencies and dev tools

@@ -1,34 +1,32 @@
+# ── Stage 1: Build ──────────────────────────────────────────
 FROM docker.io/library/golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-RUN apk add --no-cache git
-
-# Copy go mod files
+# Copy dependency files FIRST (this layer gets cached if go.mod/go.sum don't change)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy source code (this layer invalidates when code changes)
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o app ./cmd/api
+# Build with optimizations: -s removes symbol table, -w removes DWARF debug info (~30% smaller binary)
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o app ./cmd/api
 
-# Final stage
+# ── Stage 2: Runtime ────────────────────────────────────────
 FROM docker.io/library/alpine:latest
 
 WORKDIR /app
 
-# Install ca-certificates
 RUN apk --no-cache add ca-certificates
 
-# Copy the binary from builder stage
 COPY --from=builder /app/app .
 
-# Expose port (must match APP_PORT in .env) (8080 is the default)
 ARG APP_PORT=8080
 EXPOSE ${APP_PORT}
 
-# Command to run
+# Run as non-root user (security best practice)
+RUN adduser -D -g '' appuser
+USER appuser
+
 CMD ["./app"]

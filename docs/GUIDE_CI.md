@@ -48,10 +48,11 @@ Workflow (ci.yml)
 ```
 backend/                             ← raíz del repositorio Git
 ├── .github/
+│   ├── CODEOWNERS                   ← protege archivos sensibles (requiere aprobación)
 │   └── workflows/
 │       ├── ci.yml                   ← el workflow de CI
 │       └── cd.yml                   ← workflow de despliegue (ver GUIDE_CD.md)
-├── .dockerignore                    ← NUEVO: excluir archivos del build Docker
+├── .dockerignore                    ← excluir archivos del build Docker
 ├── Dockerfile
 ├── go.mod
 ├── cmd/
@@ -61,6 +62,106 @@ backend/                             ← raíz del repositorio Git
 ```
 
 > **Nota**: la infraestructura de producción (docker-compose.prod.yml, nginx.conf, prometheus.yml) vive en un repositorio separado `infra/`. Ver `GUIDE_CD.md` para más detalles.
+
+### 2.1 ¿Por qué los workflows viven aquí y no en `infra/`?
+
+Es una pregunta legítima: si alguien puede editar `ci.yml` en el mismo repo que el código, ¿podría saltarse las validaciones? Hay tres estrategias posibles:
+
+| Estrategia | Dónde viven los `.yml` | Seguridad | Facilidad | Mantenibilidad |
+|---|---|---|---|---|
+| **Todo en el repo** | `backend/.github/workflows/` | Media | Alta | Media |
+| **Repo separado** | `infra/.github/workflows/` | Alta | Baja | Baja |
+| **Híbrido** (recomendado a escala) | Lógica en repo central, caller en cada repo | Alta | Alta | Alta |
+
+**Estrategia 1 — Todo en el mismo repo** (la que usamos):
+- El pipeline viaja con el código: si cambias el código, puedes ajustar el CI en el mismo PR
+- El riesgo de manipulación se mitiga con **CODEOWNERS** + **branch protection** (ver sección 8)
+- Es lo más práctico para equipos pequeños y proyectos en fase temprana
+
+**Estrategia 2 — Repo separado (`infra/`)**:
+- Los devs no pueden tocar los pipelines
+- Pero los workflows de GitHub Actions **deben vivir en el repo donde se disparan** (`.github/workflows/`), así que necesitarías `repository_dispatch` o `workflow_dispatch` para triggerear desde otro repo — añade complejidad innecesaria
+- Cambiar código y pipeline requiere 2 PRs en 2 repos, lo que ralentiza el desarrollo
+
+**Estrategia 3 — Híbrida** (cuando escales):
+- La lógica crítica (build, test, deploy) se centraliza en un repo `platform-workflows/` como **reusable workflows**
+- Cada repo solo tiene un "caller" mínimo que llama al workflow centralizado
+- Los devs solo pueden parametrizar (versión de Go, flags), **no cambiar el comportamiento**
+
+```yaml
+# Ejemplo: backend/.github/workflows/ci.yml (caller mínimo)
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: org/platform-workflows/.github/workflows/reusable-go-ci.yml@v1
+    with:
+      go-version: "1.24"
+    secrets: inherit
+```
+
+```yaml
+# Ejemplo: platform-workflows/.github/workflows/reusable-go-ci.yml (source of truth)
+name: Reusable Go CI
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        type: string
+        default: "1.24"
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+      - run: make lint
+      - run: make test
+```
+
+> **Para este proyecto**: usamos la estrategia 1 (workflows en el mismo repo) porque es pragmática y suficiente. La protección la ponemos con CODEOWNERS y branch protection rules (sección 8). Si el día de mañana tienes 5+ microservicios, migras a la estrategia híbrida.
+
+### 2.2 Estructura del repo `infra/` (separado)
+
+El repo `infra/` contiene **solo infraestructura de despliegue**, no pipelines de CI:
+
+```
+infra/                               ← repositorio independiente
+├── docker-compose.staging.yml       ← orquestación para staging
+├── docker-compose.prod.yml          ← orquestación para producción
+├── nginx/
+│   └── nginx.conf                   ← reverse proxy / TLS termination
+├── monitoring/
+│   ├── prometheus.yml               ← métricas
+│   └── grafana/
+│       └── dashboards/
+├── scripts/
+│   ├── deploy.sh                    ← script de despliegue
+│   └── rollback.sh                  ← rollback manual
+└── README.md
+```
+
+**¿Qué va en cada repo?**
+
+| Qué | Dónde | Por qué |
+|-----|-------|---------|
+| Código fuente Go | `backend/` | Es el producto, lo cambian los devs |
+| CI workflows (`.github/workflows/ci.yml`) | `backend/` | Validan el código, viajan con él |
+| CD workflows (`.github/workflows/cd.yml`) | `backend/` | Se triggerean por push/tag en este repo |
+| Dockerfile | `backend/` | Define cómo se construye la imagen, depende del código |
+| docker-compose para **dev local** | `backend/` | Los devs lo usan día a día |
+| docker-compose para **staging/prod** | `infra/` | Configuración de infra, no de código |
+| nginx, prometheus, grafana | `infra/` | Infraestructura transversal, no acoplada al backend |
+| Scripts de deploy/rollback | `infra/` | Operaciones, no desarrollo |
+| Contratos OpenAPI | `contracts/` | Compartidos entre frontend y backend |
+
+El principio es simple: **si lo cambia un dev para añadir una feature, va en `backend/`**. **Si lo cambia un ops/SRE para configurar infraestructura, va en `infra/`**.
 
 ---
 
@@ -78,8 +179,11 @@ on:
     branches: [main, release]
   pull_request:
     branches: [main, release]
+  workflow_call:                     # allows CD to re-run CI before deploying
 
 # ─── Variables compartidas ───────────────────────────────────
+# Postgres runs via docker-compose.dev.yml (single source of truth
+# for image version, healthcheck, init.sql, and ports).
 env:
   GO_VERSION: "1.24"
   DB_USER: ci_user
@@ -127,120 +231,83 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
       - name: Run unit tests
-        run: go test -v -race -count=1 ./test/unit/...
+        run: make test-unit
 
   # ── 3. Integration tests (necesitan Postgres) ─────────────
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-
-    # Service container: Postgres corre junto al job
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci_user"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Initialize database schema
-        run: PGPASSWORD=${{ env.DB_PASSWORD }} psql -h localhost -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -f init.sql
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
 
       - name: Run integration tests
-        run: go test -v -race -count=1 ./test/integration/...
+        run: make test-integration
 
   # ── 4. Contract tests (necesitan Postgres + API corriendo) ─
   contract-tests:
     name: Contract Tests
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci_user"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Initialize database schema
-        run: PGPASSWORD=${{ env.DB_PASSWORD }} psql -h localhost -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -f init.sql
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
 
       - name: Build and start API server
         run: |
-          go build -o bin/api ./cmd/api
+          make app-build
           ./bin/api &
           sleep 3
 
       - name: Run contract tests
-        run: go test -v -race -count=1 ./test/contract/...
+        run: make test-contract
 
   # ── 5. E2E tests (necesitan Postgres + API corriendo) ─────
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci_user"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Postgres
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Initialize database schema
-        run: PGPASSWORD=${{ env.DB_PASSWORD }} psql -h localhost -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -f init.sql
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
 
       - name: Build and start API server
         run: |
-          go build -o bin/api ./cmd/api
+          make app-build
           ./bin/api &
           sleep 3
 
       - name: Run E2E tests
-        run: go test -v -race -count=1 ./test/e2e/...
+        run: make test-e2e
 ```
 
 ---
@@ -269,61 +336,59 @@ Las variables definidas a nivel de workflow están disponibles en **todos los jo
 
 `LOG_LEVEL: error` — en CI no quieres ver los logs de info/debug. Solo errores reales.
 
-### 4.3 `services:` — Service containers
+### 4.3 `docker compose` — Postgres como single source of truth
 
 ```yaml
-services:
-  postgres:
-    image: postgres:15-alpine
-    env:
-      POSTGRES_USER: ${{ env.DB_USER }}
-    ports:
-      - 5432:5432
-    options: >-
-      --health-cmd "pg_isready -U ci_user"
-      --health-interval 10s
-      --health-timeout 5s
-      --health-retries 5
+- name: Start Postgres
+  run: docker compose -f docker-compose.dev.yml up -d --wait postgres
 ```
 
-GitHub Actions levanta un contenedor Postgres **dentro del runner**. El `options` con `--health-*` hace que el job espere a que Postgres esté listo antes de ejecutar los steps. Sin esto, los tests podrían fallar porque Postgres aún no aceptaba conexiones.
+En vez de usar `services:` de GitHub Actions (que obliga a duplicar imagen, healthcheck, puertos y env vars), usamos directamente `docker-compose.dev.yml`. Ventajas:
 
-`ports: - 5432:5432` hace que el contenedor sea accesible en `localhost:5432` del runner, exactamente como en tu máquina local.
+- **Una sola fuente de verdad**: versión de Postgres, healthcheck, puertos e `init.sql` se definen en un solo lugar.
+- **Cero divergencia**: cualquier cambio en `docker-compose.dev.yml` aplica automáticamente a CI.
+- **`init.sql` se monta automáticamente** vía el volumen `./init.sql:/docker-entrypoint-initdb.d/init.sql`. No necesitas un step `psql` separado.
 
-### 4.4 Database schema initialization
+El flag `--wait` espera a que los healthchecks definidos en el compose estén healthy antes de continuar. `docker compose` (v2) viene preinstalado en los runners `ubuntu-latest` de GitHub Actions.
 
-```yaml
-- name: Initialize database schema
-  run: PGPASSWORD=${{ env.DB_PASSWORD }} psql -h localhost -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }} -f init.sql
-```
+Las variables de entorno del workflow (`DB_USER`, `DB_PASSWORD`, etc.) se heredan automáticamente al shell donde corre `docker compose`, así que las interpolaciones `${DB_USER}` del compose funcionan sin configuración extra.
 
-En local, tu `docker-compose.dev.yml` monta `init.sql` automáticamente con el volumen `./init.sql:/docker-entrypoint-initdb.d/init.sql`. Pero los service containers de GitHub Actions **no soportan volúmenes**. Así que ejecutamos `psql` manualmente para crear las tablas.
+> **¿Por qué no `services:` de Actions?** Los service containers no soportan bind mounts (volúmenes), lo que obliga a inicializar el schema manualmente con `psql`. Además, cualquier cambio en la configuración de Postgres requiere actualizar dos archivos: `docker-compose.dev.yml` y `ci.yml`. Con `docker compose` en CI, el compose es la única fuente de verdad.
 
-> **Nota**: `psql` ya viene instalado en los runners de Ubuntu de GitHub Actions. No necesitas instalar nada extra.
-
-### 4.5 API server para contract y E2E tests
+### 4.4 API server para contract y E2E tests
 
 ```yaml
 - name: Build and start API server
   run: |
-    go build -o bin/api ./cmd/api
+    make app-build
     ./bin/api &
     sleep 3
 ```
 
-Compilamos el binario, lo lanzamos en background (`&`) y esperamos 3 segundos para que esté listo. Los contract y E2E tests necesitan hacer requests HTTP reales contra la API corriendo.
+Compilamos el binario con `make app-build` (el mismo target que usas en local), lo lanzamos en background (`&`) y esperamos 3 segundos para que esté listo. Los contract y E2E tests necesitan hacer requests HTTP reales contra la API corriendo.
 
-### 4.6 Test flags
+### 4.5 Makefile como single source of truth
 
+```yaml
+# En ci.yml
+- name: Run unit tests
+  run: make test-unit
 ```
-go test -v -race -count=1 ./test/unit/...
+
+```makefile
+# En Makefile
+test-unit:
+	gotestsum --format pkgname -- -race -count=1 ./test/unit/...
 ```
+
+CI usa los mismos targets de `make` que el desarrollador en local. Esto garantiza que **los flags, rutas y herramientas sean siempre idénticos**. Si cambias cómo se ejecutan los tests (ej: añades `-timeout 30s`), lo cambias en el Makefile y CI se actualiza automáticamente.
 
 | Flag | Qué hace |
 |------|----------|
-| `-v` | Verbose — muestra cada test que corre (útil para diagnosticar fallos en CI) |
 | `-race` | Activa el **race detector** de Go — detecta accesos concurrentes no protegidos |
-| `-count=1` | Desactiva el cache de tests — en CI quieres que siempre corran fresh |
+| `-count=1` | Desactiva el cache de tests — cada ejecución corre fresh |
+
+> **Nota**: CI instala `gotestsum` con `go install gotest.tools/gotestsum@latest` porque los runners de GitHub Actions no lo incluyen por defecto. En local ya lo tienes por `make deps`.
 
 ---
 
@@ -480,7 +545,258 @@ Una vez que hagas push del archivo `ci.yml`:
 
 ---
 
-## 8. Próximos pasos
+## 8. Proteger el repositorio en GitHub
+
+De nada sirve un CI perfecto si alguien puede saltárselo. Estas son las reglas que debes configurar en **GitHub → Settings** para que el pipeline sea una barrera real.
+
+### 8.1 Branch Protection Rules
+
+Ve a **Settings → Branches → Add rule** para `main` y `release`:
+
+| Regla | Qué activas | Por qué |
+|-------|------------|---------|
+| **Require a pull request before merging** | ✅ | Nadie puede hacer push directo a `main`/`release`. Todo pasa por PR. |
+| **Require approvals** (mínimo 1) | ✅ | Al menos un compañero revisa el código antes del merge. |
+| **Dismiss stale pull request approvals** | ✅ | Si alguien aprueba y luego cambias el código, la aprobación se invalida. Evita el truco de "apruébame y luego subo otra cosa". |
+| **Require status checks to pass** | ✅ | El merge se bloquea hasta que CI pase. Marca como **required** los 6 jobs: `Lint & Vet`, `Unit Tests`, `Integration Tests`, `Contract Tests`, `E2E Tests`, `Docker Build`. |
+| **Require branches to be up to date** | ✅ | El PR debe estar actualizado con la rama base. Evita conflictos silenciosos. |
+| **Require conversation resolution** | ✅ | Todos los comentarios del code review deben resolverse antes de mergear. |
+| **Do not allow bypassing** | ✅ | Ni siquiera los admins pueden saltarse las reglas. (Desactiva esto solo si estás seguro.) |
+
+> **Importante**: cuando actives "Require status checks to pass", los nombres de los jobs deben coincidir exactamente con los `name:` del workflow. Por ejemplo: `Lint & Vet`, `Unit Tests`, etc.
+
+### 8.2 CODEOWNERS
+
+Crea el archivo `.github/CODEOWNERS` en la raíz del repo. Esto **exige** la aprobación de personas concretas cuando se modifican archivos sensibles:
+
+```
+# ── CODEOWNERS ───────────────────────────────────────────────
+# Syntax: <pattern>  <owners>
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# CI/CD workflows — only platform/devops team can approve changes
+/.github/                @org/platform-team
+
+# Docker config — changes affect production builds
+/Dockerfile              @org/platform-team
+/docker-compose*.yml     @org/platform-team
+/.dockerignore           @org/platform-team
+
+# Database schema — changes affect all environments
+/init.sql                @org/platform-team @org/backend-leads
+
+# Default: any team member can approve other changes
+*                        @org/backend-team
+```
+
+Para que CODEOWNERS funcione, activa en branch protection:
+- **Require review from Code Owners** ✅
+
+Ahora, si alguien toca `ci.yml` o el `Dockerfile`, GitHub exigirá aprobación del equipo de plataforma, no solo de cualquier reviewer.
+
+> **Si eres un equipo pequeño (1-3 personas)**: sustituye `@org/platform-team` por tu usuario (`@jsuarez`). El concepto es el mismo — ciertos archivos requieren aprobación explícita de alguien con criterio.
+
+### 8.3 Rulesets (alternativa moderna)
+
+GitHub Rulesets (**Settings → Rules → Rulesets**) son la evolución de branch protection. Ofrecen lo mismo pero con más granularidad:
+
+- Se pueden aplicar a **múltiples ramas** con un solo ruleset (regex patterns)
+- Permiten **reglas por tag** (útil para proteger tags de release)
+- Se pueden configurar a nivel de **organización** (aplican a todos los repos — los devs no pueden desactivarlos)
+
+> **¿Branch protection o Rulesets?** Si usas GitHub Free, usa branch protection (2 reglas: una para `main`, otra para `release`). Si tienes GitHub Team ($4/user/mes) o Enterprise, usa Rulesets porque son más potentes y centralizados.
+
+En GitHub aparecen **3 tipos de ruleset**: Branch, Tag y Push. Necesitas configurar **2** de ellos:
+
+#### 8.3.1 Branch Ruleset — `Protect main and release`
+
+**Settings → Rules → Rulesets → New branch ruleset**
+
+| Campo | Valor |
+|---|---|
+| **Ruleset name** | `Protect main and release` |
+| **Enforcement status** | `Active` |
+| **Bypass list** | Vacío (nadie se lo salta). Añade tu usuario solo para emergencias. |
+
+**Target branches → Add target → Include by pattern**: añade `main` y `release` como dos patterns separados.
+
+**Rules a activar:**
+
+| Regla | Configuración |
+|---|---|
+| **Restrict deletions** | ✅ Nadie puede borrar `main` ni `release` |
+| **Require a pull request before merging** | ✅ |
+| ↳ Required approvals | `1` |
+| ↳ Dismiss stale pull request approvals | ✅ |
+| ↳ Require review from Code Owners | ✅ |
+| ↳ Require conversation resolution before merging | ✅ |
+| **Require status checks to pass** | ✅ |
+| ↳ Require branches to be up to date before merging | ✅ |
+| ↓ Status checks (busca y añade los 6): | `Lint & Vet`, `Unit Tests`, `Integration Tests`, `Contract Tests`, `E2E Tests`, `Docker Build` |
+| **Block force pushes** | ✅ |
+
+> **Nota**: los nombres de los status checks aparecen en el buscador **solo después** de que el workflow haya corrido al menos una vez. Haz push del `ci.yml` primero, deja que corra, y luego configura el ruleset.
+
+Las demás reglas (`Require signed commits`, `Require linear history`, etc.) déjalas desactivadas por ahora.
+
+#### 8.3.2 Tag Ruleset — `Protect release tags`
+
+**Settings → Rules → Rulesets → New tag ruleset**
+
+| Campo | Valor |
+|---|---|
+| **Ruleset name** | `Protect release tags` |
+| **Enforcement status** | `Active` |
+| **Bypass list** | Tu usuario o el equipo de maintainers (alguien tiene que poder crear tags para release) |
+
+**Target tags → Add target → Include by pattern**: `v*`
+
+**Rules a activar:**
+
+| Regla | Por qué |
+|---|---|
+| **Restrict creations** | ✅ Solo los usuarios en la bypass list pueden crear tags `v*`. Evita que cualquiera dispare un deploy a producción. |
+| **Restrict deletions** | ✅ Nadie puede borrar un tag de release. |
+| **Block force pushes** | ✅ |
+
+#### 8.3.3 Push Ruleset — NO lo necesitas
+
+El push ruleset restringe **quién** puede hacer push a qué rutas de archivos. Es redundante si ya tienes:
+- Branch ruleset que exige PRs (nadie hace push directo)
+- CODEOWNERS que exige aprobación para archivos sensibles
+
+Solo es útil en organizaciones grandes donde quieres impedir que alguien ni siquiera pueda *incluir* ciertos archivos en un commit.
+
+#### 8.3.4 Rulesets a nivel de organización
+
+Si tienes GitHub Team o Enterprise, puedes crear rulesets desde **Organization Settings → Rules → Rulesets** que aplican a **todos los repos** (o a un subconjunto por nombre/pattern). La ventaja clave: los admins de cada repo **no pueden desactivarlos**.
+
+| Característica | Branch Protection | Rulesets (repo) | Rulesets (org) |
+|---|---|---|---|
+| Aplica a múltiples repos | No | No | **Sí** |
+| Los admins del repo pueden desactivarlo | Sí | Sí | **No** |
+| Disponible en GitHub Free | Sí (limitado) | Sí | **No** (Team/Enterprise) |
+| Aplica por pattern de branches | No (una regla por rama) | Sí | Sí |
+| Aplica por pattern de repos | N/A | N/A | Sí |
+
+### 8.4 Seguridad en el deploy con tags (CI antes de CD)
+
+Una preocupación legítima: si crear un tag `v*` dispara automáticamente un deploy a producción, ¿qué pasa si tageas el commit equivocado? ¿Se despliega sin validación?
+
+**No**, si configuras CD correctamente. Hay **3 capas de seguridad** que se combinan:
+
+**Capa 1 — El código ya pasó CI (implícita)**:
+Todo lo que llega a `release` ya pasó CI porque branch protection exige que el PR tenga los checks verdes. Pero esto no es suficiente — podrías tagear el commit equivocado.
+
+**Capa 2 — CI se re-ejecuta en el tag (workflow prerequisito)**:
+El workflow de CD llama a CI como primer paso. Si falla, el deploy no se ejecuta:
+
+```yaml
+# .github/workflows/cd.yml (estructura simplificada)
+name: CD
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  # Step 1: re-run full CI suite on the tagged commit
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # Step 2: deploy only if CI passed
+  deploy:
+    needs: [ci]                    # ← blocked until CI passes
+    runs-on: ubuntu-latest
+    environment: production        # ← requires manual approval
+    steps:
+      - uses: actions/checkout@v4
+      # ... build image, push, deploy
+```
+
+Para que esto funcione, `ci.yml` incluye `workflow_call` en su `on:` — esto ya está configurado. Permite que otros workflows (como `cd.yml`) lo invoquen como un sub-workflow reutilizable.
+
+**Capa 3 — Aprobación manual con GitHub Environments (la más importante)**:
+El job de deploy usa `environment: production`. Cuando CD llega a este punto, GitHub **pausa la ejecución** y muestra un panel donde puedes:
+- Ver qué commit se va a desplegar
+- Verificar que CI pasó (los 5 jobs en verde)
+- Verificar el tag y el mensaje del commit
+- **Aprobar** o **rechazar** el deploy
+
+```
+┌────────────────────────────────────────────────┐
+│  Deploy to production                          │
+│  Waiting for review                            │
+│                                                │
+│  CI: ✅ Lint & Vet                             │
+│      ✅ Unit Tests                             │
+│      ✅ Integration Tests                      │
+│      ✅ Contract Tests                         │
+│      ✅ E2E Tests                              │
+│                                                │
+│  Tag: v1.0.1                                   │
+│  Commit: abc1234 - "fix: payment timeout"      │
+│                                                │
+│     [ Reject ]        [ Approve and deploy ]   │
+└────────────────────────────────────────────────┘
+```
+
+**El flujo completo seguro:**
+
+```
+1. Código en release (ya pasó CI vía PR)
+         │
+2. git tag v1.0.1 && git push origin v1.0.1
+         │
+3. CD se dispara
+         │
+4. Re-ejecuta CI completo (5 jobs)
+         │
+    ┌────┴────┐
+    ▼         ▼
+  ✅ CI     ❌ CI falla → deploy cancelado
+  pasa
+    │
+5. GitHub pausa: aprobación manual requerida
+         │
+    ┌────┴────┐
+    ▼         ▼
+  Aprobado   Rechazado → deploy cancelado
+    │
+6. Deploy a producción
+```
+
+> **Resultado**: 3 puntos de fallo seguro antes de que algo llegue a producción. No existe riesgo de deploy accidental.
+
+### 8.5 Proteger los secretos y environments
+
+En **Settings → Secrets and variables → Actions**:
+
+- Crea los secretos necesarios para CD (`DOCKER_USERNAME`, `DOCKER_PASSWORD`, etc.)
+- Los secretos **nunca aparecen en los logs** — GitHub los enmascara automáticamente con `***`
+
+En **Settings → Environments**:
+
+| Environment | Configuración |
+|---|---|
+| **staging** | Sin protección especial (se despliega automáticamente tras merge a `main`) |
+| **production** | **Required reviewers** ✅ — añade tu usuario o el equipo de leads. Esto es lo que activa el panel de aprobación manual del punto 8.4. |
+
+### 8.6 Checklist rápido
+
+```
+□ Branch ruleset en main + release → require PR + approvals + status checks
+□ Tag ruleset en v*                → restrict creations + deletions
+□ CODEOWNERS creado                → .github/CODEOWNERS
+□ Require Code Owner review        → activado en branch ruleset
+□ Status checks marcados required  → los 6 jobs de CI
+□ Force push bloqueado             → en main, release y tags v*
+□ Environment production           → required reviewers activado
+□ Secretos de CD configurados      → en Settings → Secrets
+```
+
+---
+
+## 9. Próximos pasos
 
 Con el CI funcionando, ve a `docs/GUIDE_CD.md` para configurar:
 - Despliegue automático a **staging** desde `main`
