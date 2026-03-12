@@ -264,6 +264,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout contracts repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/contracts
+          path: ../contracts
+
       - name: Start Postgres
         run: docker compose -f docker-compose.dev.yml up -d --wait postgres
 
@@ -389,6 +395,50 @@ CI usa los mismos targets de `make` que el desarrollador en local. Esto garantiz
 | `-count=1` | Desactiva el cache de tests — cada ejecución corre fresh |
 
 > **Nota**: CI instala `gotestsum` con `go install gotest.tools/gotestsum@latest` porque los runners de GitHub Actions no lo incluyen por defecto. En local ya lo tienes por `make deps`.
+
+### 4.6 Checkout del repo `contracts/` para contract tests
+
+Los contract tests validan las respuestas de la API contra el spec OpenAPI (`bundled.yaml`), que vive en el repo separado `contracts/`. En local funciona porque ambos repos son carpetas hermanas en tu workspace:
+
+```
+workspace/
+├── backend/          ← repo Git
+├── contracts/        ← repo Git (contiene openapi/bundled.yaml)
+└── infra/            ← repo Git
+```
+
+El código usa la ruta relativa `../../../contracts/openapi/bundled.yaml` desde `test/contract/`. En CI, solo se hace checkout de `backend/`, así que esa ruta no existe.
+
+**Solución**: hacer un segundo `actions/checkout` del repo `contracts/` en la misma ubicación relativa:
+
+```yaml
+- uses: actions/checkout@v4                    # checkout backend/ (default)
+
+- name: Checkout contracts repo
+  uses: actions/checkout@v4
+  with:
+    repository: ${{ github.repository_owner }}/contracts
+    path: ../contracts                         # same relative position as local
+```
+
+`actions/checkout` permite hacer checkout de **múltiples repos** en el mismo job. El segundo checkout no sobrescribe el primero porque usa `path: ../contracts` — lo coloca un nivel arriba del workspace, exactamente donde la ruta relativa lo espera.
+
+`${{ github.repository_owner }}` se resuelve al owner del repo actual (tu usuario u organización), así que no necesitas hardcodear el nombre.
+
+**¿Y si el repo `contracts/` es privado?** El `GITHUB_TOKEN` por defecto solo tiene acceso al repo actual. Para repos privados del mismo owner, necesitas un **Personal Access Token (PAT)** o un **GitHub App token** con acceso a ambos repos:
+
+```yaml
+- name: Checkout contracts repo
+  uses: actions/checkout@v4
+  with:
+    repository: ${{ github.repository_owner }}/contracts
+    path: ../contracts
+    token: ${{ secrets.CONTRACTS_PAT }}        # only needed if contracts is private
+```
+
+Crea el secreto `CONTRACTS_PAT` en **Settings → Secrets → Actions** con un PAT que tenga scope `repo` (o `contents:read` si usas fine-grained tokens).
+
+> **Fallback alternativo**: el código también soporta la variable de entorno `CONTRACT_SPEC_PATH`. Si prefieres no hacer checkout del repo, podrías descargar solo el archivo con `curl` y apuntar la variable. Pero el checkout es más robusto porque garantiza que siempre usas la versión correcta del spec.
 
 ---
 

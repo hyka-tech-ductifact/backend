@@ -93,6 +93,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout contracts repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/contracts
+          path: ../contracts
+
       - name: Start Postgres
         run: make db-start
 
@@ -152,7 +158,7 @@ jobs:
         run: make prod-start
 
       - name: Health check
-        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/health
+        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/api/v1/health
 
       - name: Teardown
         if: always()
