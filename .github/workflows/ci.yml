@@ -253,6 +253,6 @@ jobs:
       - name: Publish coverage summary
         if: always()
         run: |
-          if [ -f coverage-summary.md ]; then
-            cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage-report/coverage-summary.md ]; then
+            cat coverage-report/coverage-summary.md >> $GITHUB_STEP_SUMMARY
           fi
