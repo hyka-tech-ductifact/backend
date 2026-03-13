@@ -102,9 +102,9 @@ These spin up the router internally using `httptest`. No running server needed.
 
 ```bash
 make db-start                   # terminal 1: start PostgreSQL
-make app-run                    # terminal 2: start the server
+make app-start                  # terminal 2: build and start the server
 make test-e2e                   # terminal 3: run E2E tests
-make test-e2e COVERAGE          # with coverage report
+make test-e2e COVERAGE=1        # with coverage report
 ```
 
 These make real HTTP calls to `http://localhost:8080`.

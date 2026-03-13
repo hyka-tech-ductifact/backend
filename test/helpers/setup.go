@@ -75,7 +75,7 @@ func WaitForAPI(baseURL string, maxRetries int) error {
 			return nil
 		}
 		if i == maxRetries-1 {
-			return fmt.Errorf("API not ready at %s after %d retries — is the server running? (make app-run)", baseURL, maxRetries)
+			return fmt.Errorf("API not ready at %s after %d retries — is the server running? (make app-start)", baseURL, maxRetries)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

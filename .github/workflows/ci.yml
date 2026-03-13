@@ -79,7 +79,7 @@ jobs:
         run: go install gotest.tools/gotestsum@latest
 
       - name: Run unit tests
-        run: make test-unit RACE
+        run: make test-unit RACE=1
 
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:
@@ -99,7 +99,7 @@ jobs:
         run: go install gotest.tools/gotestsum@latest
 
       - name: Run integration tests
-        run: make test-integration RACE
+        run: make test-integration RACE=1
 
   # ── 4. Contract tests (need Postgres + running API) ────────
   contract-tests:
@@ -125,7 +125,7 @@ jobs:
         run: make app-start
 
       - name: Run contract tests
-        run: make test-contract RACE
+        run: make test-contract RACE=1
 
   # ── 5. E2E tests (need Postgres + running API) ────────────
   e2e-tests:
@@ -148,7 +148,7 @@ jobs:
         run: make app-start
 
       - name: Run E2E tests
-        run: make test-e2e RACE
+        run: make test-e2e RACE=1
 
   # ── 6. Docker smoke test ─────────────────────────────────────
   docker-smoke:
