@@ -1,0 +1,255 @@
+package persistence_test
+
+import (
+	"context"
+	"testing"
+
+	"ductifact/internal/domain/entities"
+	"ductifact/internal/infrastructure/adapters/outbound/persistence"
+	"ductifact/test/helpers"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// setupClientRepo creates both user and client repos with a clean DB.
+func setupClientRepo(t *testing.T) (*persistence.PostgresClientRepository, *persistence.PostgresUserRepository) {
+	db := helpers.SetupTestDB(t)
+	helpers.CleanDB(t, db)
+	return persistence.NewPostgresClientRepository(db), persistence.NewPostgresUserRepository(db)
+}
+
+// createTestUser is a helper that creates and persists a user for FK tests.
+func createTestUser(t *testing.T, userRepo *persistence.PostgresUserRepository) *entities.User {
+	user, err := entities.NewUser("Test User", "testuser_"+uuid.New().String()[:8]+"@example.com", "securepass123")
+	require.NoError(t, err)
+	require.NoError(t, userRepo.Create(context.Background(), user))
+	return user
+}
+
+// =============================================================================
+// Create + GetByID
+// =============================================================================
+
+func TestPostgresClientRepository_Create_And_GetByID(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+
+	client, err := entities.NewClient("Acme Corp", user.ID)
+	require.NoError(t, err)
+
+	err = clientRepo.Create(ctx, client)
+	require.NoError(t, err)
+
+	found, err := clientRepo.GetByID(ctx, client.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, client.ID, found.ID)
+	assert.Equal(t, "Acme Corp", found.Name)
+	assert.Equal(t, user.ID, found.UserID)
+	assert.False(t, found.CreatedAt.IsZero())
+	assert.False(t, found.UpdatedAt.IsZero())
+}
+
+// =============================================================================
+// ListByUserID
+// =============================================================================
+
+func TestPostgresClientRepository_ListByUserID(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+
+	client1, _ := entities.NewClient("Client A", user.ID)
+	client2, _ := entities.NewClient("Client B", user.ID)
+	require.NoError(t, clientRepo.Create(ctx, client1))
+	require.NoError(t, clientRepo.Create(ctx, client2))
+
+	clients, err := clientRepo.ListByUserID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Len(t, clients, 2)
+}
+
+func TestPostgresClientRepository_ListByUserID_Empty(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+
+	clients, err := clientRepo.ListByUserID(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Empty(t, clients)
+}
+
+func TestPostgresClientRepository_ListByUserID_DoesNotReturnOtherUsersClients(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user1 := createTestUser(t, userRepo)
+	user2 := createTestUser(t, userRepo)
+
+	clientA, _ := entities.NewClient("Shared Name", user1.ID)
+	clientB, _ := entities.NewClient("Shared Name", user2.ID)
+	require.NoError(t, clientRepo.Create(ctx, clientA))
+	require.NoError(t, clientRepo.Create(ctx, clientB))
+
+	// User 1 should only see their own client
+	clients1, err := clientRepo.ListByUserID(ctx, user1.ID)
+	require.NoError(t, err)
+	assert.Len(t, clients1, 1)
+	assert.Equal(t, user1.ID, clients1[0].UserID)
+
+	// User 2 should only see their own client
+	clients2, err := clientRepo.ListByUserID(ctx, user2.ID)
+	require.NoError(t, err)
+	assert.Len(t, clients2, 1)
+	assert.Equal(t, user2.ID, clients2[0].UserID)
+}
+
+// =============================================================================
+// Update
+// =============================================================================
+
+func TestPostgresClientRepository_Update(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	client, _ := entities.NewClient("Old Name", user.ID)
+	require.NoError(t, clientRepo.Create(ctx, client))
+
+	client.Name = "New Name"
+	err := clientRepo.Update(ctx, client)
+	require.NoError(t, err)
+
+	found, err := clientRepo.GetByID(ctx, client.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New Name", found.Name)
+}
+
+// =============================================================================
+// Delete
+// =============================================================================
+
+func TestPostgresClientRepository_Delete(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	client, _ := entities.NewClient("To Delete", user.ID)
+	require.NoError(t, clientRepo.Create(ctx, client))
+
+	err := clientRepo.Delete(ctx, client.ID)
+	require.NoError(t, err)
+
+	found, err := clientRepo.GetByID(ctx, client.ID)
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}
+
+// =============================================================================
+// GetByID — Not Found
+// =============================================================================
+
+func TestPostgresClientRepository_GetByID_NotFound(t *testing.T) {
+	clientRepo, _ := setupClientRepo(t)
+	ctx := context.Background()
+
+	found, err := clientRepo.GetByID(ctx, uuid.New())
+
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}
+
+// =============================================================================
+// Create — FK violation (non-existing user)
+// =============================================================================
+
+func TestPostgresClientRepository_Create_WithInvalidUserID_Fails(t *testing.T) {
+	clientRepo, _ := setupClientRepo(t)
+	ctx := context.Background()
+
+	client, _ := entities.NewClient("Orphan Client", uuid.New())
+	err := clientRepo.Create(ctx, client)
+
+	assert.Error(t, err, "creating a client with a non-existing user_id should fail due to FK constraint")
+}
+
+// =============================================================================
+// Two Users Same Client Name — Both succeed
+// =============================================================================
+
+func TestPostgresClientRepository_TwoUsers_SameClientName_BothSucceed(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user1 := createTestUser(t, userRepo)
+	user2 := createTestUser(t, userRepo)
+
+	clientA, _ := entities.NewClient("Same Name", user1.ID)
+	clientB, _ := entities.NewClient("Same Name", user2.ID)
+
+	require.NoError(t, clientRepo.Create(ctx, clientA))
+	require.NoError(t, clientRepo.Create(ctx, clientB))
+
+	foundA, err := clientRepo.GetByID(ctx, clientA.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Same Name", foundA.Name)
+	assert.Equal(t, user1.ID, foundA.UserID)
+
+	foundB, err := clientRepo.GetByID(ctx, clientB.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Same Name", foundB.Name)
+	assert.Equal(t, user2.ID, foundB.UserID)
+
+	assert.NotEqual(t, foundA.ID, foundB.ID, "they are different clients even though they have the same name")
+}
+
+// =============================================================================
+// Mapper — Data integrity
+// =============================================================================
+
+func TestPostgresClientRepository_Mapper_PreservesAllFields(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	original, _ := entities.NewClient("Full Data Client", user.ID)
+	require.NoError(t, clientRepo.Create(ctx, original))
+
+	found, err := clientRepo.GetByID(ctx, original.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, original.ID, found.ID)
+	assert.Equal(t, original.Name, found.Name)
+	assert.Equal(t, original.UserID, found.UserID)
+	assert.WithinDuration(t, original.CreatedAt, found.CreatedAt, 1_000_000_000)
+	assert.WithinDuration(t, original.UpdatedAt, found.UpdatedAt, 1_000_000_000)
+}
+
+// =============================================================================
+// Cascade Delete — Deleting user deletes their clients
+// =============================================================================
+
+func TestPostgresClientRepository_CascadeDelete_UserDeletion(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	client, _ := entities.NewClient("Will Be Orphaned", user.ID)
+	require.NoError(t, clientRepo.Create(ctx, client))
+
+	// Delete the user directly via DB (simulating cascade)
+	db := helpers.SetupTestDB(t)
+	err := db.Exec("DELETE FROM users WHERE id = ?", user.ID).Error
+	require.NoError(t, err)
+
+	// The client should be gone too (CASCADE)
+	found, err := clientRepo.GetByID(ctx, client.ID)
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}

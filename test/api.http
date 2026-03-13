@@ -1,0 +1,122 @@
+# API Test Suite
+# Use with REST Client plugin in VS Code
+# Make sure the server is running: make app-watch or make prod-start
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+@baseUrl = http://localhost:8080/api/v1
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+
+### Health Check
+GET {{baseUrl}}/health
+
+# =============================================================================
+# USER ENDPOINTS
+# =============================================================================
+
+### Create User
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "name": "John Doe"
+}
+
+### Get User by ID (replace with actual UUID from create response)
+GET {{baseUrl}}/users/{{user_id}}
+
+### Get User by ID (example with UUID)
+GET {{baseUrl}}/users/123e4567-e89b-12d3-a456-426614174000
+
+### Update User
+PUT {{baseUrl}}/users/{{user_id}}
+Content-Type: application/json
+
+{
+  "email": "john.updated@example.com",
+  "name": "John Updated"
+}
+
+# =============================================================================
+# CREATE MULTIPLE USERS
+# =============================================================================
+
+### Create Alice
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "name": "Alice Smith"
+}
+
+### Create Bob
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "name": "Bob Johnson"
+}
+
+### Create Charlie
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "charlie@example.com",
+  "name": "Charlie Brown"
+}
+
+# =============================================================================
+# VALIDATION TESTS
+# =============================================================================
+
+### Invalid Email -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "name": "Test User"
+}
+
+### Missing Email -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Test User"
+}
+
+### Missing Name -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Empty Email -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "",
+  "name": "Test User"
+}
+
+### Empty Name -> 400
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "name": ""
+}
