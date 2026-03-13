@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,11 +30,15 @@ var (
 		},
 		[]string{"method", "path", "status"},
 	)
+
+	registerMetricsOnce sync.Once
 )
 
-func init() {
-	prometheus.MustRegister(httpRequestsTotal)
-	prometheus.MustRegister(httpRequestDuration)
+func registerMetrics() {
+	registerMetricsOnce.Do(func() {
+		prometheus.Register(httpRequestsTotal)
+		prometheus.Register(httpRequestDuration)
+	})
 }
 
 // MetricsMiddleware records Prometheus metrics for each HTTP request.
@@ -45,6 +50,8 @@ func init() {
 // This middleware should be registered AFTER RequestIDMiddleware and BEFORE
 // the business-logic handlers so it captures all requests.
 func MetricsMiddleware() gin.HandlerFunc {
+	registerMetrics()
+
 	return func(c *gin.Context) {
 		start := time.Now()
 
