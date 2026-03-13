@@ -215,6 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -222,16 +223,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: "*-test-results"
-          merge-multiple: false
+          merge-multiple: true
 
       - name: Publish test results
-        uses: dorny/test-reporter@v1
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          artifact: /(.+-test-results)/
-          name: Test Summary
-          path: "*-test-results.xml"
-          only-summary: true
-          reporter: java-junit
+          files: "*-test-results.xml"
+          check_name: Test Results
+          comment_mode: off
 
       - name: Download coverage report
         if: always()
