@@ -81,17 +81,6 @@ jobs:
       - name: Run unit tests
         run: make test-unit CI=1 COVERAGE=1
 
-      - name: Generate coverage summary
-        if: always()
-        run: |
-          if [ -f coverage.out ]; then
-            total=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $3}')
-            echo "## 🧪 Unit Test Coverage: ${total}" > coverage-summary.md
-            echo '```' >> coverage-summary.md
-            go tool cover -func=coverage.out | grep -v '100.0%' >> coverage-summary.md
-            echo '```' >> coverage-summary.md
-          fi
-
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,7 +96,6 @@ jobs:
           path: |
             coverage.html
             coverage.out
-            coverage-summary.md
 
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:
@@ -248,11 +236,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-report
+          path: coverage-report
         continue-on-error: true
 
       - name: Publish coverage summary
         if: always()
-        run: |
-          if [ -f coverage-report/coverage-summary.md ]; then
-            cat coverage-report/coverage-summary.md >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: coverage-report/coverage.out
