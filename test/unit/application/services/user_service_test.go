@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
-	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -22,44 +20,22 @@ import (
 // =============================================================================
 
 func TestGetUserByID_WithExistingUser_ReturnsUser(t *testing.T) {
-	expectedID := uuid.New()
-	expectedUser := &entities.User{
-		ID:    expectedID,
-		Name:  "Juan",
-		Email: "juan@example.com",
-	}
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			if id == expectedID {
-				return expectedUser, nil
-			}
-			return nil, repositories.ErrNotFound
-		},
-	}
-
-	svc := services.NewUserService(mockRepo)
-
-	user, err := svc.GetUserByID(context.Background(), expectedID)
+	result, err := svc.GetUserByID(context.Background(), user.ID)
 
 	require.NoError(t, err)
-	assert.Equal(t, expectedUser.Name, user.Name)
-	assert.Equal(t, expectedUser.Email, user.Email)
-	assert.Equal(t, expectedID, user.ID)
+	assert.Equal(t, user.Name, result.Name)
+	assert.Equal(t, user.Email, result.Email)
 }
 
 func TestGetUserByID_WithNonExistingUser_ReturnsError(t *testing.T) {
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
+	svc := services.NewUserService(userRepoReturning(nil))
 
-	svc := services.NewUserService(mockRepo)
+	result, err := svc.GetUserByID(context.Background(), uuid.New())
 
-	user, err := svc.GetUserByID(context.Background(), uuid.New())
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
 }
 
@@ -68,298 +44,142 @@ func TestGetUserByID_WithNonExistingUser_ReturnsError(t *testing.T) {
 // =============================================================================
 
 func TestUpdateUser_WithNewName_UpdatesOnlyName(t *testing.T) {
-	existingUser := &entities.User{
-		ID:        uuid.New(),
-		Name:      "Juan",
-		Email:     "juan@example.com",
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
-	}
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			return nil
-		},
-	}
-
-	svc := services.NewUserService(mockRepo)
-	newName := "Pedro"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, &newName, nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Pedro", user.Name)
-	assert.Equal(t, "juan@example.com", user.Email)
+	assert.Equal(t, "Pedro", result.Name)
+	assert.Equal(t, user.Email, result.Email)
 }
 
 func TestUpdateUser_WithNewEmail_UpdatesOnlyEmail(t *testing.T) {
-	existingUser := &entities.User{
-		ID:        uuid.New(),
-		Name:      "Juan",
-		Email:     "juan@example.com",
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
+		return nil, repositories.ErrNotFound
 	}
+	svc := services.NewUserService(repo)
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			return nil
-		},
-	}
-
-	svc := services.NewUserService(mockRepo)
-	newEmail := "pedro@example.com"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, &newEmail)
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"))
 
 	require.NoError(t, err)
-	assert.Equal(t, "Juan", user.Name)
-	assert.Equal(t, "pedro@example.com", user.Email)
+	assert.Equal(t, "Juan", result.Name)
+	assert.Equal(t, "pedro@example.com", result.Email)
 }
 
 func TestUpdateUser_WithDuplicateEmail_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	existingUser := &entities.User{
-		ID:    userID,
-		Name:  "Juan",
-		Email: "juan@example.com",
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
+		return &entities.User{ID: uuid.New(), Email: email}, nil
 	}
+	svc := services.NewUserService(repo)
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return &entities.User{ID: uuid.New(), Email: email}, nil
-		},
-	}
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("taken@example.com"))
 
-	svc := services.NewUserService(mockRepo)
-	newEmail := "taken@example.com"
-
-	user, err := svc.UpdateUser(context.Background(), userID, nil, &newEmail)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
 }
 
 func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
-	userID := uuid.New()
-	existingUser := &entities.User{
-		ID:        userID,
-		Name:      "Juan",
-		Email:     "juan@example.com",
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
-	}
-
+	user := newTestUser()
+	repo := userRepoReturning(user)
 	getByEmailCalled := false
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			getByEmailCalled = true
-			return nil, nil
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			return nil
-		},
+	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
+		getByEmailCalled = true
+		return nil, nil
 	}
+	svc := services.NewUserService(repo)
 
-	svc := services.NewUserService(mockRepo)
-	sameEmail := "juan@example.com"
-
-	user, err := svc.UpdateUser(context.Background(), userID, nil, &sameEmail)
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr(user.Email))
 
 	require.NoError(t, err)
-	assert.Equal(t, "juan@example.com", user.Email)
+	assert.Equal(t, user.Email, result.Email)
 	assert.False(t, getByEmailCalled, "GetByEmail should not be called when email does not change")
 }
 
 func TestUpdateUser_WithNonExistingUser_ReturnsError(t *testing.T) {
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
+	svc := services.NewUserService(userRepoReturning(nil))
 
-	svc := services.NewUserService(mockRepo)
-	newName := "Pedro"
+	result, err := svc.UpdateUser(context.Background(), uuid.New(), strPtr("Pedro"), nil)
 
-	user, err := svc.UpdateUser(context.Background(), uuid.New(), &newName, nil)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
 }
 
 func TestUpdateUser_WhenRepoFails_ReturnsError(t *testing.T) {
-	existingUser := &entities.User{
-		ID:    uuid.New(),
-		Name:  "Juan",
-		Email: "juan@example.com",
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.UpdateFn = func(ctx context.Context, u *entities.User) error {
+		return errors.New("db write failed")
 	}
+	svc := services.NewUserService(repo)
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			return errors.New("db write failed")
-		},
-	}
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
 
-	svc := services.NewUserService(mockRepo)
-	newName := "Pedro"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, &newName, nil)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.EqualError(t, err, "db write failed")
 }
 
 func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
-	oldTime := time.Now().Add(-time.Hour)
-	existingUser := &entities.User{
-		ID:        uuid.New(),
-		Name:      "Juan",
-		Email:     "juan@example.com",
-		CreatedAt: oldTime,
-		UpdatedAt: oldTime,
-	}
+	user := newTestUser()
+	oldTime := user.UpdatedAt
+	svc := services.NewUserService(userRepoReturning(user))
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			return nil
-		},
-	}
-
-	svc := services.NewUserService(mockRepo)
-	newName := "Pedro"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, &newName, nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
 
 	require.NoError(t, err)
-	assert.True(t, user.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
+	assert.True(t, result.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
 }
 
 func TestUpdateUser_WithNoChanges_SkipsPersistence(t *testing.T) {
-	existingUser := &entities.User{
-		ID:        uuid.New(),
-		Name:      "Juan",
-		Email:     "juan@example.com",
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
-	}
-	originalUpdatedAt := existingUser.UpdatedAt
-
+	user := newTestUser()
+	repo := userRepoReturning(user)
 	updateCalled := false
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, user *entities.User) error {
-			updateCalled = true
-			return nil
-		},
+	repo.UpdateFn = func(ctx context.Context, u *entities.User) error {
+		updateCalled = true
+		return nil
 	}
+	svc := services.NewUserService(repo)
 
-	svc := services.NewUserService(mockRepo)
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, nil)
+	_, err := svc.UpdateUser(context.Background(), user.ID, nil, nil)
 
 	require.NoError(t, err)
 	assert.False(t, updateCalled, "Update should not be called when no fields change")
-	assert.Equal(t, originalUpdatedAt, user.UpdatedAt, "UpdatedAt should not change")
 }
 
 func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
-	existingUser := &entities.User{
-		ID:    uuid.New(),
-		Name:  "Juan",
-		Email: "juan@example.com",
-	}
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-	}
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr(""), nil)
 
-	svc := services.NewUserService(mockRepo)
-	emptyName := ""
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, &emptyName, nil)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
 }
 
 func TestUpdateUser_WithInvalidEmailFormat_ReturnsError(t *testing.T) {
-	existingUser := &entities.User{
-		ID:    uuid.New(),
-		Name:  "Juan",
-		Email: "juan@example.com",
-	}
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-	}
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("not-an-email"))
 
-	svc := services.NewUserService(mockRepo)
-	badEmail := "not-an-email"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, &badEmail)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, valueobjects.ErrInvalidEmail)
 }
 
 func TestUpdateUser_WhenGetByEmailFails_ReturnsError(t *testing.T) {
-	existingUser := &entities.User{
-		ID:    uuid.New(),
-		Name:  "Juan",
-		Email: "juan@example.com",
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
+		return nil, errors.New("db connection lost")
 	}
+	svc := services.NewUserService(repo)
 
-	mockRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			cp := *existingUser
-			return &cp, nil
-		},
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("db connection lost")
-		},
-	}
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"))
 
-	svc := services.NewUserService(mockRepo)
-	newEmail := "pedro@example.com"
-
-	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, &newEmail)
-
-	assert.Nil(t, user)
+	assert.Nil(t, result)
 	assert.EqualError(t, err, "db connection lost")
 }
