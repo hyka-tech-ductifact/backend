@@ -123,11 +123,24 @@ db-stop:
 define run-tests
 	@if [ "$(COVERAGE)" = "1" ]; then \
 		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
-		go tool cover -func=coverage.out && \
 		go tool cover -html=coverage.out -o coverage.html && \
 		echo "" && \
-		echo "Coverage report generated: coverage.html" && \
-		explorer.exe "$$(wslpath -w coverage.html)" || true; \
+		echo "─── Coverage Summary ───────────────────────────────" && \
+		echo "" && \
+		go tool cover -func=coverage.out | grep -v '100.0%' && \
+		echo "" && \
+		total=$$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $$3}' | tr -d '%') && \
+		echo "Total coverage: $${total}%" && \
+		echo "" && \
+		echo "📄 Coverage report: file:///$$(wslpath -m coverage.html)" && \
+		if [ -n "$$GITHUB_STEP_SUMMARY" ]; then \
+			echo "## 📊 Coverage Report" >> "$$GITHUB_STEP_SUMMARY" && \
+			echo "" >> "$$GITHUB_STEP_SUMMARY" && \
+			echo "| Metric | Value |" >> "$$GITHUB_STEP_SUMMARY" && \
+			echo "|--------|-------|" >> "$$GITHUB_STEP_SUMMARY" && \
+			echo "| Total coverage | **$${total}%** |" >> "$$GITHUB_STEP_SUMMARY" && \
+			echo "" >> "$$GITHUB_STEP_SUMMARY"; \
+		fi; \
 	else \
 		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 $(1); \
 	fi
