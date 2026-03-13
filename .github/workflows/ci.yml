@@ -81,6 +81,25 @@ jobs:
       - name: Run unit tests
         run: make test-unit CI=1 COVERAGE=1
 
+      - name: Convert coverage to Cobertura
+        if: always()
+        run: |
+          go install github.com/boumenot/gocover-cobertura@latest
+          gocover-cobertura < coverage.out > coverage.xml
+
+      - name: Coverage summary
+        if: always()
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.xml
+          format: markdown
+          output: both
+          badge: false
+
+      - name: Write coverage to Step Summary
+        if: always()
+        run: cat code-coverage-results.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -96,6 +115,7 @@ jobs:
           path: |
             coverage.out
             coverage.html
+            coverage.xml
 
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:

@@ -133,14 +133,10 @@ define run-tests
 		total=$$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $$3}' | tr -d '%') && \
 		echo "Total coverage: $${total}%" && \
 		echo "" && \
-		echo "📄 Coverage report: file:///$$(wslpath -m coverage.html)" && \
-		if [ -n "$$GITHUB_STEP_SUMMARY" ]; then \
-			echo "## 📊 Coverage Report" >> "$$GITHUB_STEP_SUMMARY" && \
-			echo "" >> "$$GITHUB_STEP_SUMMARY" && \
-			echo "| Metric | Value |" >> "$$GITHUB_STEP_SUMMARY" && \
-			echo "|--------|-------|" >> "$$GITHUB_STEP_SUMMARY" && \
-			echo "| Total coverage | **$${total}%** |" >> "$$GITHUB_STEP_SUMMARY" && \
-			echo "" >> "$$GITHUB_STEP_SUMMARY"; \
+		if command -v wslpath >/dev/null 2>&1; then \
+			echo "📄 Coverage report: file:///$$(wslpath -m coverage.html)"; \
+		else \
+			echo "📄 Coverage report: $$(pwd)/coverage.html"; \
 		fi; \
 	else \
 		gotestsum --format $(TEST_FORMAT) $(_JUNIT_FLAG) -- $(_RACE_FLAG) -count=1 $(1); \
