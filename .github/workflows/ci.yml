@@ -86,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
-          path: test-results.xml
+          path: unit-test-results.xml
 
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
-          path: test-results.xml
+          path: integration-test-results.xml
 
   # ── 4. Contract tests (need Postgres + running API) ────────
   contract-tests:
@@ -146,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: contract-test-results
-          path: test-results.xml
+          path: contract-test-results.xml
 
   # ── 5. E2E tests (need Postgres + running API) ────────────
   e2e-tests:
@@ -176,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-test-results
-          path: test-results.xml
+          path: e2e-test-results.xml
 
   # ── 6. Docker smoke test ─────────────────────────────────────
   docker-smoke:
@@ -218,6 +218,6 @@ jobs:
         with:
           artifact: /(.+-test-results)/
           name: Test Summary
-          path: test-results.xml
+          path: "*-test-results.xml"
           only-summary: true
           reporter: java-junit

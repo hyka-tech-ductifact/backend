@@ -1,122 +1,165 @@
 # API Test Suite
-# Use with REST Client plugin in VS Code
+# Use with REST Client plugin in VS Code (humao.rest-client)
 # Make sure the server is running: make app-watch or make prod-start
+#
+# Workflow: Register → Login → copy token → use protected endpoints
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
 @baseUrl = http://localhost:8080/api/v1
+@token = <paste-token-here>
 
 # =============================================================================
-# HEALTH CHECK
+# HEALTH & METRICS (public)
 # =============================================================================
 
 ### Health Check
 GET {{baseUrl}}/health
 
+### Prometheus Metrics
+GET {{baseUrl}}/metrics
+
 # =============================================================================
-# USER ENDPOINTS
+# AUTH (public)
 # =============================================================================
 
-### Create User
-POST {{baseUrl}}/users
+### Register a new user
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "john.doe@example.com",
-  "name": "John Doe"
+  "name": "Juan García",
+  "email": "juan@example.com",
+  "password": "securepass123"
 }
 
-### Get User by ID (replace with actual UUID from create response)
-GET {{baseUrl}}/users/{{user_id}}
-
-### Get User by ID (example with UUID)
-GET {{baseUrl}}/users/123e4567-e89b-12d3-a456-426614174000
-
-### Update User
-PUT {{baseUrl}}/users/{{user_id}}
+### Login
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "john.updated@example.com",
-  "name": "John Updated"
+  "email": "juan@example.com",
+  "password": "securepass123"
 }
 
 # =============================================================================
-# CREATE MULTIPLE USERS
+# AUTH VALIDATION (public)
 # =============================================================================
 
-### Create Alice
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "alice@example.com",
-  "name": "Alice Smith"
-}
-
-### Create Bob
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "bob@example.com",
-  "name": "Bob Johnson"
-}
-
-### Create Charlie
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "charlie@example.com",
-  "name": "Charlie Brown"
-}
-
-# =============================================================================
-# VALIDATION TESTS
-# =============================================================================
-
-### Invalid Email -> 400
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "invalid-email",
-  "name": "Test User"
-}
-
-### Missing Email -> 400
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "name": "Test User"
-}
-
-### Missing Name -> 400
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "test@example.com"
-}
-
-### Empty Email -> 400
-POST {{baseUrl}}/users
-Content-Type: application/json
-
-{
-  "email": "",
-  "name": "Test User"
-}
-
-### Empty Name -> 400
-POST {{baseUrl}}/users
+### Register — missing name → 400
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
   "email": "test@example.com",
-  "name": ""
+  "password": "securepass123"
 }
+
+### Register — invalid email → 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "invalid-email",
+  "password": "securepass123"
+}
+
+### Register — password too short → 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "short"
+}
+
+### Login — wrong password → 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "juan@example.com",
+  "password": "wrongpassword"
+}
+
+# =============================================================================
+# USER PROFILE (protected — requires Bearer token)
+# =============================================================================
+
+### Get my profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+
+### Update my profile
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Juan Updated"
+}
+
+### Update my email
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "juan.new@example.com"
+}
+
+### Unauthorized — no token → 401
+GET {{baseUrl}}/users/me
+
+# =============================================================================
+# CLIENTS (protected — requires Bearer token)
+# =============================================================================
+
+### Create a client
+POST {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Acme Corp"
+}
+
+### List my clients
+GET {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+
+### Get a client by ID (replace with actual UUID)
+GET {{baseUrl}}/users/me/clients/{{client_id}}
+Authorization: Bearer {{token}}
+
+### Update a client
+PUT {{baseUrl}}/users/me/clients/{{client_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Acme Corp Updated"
+}
+
+### Delete a client
+DELETE {{baseUrl}}/users/me/clients/{{client_id}}
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# CLIENT VALIDATION (protected)
+# =============================================================================
+
+### Create client — missing name → 400
+POST {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Get client — invalid UUID → 400
+GET {{baseUrl}}/users/me/clients/not-a-uuid
+Authorization: Bearer {{token}}

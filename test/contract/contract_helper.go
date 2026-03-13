@@ -150,11 +150,6 @@ func DefaultSpecPath() string {
 		}
 	}
 
-	// Fallback: environment variable
-	if envPath := os.Getenv("CONTRACT_SPEC_PATH"); envPath != "" {
-		return envPath
-	}
-
 	return "../../../contracts/openapi/bundled.yaml"
 }
 

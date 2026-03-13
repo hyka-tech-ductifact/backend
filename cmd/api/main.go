@@ -56,7 +56,6 @@ func main() {
 	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS, cfg.Contract)
 
 	port := cfg.App.Port
-
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,
