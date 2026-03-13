@@ -55,6 +55,9 @@ temp/
 /bin/
 /dist/
 
+# Contracts (fetched by make fetch-contract)
+/contracts/
+
 # Go build artifacts
 /api
 *.exe

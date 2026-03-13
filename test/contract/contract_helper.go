@@ -139,8 +139,8 @@ func (cv *ContractValidator) ValidateResponse(resp *http.Response, expectedStatu
 // DefaultSpecPath returns the path to the OpenAPI spec relative to the test directory.
 func DefaultSpecPath() string {
 	paths := []string{
-		"../../../contracts/openapi/bundled.yaml", // from backend/test/contract/
-		"../../contracts/openapi/bundled.yaml",    // fallback
+		"../../contracts/openapi/bundled.yaml",    // from test/contract/ → fetched by make fetch-contract
+		"../../../contracts/openapi/bundled.yaml", // from test/contract/ → workspace sibling repo
 		"../contracts/openapi/bundled.yaml",       // from backend/
 	}
 

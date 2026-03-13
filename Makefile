@@ -1,6 +1,6 @@
 # Ductifact Backend Makefile
 
-.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps COVERAGE RACE
+.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps validate-branch fetch-contract COVERAGE RACE
 
 # Allow COVERAGE to be used as a flag (e.g. make test-unit COVERAGE)
 COVERAGE: ;
@@ -45,6 +45,9 @@ help:
 	@echo "    make test-unit TEST_FORMAT=dots"
 	@echo "    Formats: testdox (default), pkgname, testname, dots, dots-v2,"
 	@echo "             standard-quiet, standard-verbose, pkgname-and-test-fails"
+	@echo ""
+	@echo "  Contracts:"
+	@echo "    fetch-contract     - Download bundled.yaml from contracts release"
 	@echo ""
 	@echo "  Production:"
 	@echo "    prod-build     - Build Docker images"
@@ -203,6 +206,30 @@ lint:
 	go vet ./...
 	golangci-lint run
 
+# Validate branch name and target (used in CI)
+# Requires BRANCH and BASE env vars (set by GitHub Actions).
+# BRANCH = source branch name (e.g. feat/add-login)
+# BASE   = target branch name (e.g. main) — only needed for target validation
+validate-branch:
+	@PATTERN='^(feat|fix|chore|docs|hotfix|test|refactor)/.+$$'; \
+	if [ -z "$$BRANCH" ]; then \
+		echo "❌ BRANCH env var is required"; exit 1; \
+	fi; \
+	if ! echo "$$BRANCH" | grep -qE "$$PATTERN"; then \
+		echo "❌ Branch '$$BRANCH' does not match: $$PATTERN"; \
+		echo "   Expected: feat/*, fix/*, chore/*, docs/*, hotfix/*, test/*, refactor/*"; \
+		exit 1; \
+	fi; \
+	if [ -n "$$BASE" ]; then \
+		if echo "$$BRANCH" | grep -qE '^hotfix/' && [ "$$BASE" != "release" ]; then \
+			echo "❌ hotfix/* branches must target 'release', not '$$BASE'"; exit 1; \
+		fi; \
+		if [ "$$BASE" = "release" ] && ! echo "$$BRANCH" | grep -qE '^hotfix/'; then \
+			echo "❌ Only hotfix/* branches can target 'release', got '$$BRANCH'"; exit 1; \
+		fi; \
+	fi; \
+	echo "✅ Branch '$$BRANCH' → '$${BASE:-*}' is valid"
+
 # Install dependencies and dev tools
 deps:
 	@echo "Installing dependencies..."
@@ -212,3 +239,24 @@ deps:
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install gotest.tools/gotestsum@latest
+
+# ─── Contracts ───────────────────────────────────────────────
+
+# GitHub org/user that owns the contracts repo
+CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
+
+# Download bundled.yaml from the contracts GitHub Release matching CONTRACT_VERSION.
+# Requires CONTRACT_VERSION env var (from .env or CI).
+# The file is saved to contracts/openapi/bundled.yaml (git-ignored).
+fetch-contract:
+	@if [ -z "$$CONTRACT_VERSION" ]; then \
+		echo "❌ CONTRACT_VERSION env var is required"; \
+		echo "   Set it in .env or export it: export CONTRACT_VERSION=0.1.0"; \
+		exit 1; \
+	fi; \
+	echo "Fetching contracts v$$CONTRACT_VERSION..."; \
+	mkdir -p contracts/openapi; \
+	curl -fsSL \
+		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$$CONTRACT_VERSION/bundled.yaml" \
+		-o contracts/openapi/bundled.yaml; \
+	echo "✅ contracts/openapi/bundled.yaml (v$$CONTRACT_VERSION)"
