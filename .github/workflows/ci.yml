@@ -206,3 +206,24 @@ jobs:
       - name: Teardown
         if: always()
         run: make prod-stop
+
+  # ── 7. Publish test results ────────────────────────────────
+  test-results:
+    name: Test Results
+    if: always()
+    needs: [unit-tests, integration-tests, contract-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-test-results"
+          merge-multiple: false
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "**/test-results.xml"
+          comment_mode: off

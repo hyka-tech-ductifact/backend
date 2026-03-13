@@ -52,6 +52,9 @@ func TestMain(m *testing.M) {
 	// feasible when the API server manages its own DB pool.
 	// This scenario is already covered by unit tests (health_handler_test.go).
 	tracker.Exclude("GET", "/health", 503)
+	// GET /health → 404 is a generic spec response for "endpoint not found".
+	// It cannot be triggered on an existing endpoint.
+	tracker.Exclude("GET", "/health", 404)
 
 	env = &contractEnv{
 		baseURL: baseURL,
