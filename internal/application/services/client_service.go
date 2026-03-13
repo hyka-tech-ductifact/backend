@@ -95,10 +95,9 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 
 	// Step 3: Apply changes
 	if name != nil {
-		if *name == "" {
-			return nil, entities.ErrEmptyClientName
+		if err := client.SetName(*name); err != nil {
+			return nil, err
 		}
-		client.Name = *name
 	}
 
 	// Step 4: Update timestamp and persist

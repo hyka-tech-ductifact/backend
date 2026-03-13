@@ -8,6 +8,8 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
+	"ductifact/internal/domain/valueobjects"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -109,7 +111,7 @@ func TestUpdateUser_WithNewEmail_UpdatesOnlyEmail(t *testing.T) {
 			return &cp, nil
 		},
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 		UpdateFn: func(ctx context.Context, user *entities.User) error {
 			return nil
@@ -257,4 +259,76 @@ func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, user.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
+}
+
+func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
+	existingUser := &entities.User{
+		ID:    uuid.New(),
+		Name:  "Juan",
+		Email: "juan@example.com",
+	}
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			cp := *existingUser
+			return &cp, nil
+		},
+	}
+
+	svc := services.NewUserService(mockRepo)
+	emptyName := ""
+
+	user, err := svc.UpdateUser(context.Background(), existingUser.ID, &emptyName, nil)
+
+	assert.Nil(t, user)
+	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
+}
+
+func TestUpdateUser_WithInvalidEmailFormat_ReturnsError(t *testing.T) {
+	existingUser := &entities.User{
+		ID:    uuid.New(),
+		Name:  "Juan",
+		Email: "juan@example.com",
+	}
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			cp := *existingUser
+			return &cp, nil
+		},
+	}
+
+	svc := services.NewUserService(mockRepo)
+	badEmail := "not-an-email"
+
+	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, &badEmail)
+
+	assert.Nil(t, user)
+	assert.ErrorIs(t, err, valueobjects.ErrInvalidEmail)
+}
+
+func TestUpdateUser_WhenGetByEmailFails_ReturnsError(t *testing.T) {
+	existingUser := &entities.User{
+		ID:    uuid.New(),
+		Name:  "Juan",
+		Email: "juan@example.com",
+	}
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			cp := *existingUser
+			return &cp, nil
+		},
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, errors.New("db connection lost")
+		},
+	}
+
+	svc := services.NewUserService(mockRepo)
+	newEmail := "pedro@example.com"
+
+	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, &newEmail)
+
+	assert.Nil(t, user)
+	assert.EqualError(t, err, "db connection lost")
 }

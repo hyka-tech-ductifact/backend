@@ -51,3 +51,22 @@ func NewUser(name, email, password string) (*User, error) {
 		UpdatedAt:    now,
 	}, nil
 }
+
+// SetName validates and updates the user's name.
+func (u *User) SetName(name string) error {
+	if name == "" {
+		return ErrEmptyUserName
+	}
+	u.Name = name
+	return nil
+}
+
+// SetEmail validates format via the Email VO and updates the user's email.
+func (u *User) SetEmail(email string) error {
+	valid, err := valueobjects.NewEmail(email)
+	if err != nil {
+		return err
+	}
+	u.Email = valid.String()
+	return nil
+}

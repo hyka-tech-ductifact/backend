@@ -36,3 +36,12 @@ func NewClient(name string, userID uuid.UUID) (*Client, error) {
 		UpdatedAt: now,
 	}, nil
 }
+
+// SetName validates and updates the client's name.
+func (c *Client) SetName(name string) error {
+	if name == "" {
+		return ErrEmptyClientName
+	}
+	c.Name = name
+	return nil
+}

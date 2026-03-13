@@ -7,6 +7,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
 	"ductifact/test/unit/mocks"
 
@@ -23,7 +24,7 @@ func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
 	// ARRANGE
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
@@ -75,7 +76,7 @@ func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
 func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{}
@@ -92,7 +93,7 @@ func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
 func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{}
@@ -109,7 +110,7 @@ func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
 func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{}
@@ -127,7 +128,7 @@ func TestRegister_WhenRepoCreateFails_ReturnsError(t *testing.T) {
 	// ARRANGE
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 		CreateFn: func(ctx context.Context, user *entities.User) error {
 			return errors.New("db connection lost")
@@ -150,7 +151,7 @@ func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 	// ARRANGE
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
@@ -292,4 +293,24 @@ func TestLogin_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 	assert.Nil(t, user)
 	assert.Empty(t, token)
 	assert.EqualError(t, err, "token signing failed")
+}
+
+func TestRegister_WhenGetByEmailFails_ReturnsError(t *testing.T) {
+	// ARRANGE: GetByEmail returns a non-"not found" error (e.g. DB failure)
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, errors.New("db connection lost")
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := services.NewAuthService(mockRepo, mockToken)
+
+	// ACT
+	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+
+	// ASSERT: DB error is propagated instead of silently ignored
+	assert.Nil(t, user)
+	assert.Empty(t, token)
+	assert.EqualError(t, err, "db connection lost")
 }
