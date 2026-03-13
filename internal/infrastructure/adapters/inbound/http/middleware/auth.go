@@ -9,10 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// contextKey is a private type to avoid key collisions in Gin's context.
-// Using a plain string as key would risk accidental overwrites by other packages.
-type contextKey string
-
 // UserIDKey is the key used to store/retrieve the authenticated user's ID in Gin's context.
 const UserIDKey contextKey = "userID"
 

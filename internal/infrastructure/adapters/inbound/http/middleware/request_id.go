@@ -5,8 +5,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// contextKey is a private type to avoid key collisions in Gin's context.
+type contextKey string
+
 // RequestIDKey is the key used to store/retrieve the request ID in Gin's context.
-const RequestIDKey = "requestID"
+const RequestIDKey contextKey = "requestID"
 
 // RequestIDHeader is the HTTP header name used to propagate the request ID.
 const RequestIDHeader = "X-Request-ID"
@@ -28,7 +31,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		}
 
 		// Store in context for downstream use (logger, handlers, etc.)
-		c.Set(RequestIDKey, requestID)
+		c.Set(string(RequestIDKey), requestID)
 
 		// Set as response header so the client can see it
 		c.Header(RequestIDHeader, requestID)
@@ -40,7 +43,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 // GetRequestIDFromContext extracts the request ID from the Gin context.
 // Returns an empty string if not found (middleware not applied).
 func GetRequestIDFromContext(c *gin.Context) string {
-	value, exists := c.Get(RequestIDKey)
+	value, exists := c.Get(string(RequestIDKey))
 	if !exists {
 		return ""
 	}
