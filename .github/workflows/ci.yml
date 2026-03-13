@@ -219,4 +219,5 @@ jobs:
           artifact: /(.+-test-results)/
           name: Test Summary
           path: test-results.xml
+          only-summary: true
           reporter: java-junit
