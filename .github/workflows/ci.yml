@@ -79,7 +79,18 @@ jobs:
         run: go install gotest.tools/gotestsum@latest
 
       - name: Run unit tests
-        run: make test-unit CI=1
+        run: make test-unit CI=1 COVERAGE=1
+
+      - name: Generate coverage summary
+        if: always()
+        run: |
+          if [ -f coverage.out ]; then
+            total=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $3}')
+            echo "## 🧪 Unit Test Coverage: ${total}" > coverage-summary.md
+            echo '```' >> coverage-summary.md
+            go tool cover -func=coverage.out | grep -v '100.0%' >> coverage-summary.md
+            echo '```' >> coverage-summary.md
+          fi
 
       - name: Upload test results
         if: always()
@@ -87,6 +98,16 @@ jobs:
         with:
           name: unit-test-results
           path: unit-test-results.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.html
+            coverage.out
+            coverage-summary.md
 
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:
@@ -221,3 +242,17 @@ jobs:
           path: "*-test-results.xml"
           only-summary: true
           reporter: java-junit
+
+      - name: Download coverage report
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+        continue-on-error: true
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f coverage-summary.md ]; then
+            cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+          fi
