@@ -1,6 +1,6 @@
 # Ductifact Backend Makefile
 
-.PHONY: help app-build app-run app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps validate-branch fetch-contract COVERAGE RACE
+.PHONY: help app-build app-run app-start app-watch app-test test test-unit test-integration test-e2e test-clean clean db-start db-stop prod-start prod-stop prod-build fmt lint deps validate-branch fetch-contract COVERAGE RACE
 
 # Allow COVERAGE to be used as a flag (e.g. make test-unit COVERAGE)
 COVERAGE: ;
@@ -23,6 +23,7 @@ help:
 	@echo "    db-stop        - Stop database"
 	@echo "    app-watch      - Run app with hot reloading (air), compiling and running"
 	@echo "    app-build      - Compile binary to bin/api"
+	@echo "    app-start      - Build and start API in background"
 	@echo "    app-run        - Run app without hot reloading"
 	@echo "    dev            - Build, start DB and run with hot reload"
 	@echo ""
@@ -72,6 +73,12 @@ app-build:
 app-run:
 	@echo "Running ductifact..."
 	go run ./cmd/api
+
+# Build and start API in background (used in CI and local testing)
+app-start: app-build
+	./bin/api &
+	@sleep 3
+	@echo "✅ API running in background"
 
 # Run the application with hot reloading
 app-watch:
