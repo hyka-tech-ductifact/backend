@@ -213,9 +213,6 @@ jobs:
     if: always()
     needs: [unit-tests, integration-tests, contract-tests, e2e-tests]
     runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -230,7 +227,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: "*-test-results.xml"
-          check_name: Test Results
+          check_run: false
           comment_mode: off
 
       - name: Download coverage report
