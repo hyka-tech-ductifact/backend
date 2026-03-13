@@ -98,14 +98,17 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 		return nil, err
 	}
 
-	// Apply changes
-	if name != nil {
-		if err := client.SetName(*name); err != nil {
-			return nil, err
-		}
+	// Nothing to update
+	if name == nil {
+		return client, nil
 	}
 
-	// Step 4: Update timestamp and persist
+	// Apply changes
+	if err := client.SetName(*name); err != nil {
+		return nil, err
+	}
+
+	// Update timestamp and persist
 	client.UpdatedAt = time.Now()
 	if err := s.clientRepo.Update(ctx, client); err != nil {
 		return nil, err

@@ -261,6 +261,37 @@ func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
 	assert.True(t, user.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
 }
 
+func TestUpdateUser_WithNoChanges_SkipsPersistence(t *testing.T) {
+	existingUser := &entities.User{
+		ID:        uuid.New(),
+		Name:      "Juan",
+		Email:     "juan@example.com",
+		CreatedAt: time.Now().Add(-time.Hour),
+		UpdatedAt: time.Now().Add(-time.Hour),
+	}
+	originalUpdatedAt := existingUser.UpdatedAt
+
+	updateCalled := false
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			cp := *existingUser
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, user *entities.User) error {
+			updateCalled = true
+			return nil
+		},
+	}
+
+	svc := services.NewUserService(mockRepo)
+
+	user, err := svc.UpdateUser(context.Background(), existingUser.ID, nil, nil)
+
+	require.NoError(t, err)
+	assert.False(t, updateCalled, "Update should not be called when no fields change")
+	assert.Equal(t, originalUpdatedAt, user.UpdatedAt, "UpdatedAt should not change")
+}
+
 func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
 	existingUser := &entities.User{
 		ID:    uuid.New(),

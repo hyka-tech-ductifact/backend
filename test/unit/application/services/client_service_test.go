@@ -331,6 +331,40 @@ func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
 	assert.True(t, client.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
 }
 
+func TestUpdateClient_WithNoChanges_SkipsPersistence(t *testing.T) {
+	userID := uuid.New()
+	clientID := uuid.New()
+	existingClient := &entities.Client{
+		ID:        clientID,
+		Name:      "Old Name",
+		UserID:    userID,
+		CreatedAt: time.Now().Add(-time.Hour),
+		UpdatedAt: time.Now().Add(-time.Hour),
+	}
+	originalUpdatedAt := existingClient.UpdatedAt
+
+	updateCalled := false
+	mockClientRepo := &mocks.MockClientRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
+			cp := *existingClient
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, client *entities.Client) error {
+			updateCalled = true
+			return nil
+		},
+	}
+	mockUserRepo := &mocks.MockUserRepository{}
+
+	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+
+	client, err := svc.UpdateClient(context.Background(), clientID, userID, nil)
+
+	require.NoError(t, err)
+	assert.False(t, updateCalled, "Update should not be called when no fields change")
+	assert.Equal(t, originalUpdatedAt, client.UpdatedAt, "UpdatedAt should not change")
+}
+
 // =============================================================================
 // DeleteClient
 // =============================================================================

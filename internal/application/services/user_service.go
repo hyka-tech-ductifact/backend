@@ -56,7 +56,12 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 		return nil, err
 	}
 
-	// Step 2: Apply changes
+	// Step 2: Nothing to update
+	if name == nil && email == nil {
+		return user, nil
+	}
+
+	// Step 3: Apply changes
 	if name != nil {
 		if err := user.SetName(*name); err != nil {
 			return nil, err
@@ -79,7 +84,7 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 		}
 	}
 
-	// Step 3: Update timestamp and persist
+	// Step 4: Update timestamp and persist
 	user.UpdatedAt = time.Now()
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
