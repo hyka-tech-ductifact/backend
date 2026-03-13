@@ -70,7 +70,7 @@ func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	// ASSERT
 	assert.Nil(t, user)
 	assert.Empty(t, token)
-	assert.ErrorIs(t, err, services.ErrEmailTaken)
+	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
 }
 
 func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {

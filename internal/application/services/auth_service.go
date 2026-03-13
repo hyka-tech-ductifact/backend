@@ -14,7 +14,6 @@ import (
 
 var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrEmailTaken         = errors.New("email already registered")
 )
 
 // authService implements usecases.AuthService.
@@ -39,7 +38,7 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 		return nil, "", err
 	}
 	if existing != nil {
-		return nil, "", ErrEmailTaken
+		return nil, "", ErrEmailAlreadyInUse
 	}
 
 	// Step 2: Create user entity (validates name + email + password, hashes password)
