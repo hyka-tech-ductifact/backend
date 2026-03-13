@@ -1,7 +1,7 @@
 package helpers
 
 import (
-	"errors"
+	"net/http"
 
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
@@ -9,30 +9,29 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrUserIDNotInContext is returned when the middleware has not set the userID
-// in the context — typically because the handler is not behind AuthMiddleware.
-var ErrUserIDNotInContext = errors.New("user ID not found in context")
-
-// GetUserIDFromContext extracts the authenticated user's ID from the Gin context.
-// This should only be called in handlers that are behind AuthMiddleware.
+// MustGetUserID extracts the authenticated user's ID from the Gin context.
+// If the ID is missing or invalid, it aborts the request with 401 and returns uuid.Nil.
+// Callers should check c.IsAborted() after calling this.
 //
 // Usage:
 //
 //	func (h *UserHandler) GetMe(c *gin.Context) {
-//	    userID, err := helpers.GetUserIDFromContext(c)
-//	    if err != nil { ... }
-//	    // userID is guaranteed to be the authenticated user
+//	    userID := helpers.MustGetUserID(c)
+//	    if c.IsAborted() { return }
+//	    // ...
 //	}
-func GetUserIDFromContext(c *gin.Context) (uuid.UUID, error) {
+func MustGetUserID(c *gin.Context) uuid.UUID {
 	value, exists := c.Get(string(middleware.UserIDKey))
 	if !exists {
-		return uuid.Nil, ErrUserIDNotInContext
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return uuid.Nil
 	}
 
 	userID, ok := value.(uuid.UUID)
 	if !ok {
-		return uuid.Nil, ErrUserIDNotInContext
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return uuid.Nil
 	}
 
-	return userID, nil
+	return userID
 }

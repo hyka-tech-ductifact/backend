@@ -30,9 +30,8 @@ func setupRouter(tokenProvider ports.TokenProvider) *gin.Engine {
 	r := gin.New()
 
 	r.GET("/protected", middleware.AuthMiddleware(tokenProvider), func(c *gin.Context) {
-		userID, err := helpers.GetUserIDFromContext(c)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		userID := helpers.MustGetUserID(c)
+		if c.IsAborted() {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"user_id": userID.String()})
@@ -164,17 +163,16 @@ func TestAuthMiddleware_ExpiredToken_Returns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-// --- Tests for GetUserIDFromContext ---
+// --- Tests for MustGetUserID ---
 
-func TestGetUserIDFromContext_WithoutMiddleware_ReturnsError(t *testing.T) {
+func TestMustGetUserID_WithoutMiddleware_Returns401(t *testing.T) {
 	// Create a router WITHOUT the middleware — simulates calling
-	// GetUserIDFromContext on a route that isn't protected.
+	// MustGetUserID on a route that isn't protected.
 	r := gin.New()
 
 	r.GET("/unprotected", func(c *gin.Context) {
-		_, err := helpers.GetUserIDFromContext(c)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		_ = helpers.MustGetUserID(c)
+		if c.IsAborted() {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "should not reach here"})
@@ -190,19 +188,18 @@ func TestGetUserIDFromContext_WithoutMiddleware_ReturnsError(t *testing.T) {
 	var body map[string]string
 	err := json.Unmarshal(w.Body.Bytes(), &body)
 	require.NoError(t, err)
-	assert.Equal(t, "user ID not found in context", body["error"])
+	assert.Equal(t, "unauthorized", body["error"])
 }
 
-func TestGetUserIDFromContext_WithWrongType_ReturnsError(t *testing.T) {
+func TestMustGetUserID_WithWrongType_Returns401(t *testing.T) {
 	// Simulate someone storing a non-UUID value with the same key.
 	r := gin.New()
 
 	r.GET("/bad-context", func(c *gin.Context) {
 		c.Set(string(middleware.UserIDKey), "not-a-uuid") // wrong type
 
-		_, err := helpers.GetUserIDFromContext(c)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		_ = helpers.MustGetUserID(c)
+		if c.IsAborted() {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "should not reach here"})
