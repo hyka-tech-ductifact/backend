@@ -241,9 +241,14 @@ jobs:
           path: coverage-report
         continue-on-error: true
 
-      - name: Publish coverage summary
+      - name: Publish coverage
+        id: coverage
         if: always()
         uses: vladopajic/go-test-coverage@v2
         with:
           profile: coverage-report/coverage.out
-          local-prefix: ductifact
+
+      - name: Coverage summary
+        if: always() && steps.coverage.outputs.total-coverage
+        run: |
+          echo "## 🧪 Unit Test Coverage: ${{ steps.coverage.outputs.total-coverage }}%" >> $GITHUB_STEP_SUMMARY
