@@ -43,7 +43,10 @@ func (s *clientService) CreateClient(ctx context.Context, name string, userID uu
 	// Step 1: Verify the user exists
 	_, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return nil, ErrUserNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
 
 	// Step 2: Domain entity validates its own invariants
@@ -60,11 +63,14 @@ func (s *clientService) CreateClient(ctx context.Context, name string, userID uu
 	return client, nil
 }
 
-// GetClientByID retrieves a client by ID, ensuring it belongs to the given user.
-func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
+// getOwnedClient fetches a client by ID and verifies it belongs to the given user.
+func (s *clientService) getOwnedClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
 	client, err := s.clientRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, ErrClientNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrClientNotFound
+		}
+		return nil, err
 	}
 
 	if client.UserID != userID {
@@ -72,6 +78,11 @@ func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID 
 	}
 
 	return client, nil
+}
+
+// GetClientByID retrieves a client by ID, ensuring it belongs to the given user.
+func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
+	return s.getOwnedClient(ctx, id, userID)
 }
 
 // ListClientsByUserID retrieves all clients belonging to a user.
@@ -82,18 +93,12 @@ func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUI
 // UpdateClient applies a partial update to an existing client.
 // Only non-nil fields are updated. Ensures the client belongs to the given user.
 func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, name *string) (*entities.Client, error) {
-	// Step 1: Fetch existing
-	client, err := s.clientRepo.GetByID(ctx, id)
+	client, err := s.getOwnedClient(ctx, id, userID)
 	if err != nil {
-		return nil, ErrClientNotFound
+		return nil, err
 	}
 
-	// Step 2: Verify ownership
-	if client.UserID != userID {
-		return nil, ErrClientNotOwned
-	}
-
-	// Step 3: Apply changes
+	// Apply changes
 	if name != nil {
 		if err := client.SetName(*name); err != nil {
 			return nil, err
@@ -111,17 +116,10 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 
 // DeleteClient removes a client, ensuring it belongs to the given user.
 func (s *clientService) DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	// Step 1: Fetch existing
-	client, err := s.clientRepo.GetByID(ctx, id)
+	client, err := s.getOwnedClient(ctx, id, userID)
 	if err != nil {
-		return ErrClientNotFound
+		return err
 	}
 
-	// Step 2: Verify ownership
-	if client.UserID != userID {
-		return ErrClientNotOwned
-	}
-
-	// Step 3: Delete
-	return s.clientRepo.Delete(ctx, id)
+	return s.clientRepo.Delete(ctx, client.ID)
 }

@@ -34,7 +34,7 @@ func TestGetUserByID_WithExistingUser_ReturnsUser(t *testing.T) {
 			if id == expectedID {
 				return expectedUser, nil
 			}
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 
@@ -51,7 +51,7 @@ func TestGetUserByID_WithExistingUser_ReturnsUser(t *testing.T) {
 func TestGetUserByID_WithNonExistingUser_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 
@@ -193,7 +193,7 @@ func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
 func TestUpdateUser_WithNonExistingUser_ReturnsError(t *testing.T) {
 	mockRepo := &mocks.MockUserRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 

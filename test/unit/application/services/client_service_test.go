@@ -8,6 +8,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -58,7 +59,7 @@ func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
 func TestCreateClient_WithNonExistingUser_ReturnsError(t *testing.T) {
 	mockUserRepo := &mocks.MockUserRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockClientRepo := &mocks.MockClientRepository{}
@@ -110,7 +111,7 @@ func TestGetClientByID_WithExistingClient_ReturnsClient(t *testing.T) {
 			if id == clientID {
 				return expectedClient, nil
 			}
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockUserRepo := &mocks.MockUserRepository{}
@@ -128,7 +129,7 @@ func TestGetClientByID_WithExistingClient_ReturnsClient(t *testing.T) {
 func TestGetClientByID_WithNonExistingClient_ReturnsError(t *testing.T) {
 	mockClientRepo := &mocks.MockClientRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockUserRepo := &mocks.MockUserRepository{}
@@ -284,7 +285,7 @@ func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 	mockClientRepo := &mocks.MockClientRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockUserRepo := &mocks.MockUserRepository{}
@@ -361,7 +362,7 @@ func TestDeleteClient_WithExistingClient_Succeeds(t *testing.T) {
 func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 	mockClientRepo := &mocks.MockClientRepository{
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
+			return nil, repositories.ErrNotFound
 		},
 	}
 	mockUserRepo := &mocks.MockUserRepository{}

@@ -36,7 +36,10 @@ func NewUserService(userRepo repositories.UserRepository) *userService {
 func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
 	return user, nil
 }
@@ -47,7 +50,10 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 	// Step 1: Fetch existing
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
 
 	// Step 2: Apply changes
