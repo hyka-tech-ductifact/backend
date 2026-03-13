@@ -8,9 +8,10 @@
 # standard-quiet, standard-verbose, pkgname-and-test-fails
 TEST_FORMAT ?= pkgname
 
-# Enable race detector (e.g. make test-unit RACE=1)
-RACE ?= 0
-_RACE_FLAG := $(if $(filter 1,$(RACE)),-race,)
+# Enable CI mode: race detector + JUnit XML report (e.g. make test-unit CI=1)
+CI ?= 0
+_RACE_FLAG := $(if $(filter 1,$(CI)),-race,)
+_JUNIT_FLAG := $(if $(filter 1,$(CI)),--junitfile test-results.xml,)
 
 # Generate coverage report (e.g. make test-unit COVERAGE=1)
 COVERAGE ?= 0
@@ -54,9 +55,9 @@ help:
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
-	@echo "      RACE=1       - Enable race detector:  make test-unit RACE=1"
-	@echo "      COVERAGE=1   - Generate coverage:      make test-unit COVERAGE=1"
-	@echo "      TEST_FORMAT  - Change output format:   make test-unit TEST_FORMAT=dots"
+	@echo "      CI=1         - CI mode (race detector + JUnit XML): make test-unit CI=1"
+	@echo "      COVERAGE=1   - Generate coverage:                   make test-unit COVERAGE=1"
+	@echo "      TEST_FORMAT  - Change output format:                make test-unit TEST_FORMAT=dots"
 	@echo "        Formats: pkgname (default), testdox, testname, dots, dots-v2,"
 	@echo "                 standard-quiet, standard-verbose, pkgname-and-test-fails"
 	@echo ""
@@ -122,7 +123,7 @@ db-stop:
 
 define run-tests
 	@if [ "$(COVERAGE)" = "1" ]; then \
-		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
+		gotestsum --format $(TEST_FORMAT) $(_JUNIT_FLAG) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
 		go tool cover -html=coverage.out -o coverage.html && \
 		echo "" && \
 		echo "─── Coverage Summary ───────────────────────────────" && \
@@ -142,7 +143,7 @@ define run-tests
 			echo "" >> "$$GITHUB_STEP_SUMMARY"; \
 		fi; \
 	else \
-		gotestsum --format $(TEST_FORMAT) -- $(_RACE_FLAG) -count=1 $(1); \
+		gotestsum --format $(TEST_FORMAT) $(_JUNIT_FLAG) -- $(_RACE_FLAG) -count=1 $(1); \
 	fi
 endef
 
