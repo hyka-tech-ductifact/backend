@@ -216,6 +216,8 @@ jobs:
     permissions:
       checks: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all test artifacts
         uses: actions/download-artifact@v4
         with:
