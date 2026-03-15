@@ -36,8 +36,8 @@ var (
 
 func registerMetrics() {
 	registerMetricsOnce.Do(func() {
-		prometheus.Register(httpRequestsTotal)
-		prometheus.Register(httpRequestDuration)
+		_ = prometheus.Register(httpRequestsTotal)
+		_ = prometheus.Register(httpRequestDuration)
 	})
 }
 
