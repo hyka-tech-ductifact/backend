@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrEmptyClientName = errors.New("client name cannot be empty")
+	ErrNilClientOwner  = errors.New("client owner ID cannot be nil")
 )
 
 type Client struct {
@@ -25,6 +26,9 @@ type Client struct {
 func NewClient(name string, userID uuid.UUID) (*Client, error) {
 	if name == "" {
 		return nil, ErrEmptyClientName
+	}
+	if userID == uuid.Nil {
+		return nil, ErrNilClientOwner
 	}
 
 	now := time.Now()

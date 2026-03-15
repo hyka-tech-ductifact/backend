@@ -31,7 +31,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// --- Database ---
-	db, err := persistence.NewPostgresConnection(cfg.Database)
+	db, err := persistence.NewPostgresConnection(cfg.Database, cfg.Log.Level)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)

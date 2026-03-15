@@ -3,6 +3,7 @@ package logging
 import (
 	"log/slog"
 	"os"
+	"strings"
 
 	"ductifact/internal/config"
 )
@@ -33,7 +34,7 @@ func NewLogger(cfg config.Log) *slog.Logger {
 // parseLevel converts a string level to slog.Level.
 // Defaults to INFO if the string is not recognized.
 func parseLevel(s string) slog.Level {
-	switch s {
+	switch strings.ToLower(s) {
 	case "debug":
 		return slog.LevelDebug
 	case "info":

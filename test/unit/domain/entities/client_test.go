@@ -29,6 +29,13 @@ func TestNewClient_WithEmptyName_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, entities.ErrEmptyClientName)
 }
 
+func TestNewClient_WithNilUserID_ReturnsError(t *testing.T) {
+	client, err := entities.NewClient("Acme Corp", uuid.Nil)
+
+	assert.Nil(t, client)
+	assert.ErrorIs(t, err, entities.ErrNilClientOwner)
+}
+
 func TestNewClient_GeneratesUniqueIDs(t *testing.T) {
 	userID := uuid.New()
 	client1, err1 := entities.NewClient("Client 1", userID)
