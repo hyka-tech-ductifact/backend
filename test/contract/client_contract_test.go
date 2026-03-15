@@ -68,9 +68,9 @@ func TestContract_ListClients_WithItems_Returns200_WithClientResponseArray(t *te
 
 	// Create two clients
 	r1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client A"})
-	r1.Body.Close()
+	defer r1.Body.Close()
 	r2 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client B"})
-	r2.Body.Close()
+	defer r2.Body.Close()
 
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 

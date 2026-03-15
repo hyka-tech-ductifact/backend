@@ -97,7 +97,7 @@ func TestContract_Register_DuplicateEmail_Returns409_WithErrorResponse(t *testin
 		"email":    "contract-dup@example.com",
 		"password": "securepass123",
 	})
-	resp1.Body.Close()
+	defer resp1.Body.Close()
 
 	// Second registration with the same email
 	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
@@ -132,7 +132,7 @@ func TestContract_Login_ValidCredentials_Returns200_WithAuthResponse(t *testing.
 		"email":    "contract-login@example.com",
 		"password": "securepass123",
 	})
-	reg.Body.Close()
+	defer reg.Body.Close()
 
 	// Login
 	resp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
@@ -153,7 +153,7 @@ func TestContract_Login_WrongPassword_Returns401_WithErrorResponse(t *testing.T)
 		"email":    "contract-loginwrong@example.com",
 		"password": "securepass123",
 	})
-	reg.Body.Close()
+	defer reg.Body.Close()
 
 	resp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
 		"email":    "contract-loginwrong@example.com",

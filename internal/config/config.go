@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // Config holds all application configuration, grouped by concern.
@@ -51,7 +52,8 @@ func (d Database) DSN() string {
 
 // JWT holds authentication token settings.
 type JWT struct {
-	Secret string // HMAC signing key
+	Secret        string        // HMAC signing key
+	TokenDuration time.Duration // How long tokens remain valid
 }
 
 // Log holds logging configuration.
@@ -88,7 +90,8 @@ func Load() Config {
 			AutoMigrate: optional("AUTO_MIGRATE", "false") == "true",
 		},
 		JWT: JWT{
-			Secret: required("JWT_SECRET"),
+			Secret:        required("JWT_SECRET"),
+			TokenDuration: parseDuration(optional("JWT_TOKEN_DURATION", "24h")),
 		},
 		Log: Log{
 			Level:  optional("LOG_LEVEL", "info"),
@@ -132,4 +135,14 @@ func parseList(raw string) []string {
 		}
 	}
 	return result
+}
+
+// parseDuration parses a duration string (e.g. "24h", "30m").
+// Panics if the format is invalid — this is a configuration error.
+func parseDuration(s string) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(fmt.Sprintf("invalid duration %q: %v", s, err))
+	}
+	return d
 }

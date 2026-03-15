@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"testing"
+	"time"
 
 	"ductifact/internal/config"
 	"ductifact/internal/infrastructure/auth"
@@ -12,7 +13,8 @@ import (
 )
 
 var testJWTConfig = config.JWT{
-	Secret: "test-secret-key-at-least-32-chars!!",
+	Secret:        "test-secret-key-at-least-32-chars!!",
+	TokenDuration: 24 * time.Hour,
 }
 
 // helper creates a JWTProvider with a test secret.
