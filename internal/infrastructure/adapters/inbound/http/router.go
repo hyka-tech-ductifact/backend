@@ -32,7 +32,6 @@ func SetupRoutes(
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyInUse, http.StatusConflict, "email already in use")
-	helpers.RegisterDomainError(services.ErrEmailTaken, http.StatusConflict, "email already registered")
 	helpers.RegisterDomainError(services.ErrInvalidCredentials, http.StatusUnauthorized, "invalid email or password")
 	helpers.RegisterDomainError(services.ErrClientNotFound, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(services.ErrClientNotOwned, http.StatusForbidden, "client does not belong to this user")

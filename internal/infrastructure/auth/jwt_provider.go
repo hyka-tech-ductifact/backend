@@ -31,7 +31,7 @@ func NewJWTProvider(cfg config.JWT) *JWTProvider {
 
 	return &JWTProvider{
 		secretKey:     []byte(cfg.Secret),
-		tokenDuration: 24 * time.Hour, // Token expires in 24 hours
+		tokenDuration: cfg.TokenDuration,
 	}
 }
 

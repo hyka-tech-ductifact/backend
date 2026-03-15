@@ -12,6 +12,9 @@
 *.out
 coverage.html
 
+# CI test result files
+*-test-results.xml
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 

@@ -39,9 +39,8 @@ func NewClientHandler(clientService usecases.ClientService) *ClientHandler {
 
 // CreateClient handles POST /users/me/clients
 func (h *ClientHandler) CreateClient(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 
@@ -62,9 +61,8 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 
 // ListClients handles GET /users/me/clients
 func (h *ClientHandler) ListClients(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 
@@ -84,9 +82,8 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 
 // GetClient handles GET /users/me/clients/:client_id
 func (h *ClientHandler) GetClient(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 
@@ -107,9 +104,8 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 
 // UpdateClient handles PUT /users/me/clients/:client_id
 func (h *ClientHandler) UpdateClient(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 
@@ -136,9 +132,8 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 
 // DeleteClient handles DELETE /users/me/clients/:client_id
 func (h *ClientHandler) DeleteClient(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 

@@ -14,7 +14,6 @@ import (
 
 var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrEmailTaken         = errors.New("email already registered")
 )
 
 // authService implements usecases.AuthService.
@@ -34,9 +33,12 @@ func NewAuthService(userRepo repositories.UserRepository, tokenProvider ports.To
 // Register creates a new user with a hashed password and returns a JWT.
 func (s *authService) Register(ctx context.Context, name, email, password string) (*entities.User, string, error) {
 	// Step 1: Check if email is already taken
-	existing, _ := s.userRepo.GetByEmail(ctx, email)
+	existing, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil && !errors.Is(err, repositories.ErrNotFound) {
+		return nil, "", err
+	}
 	if existing != nil {
-		return nil, "", ErrEmailTaken
+		return nil, "", ErrEmailAlreadyInUse
 	}
 
 	// Step 2: Create user entity (validates name + email + password, hashes password)

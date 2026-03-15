@@ -36,7 +36,10 @@ func NewUserService(userRepo repositories.UserRepository) *userService {
 func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
 	return user, nil
 }
@@ -47,25 +50,41 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 	// Step 1: Fetch existing
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
 
-	// Step 2: Apply changes
+	// Step 2: Nothing to update
+	if name == nil && email == nil {
+		return user, nil
+	}
+
+	// Step 3: Apply changes
 	if name != nil {
-		user.Name = *name
+		if err := user.SetName(*name); err != nil {
+			return nil, err
+		}
 	}
 	if email != nil {
-		// If email changes, check uniqueness
+		// If email changes, check uniqueness first (application concern)
 		if *email != user.Email {
-			existing, _ := s.userRepo.GetByEmail(ctx, *email)
+			existing, err := s.userRepo.GetByEmail(ctx, *email)
+			if err != nil && !errors.Is(err, repositories.ErrNotFound) {
+				return nil, err
+			}
 			if existing != nil {
 				return nil, ErrEmailAlreadyInUse
 			}
 		}
-		user.Email = *email
+		// Validate format and apply via entity (which uses the VO internally)
+		if err := user.SetEmail(*email); err != nil {
+			return nil, err
+		}
 	}
 
-	// Step 3: Update timestamp and persist
+	// Step 4: Update timestamp and persist
 	user.UpdatedAt = time.Now()
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err

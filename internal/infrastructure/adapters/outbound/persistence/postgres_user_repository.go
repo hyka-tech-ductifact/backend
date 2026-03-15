@@ -2,9 +2,11 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -46,6 +48,9 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *entities.User
 func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.User, error) {
 	var model UserModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, repositories.ErrNotFound
+		}
 		return nil, err
 	}
 	return toUserEntity(&model), nil
@@ -54,6 +59,9 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*en
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*entities.User, error) {
 	var model UserModel
 	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, repositories.ErrNotFound
+		}
 		return nil, err
 	}
 	return toUserEntity(&model), nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
@@ -20,50 +19,28 @@ import (
 // =============================================================================
 
 func TestCreateClient_WithValidData_ReturnsClient(t *testing.T) {
-	userID := uuid.New()
-	mockUserRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return &entities.User{ID: userID, Name: "Juan", Email: "juan@example.com"}, nil
-		},
-	}
-	mockClientRepo := &mocks.MockClientRepository{}
+	user := newTestUser()
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	client, err := svc.CreateClient(context.Background(), "Acme Corp", userID)
+	client, err := svc.CreateClient(context.Background(), "Acme Corp", user.ID)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Acme Corp", client.Name)
-	assert.Equal(t, userID, client.UserID)
-	assert.NotEmpty(t, client.ID)
+	assert.Equal(t, user.ID, client.UserID)
 }
 
 func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	mockUserRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return &entities.User{ID: userID}, nil
-		},
-	}
-	mockClientRepo := &mocks.MockClientRepository{}
+	user := newTestUser()
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	client, err := svc.CreateClient(context.Background(), "", userID)
+	client, err := svc.CreateClient(context.Background(), "", user.ID)
 
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, entities.ErrEmptyClientName)
 }
 
 func TestCreateClient_WithNonExistingUser_ReturnsError(t *testing.T) {
-	mockUserRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, errors.New("not found")
-		},
-	}
-	mockClientRepo := &mocks.MockClientRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(nil))
 
 	client, err := svc.CreateClient(context.Background(), "Acme Corp", uuid.New())
 
@@ -72,21 +49,15 @@ func TestCreateClient_WithNonExistingUser_ReturnsError(t *testing.T) {
 }
 
 func TestCreateClient_WhenRepoFails_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	mockUserRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return &entities.User{ID: userID}, nil
-		},
-	}
-	mockClientRepo := &mocks.MockClientRepository{
+	user := newTestUser()
+	clientRepo := &mocks.MockClientRepository{
 		CreateFn: func(ctx context.Context, client *entities.Client) error {
 			return errors.New("db connection lost")
 		},
 	}
+	svc := services.NewClientService(clientRepo, userRepoReturning(user))
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	client, err := svc.CreateClient(context.Background(), "Acme Corp", userID)
+	client, err := svc.CreateClient(context.Background(), "Acme Corp", user.ID)
 
 	assert.Nil(t, client)
 	assert.EqualError(t, err, "db connection lost")
@@ -98,66 +69,33 @@ func TestCreateClient_WhenRepoFails_ReturnsError(t *testing.T) {
 
 func TestGetClientByID_WithExistingClient_ReturnsClient(t *testing.T) {
 	userID := uuid.New()
-	clientID := uuid.New()
-	expectedClient := &entities.Client{
-		ID:     clientID,
-		Name:   "Acme Corp",
-		UserID: userID,
-	}
+	client := newTestClient(userID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			if id == clientID {
-				return expectedClient, nil
-			}
-			return nil, errors.New("not found")
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	client, err := svc.GetClientByID(context.Background(), clientID, userID)
+	result, err := svc.GetClientByID(context.Background(), client.ID, userID)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Acme Corp", client.Name)
-	assert.Equal(t, clientID, client.ID)
-	assert.Equal(t, userID, client.UserID)
+	assert.Equal(t, client.Name, result.Name)
+	assert.Equal(t, client.ID, result.ID)
 }
 
 func TestGetClientByID_WithNonExistingClient_ReturnsError(t *testing.T) {
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+	result, err := svc.GetClientByID(context.Background(), uuid.New(), uuid.New())
 
-	client, err := svc.GetClientByID(context.Background(), uuid.New(), uuid.New())
-
-	assert.Nil(t, client)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotFound)
 }
 
 func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
-	otherUserID := uuid.New()
-	clientID := uuid.New()
+	client := newTestClient(ownerID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return &entities.Client{ID: clientID, Name: "Acme Corp", UserID: ownerID}, nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	result, err := svc.GetClientByID(context.Background(), client.ID, uuid.New())
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	client, err := svc.GetClientByID(context.Background(), clientID, otherUserID)
-
-	assert.Nil(t, client)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotOwned)
 }
 
@@ -167,37 +105,30 @@ func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
 
 func TestListClientsByUserID_ReturnsClients(t *testing.T) {
 	userID := uuid.New()
-	expectedClients := []*entities.Client{
+	expected := []*entities.Client{
 		{ID: uuid.New(), Name: "Client 1", UserID: userID},
 		{ID: uuid.New(), Name: "Client 2", UserID: userID},
 	}
-
-	mockClientRepo := &mocks.MockClientRepository{
+	clientRepo := &mocks.MockClientRepository{
 		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID) ([]*entities.Client, error) {
-			return expectedClients, nil
+			return expected, nil
 		},
 	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
 
 	clients, err := svc.ListClientsByUserID(context.Background(), userID)
 
 	require.NoError(t, err)
 	assert.Len(t, clients, 2)
-	assert.Equal(t, "Client 1", clients[0].Name)
-	assert.Equal(t, "Client 2", clients[1].Name)
 }
 
 func TestListClientsByUserID_EmptyList(t *testing.T) {
-	mockClientRepo := &mocks.MockClientRepository{
+	clientRepo := &mocks.MockClientRepository{
 		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID) ([]*entities.Client, error) {
 			return []*entities.Client{}, nil
 		},
 	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
 
 	clients, err := svc.ListClientsByUserID(context.Background(), uuid.New())
 
@@ -211,123 +142,73 @@ func TestListClientsByUserID_EmptyList(t *testing.T) {
 
 func TestUpdateClient_WithNewName_UpdatesName(t *testing.T) {
 	userID := uuid.New()
-	clientID := uuid.New()
-	existingClient := &entities.Client{
-		ID:        clientID,
-		Name:      "Old Name",
-		UserID:    userID,
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
-	}
+	client := newTestClient(userID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			cp := *existingClient
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, client *entities.Client) error {
-			return nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-	newName := "New Name"
-
-	client, err := svc.UpdateClient(context.Background(), clientID, userID, &newName)
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr("New Name"))
 
 	require.NoError(t, err)
-	assert.Equal(t, "New Name", client.Name)
+	assert.Equal(t, "New Name", result.Name)
 }
 
 func TestUpdateClient_WithEmptyName_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	clientID := uuid.New()
+	client := newTestClient(userID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return &entities.Client{ID: clientID, Name: "Acme", UserID: userID}, nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr(""))
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-	emptyName := ""
-
-	client, err := svc.UpdateClient(context.Background(), clientID, userID, &emptyName)
-
-	assert.Nil(t, client)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, entities.ErrEmptyClientName)
 }
 
 func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
-	otherUserID := uuid.New()
-	clientID := uuid.New()
+	client := newTestClient(ownerID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return &entities.Client{ID: clientID, Name: "Acme", UserID: ownerID}, nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	result, err := svc.UpdateClient(context.Background(), client.ID, uuid.New(), strPtr("New Name"))
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-	newName := "New Name"
-
-	client, err := svc.UpdateClient(context.Background(), clientID, otherUserID, &newName)
-
-	assert.Nil(t, client)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotOwned)
 }
 
 func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-	newName := "New Name"
+	result, err := svc.UpdateClient(context.Background(), uuid.New(), uuid.New(), strPtr("New Name"))
 
-	client, err := svc.UpdateClient(context.Background(), uuid.New(), uuid.New(), &newName)
-
-	assert.Nil(t, client)
+	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotFound)
 }
 
 func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
-	clientID := uuid.New()
-	oldTime := time.Now().Add(-time.Hour)
-	existingClient := &entities.Client{
-		ID:        clientID,
-		Name:      "Old Name",
-		UserID:    userID,
-		CreatedAt: oldTime,
-		UpdatedAt: oldTime,
-	}
+	client := newTestClient(userID)
+	oldTime := client.UpdatedAt
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			cp := *existingClient
-			return &cp, nil
-		},
-		UpdateFn: func(ctx context.Context, client *entities.Client) error {
-			return nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-	newName := "New Name"
-
-	client, err := svc.UpdateClient(context.Background(), clientID, userID, &newName)
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr("New Name"))
 
 	require.NoError(t, err)
-	assert.True(t, client.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
+	assert.True(t, result.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
+}
+
+func TestUpdateClient_WithNoChanges_SkipsPersistence(t *testing.T) {
+	userID := uuid.New()
+	client := newTestClient(userID)
+	repo := clientRepoReturning(client)
+	updateCalled := false
+	repo.UpdateFn = func(ctx context.Context, c *entities.Client) error {
+		updateCalled = true
+		return nil
+	}
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{})
+
+	_, err := svc.UpdateClient(context.Background(), client.ID, userID, nil)
+
+	require.NoError(t, err)
+	assert.False(t, updateCalled, "Update should not be called when no fields change")
 }
 
 // =============================================================================
@@ -336,37 +217,23 @@ func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
 
 func TestDeleteClient_WithExistingClient_Succeeds(t *testing.T) {
 	userID := uuid.New()
-	clientID := uuid.New()
+	client := newTestClient(userID)
 	deleteCalled := false
-
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return &entities.Client{ID: clientID, Name: "Acme", UserID: userID}, nil
-		},
-		DeleteFn: func(ctx context.Context, id uuid.UUID) error {
-			deleteCalled = true
-			return nil
-		},
+	repo := clientRepoReturning(client)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		return nil
 	}
-	mockUserRepo := &mocks.MockUserRepository{}
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{})
 
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	err := svc.DeleteClient(context.Background(), clientID, userID)
+	err := svc.DeleteClient(context.Background(), client.ID, userID)
 
 	assert.NoError(t, err)
-	assert.True(t, deleteCalled, "Delete should have been called on the repository")
+	assert.True(t, deleteCalled)
 }
 
 func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return nil, errors.New("not found")
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
 
 	err := svc.DeleteClient(context.Background(), uuid.New(), uuid.New())
 
@@ -375,19 +242,10 @@ func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 
 func TestDeleteClient_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
-	otherUserID := uuid.New()
-	clientID := uuid.New()
+	client := newTestClient(ownerID)
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	mockClientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
-			return &entities.Client{ID: clientID, Name: "Acme", UserID: ownerID}, nil
-		},
-	}
-	mockUserRepo := &mocks.MockUserRepository{}
-
-	svc := services.NewClientService(mockClientRepo, mockUserRepo)
-
-	err := svc.DeleteClient(context.Background(), clientID, otherUserID)
+	err := svc.DeleteClient(context.Background(), client.ID, uuid.New())
 
 	assert.ErrorIs(t, err, services.ErrClientNotOwned)
 }

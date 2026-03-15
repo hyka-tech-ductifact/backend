@@ -31,7 +31,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// --- Database ---
-	db, err := persistence.NewPostgresConnection(cfg.Database)
+	db, err := persistence.NewPostgresConnection(cfg.Database, cfg.Log.Level)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -56,7 +56,6 @@ func main() {
 	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS, cfg.Contract)
 
 	port := cfg.App.Port
-
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,

@@ -11,7 +11,7 @@ TEST_FORMAT ?= pkgname
 # Enable CI mode: race detector + JUnit XML report (e.g. make test-unit CI=1)
 CI ?= 0
 _RACE_FLAG := $(if $(filter 1,$(CI)),-race,)
-_JUNIT_FLAG := $(if $(filter 1,$(CI)),--junitfile test-results.xml,)
+_junit_flag = $(if $(filter 1,$(CI)),--junitfile $(1)-test-results.xml,)
 
 # Generate coverage report (e.g. make test-unit COVERAGE=1)
 COVERAGE ?= 0
@@ -123,7 +123,7 @@ db-stop:
 
 define run-tests
 	@if [ "$(COVERAGE)" = "1" ]; then \
-		gotestsum --format $(TEST_FORMAT) $(_JUNIT_FLAG) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(1) && \
+		gotestsum --format $(TEST_FORMAT) $(call _junit_flag,$(1)) -- $(_RACE_FLAG) -count=1 -coverprofile=coverage.out -coverpkg=./internal/... $(2) && \
 		go tool cover -html=coverage.out -o coverage.html && \
 		echo "" && \
 		echo "─── Coverage Summary ───────────────────────────────" && \
@@ -139,7 +139,7 @@ define run-tests
 			echo "📄 Coverage report: $$(pwd)/coverage.html"; \
 		fi; \
 	else \
-		gotestsum --format $(TEST_FORMAT) $(_JUNIT_FLAG) -- $(_RACE_FLAG) -count=1 $(1); \
+		gotestsum --format $(TEST_FORMAT) $(call _junit_flag,$(1)) -- $(_RACE_FLAG) -count=1 $(2); \
 	fi
 endef
 
@@ -149,22 +149,22 @@ test: test-unit test-integration test-contract test-e2e
 # Run unit tests — no dependencies needed
 test-unit:
 	@echo "Running unit tests..."
-	$(call run-tests,./test/unit/...)
+	$(call run-tests,unit,./test/unit/...)
 
 # Run integration tests — requires DB running (make db-start)
 test-integration:
 	@echo "Running integration tests..."
-	$(call run-tests,./test/integration/...)
+	$(call run-tests,integration,./test/integration/...)
 
 # Run contract tests — requires DB + server running (make db-start && make app-start)
 test-contract:
 	@echo "Running contract tests..."
-	$(call run-tests,./test/contract/...)
+	$(call run-tests,contract,./test/contract/...)
 
 # Run E2E tests — requires DB + server running (make db-start && make app-start)
 test-e2e:
 	@echo "Running E2E tests..."
-	$(call run-tests,./test/e2e/...)
+	$(call run-tests,e2e,./test/e2e/...)
 
 # Clear Go test cache
 test-clean:
@@ -288,6 +288,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf bin/
 	rm -f coverage.out coverage.html
+	rm -f *-test-results.xml
 	rm -f api ductifact
 	@echo "Cleaning test cache..."
 	go clean -testcache

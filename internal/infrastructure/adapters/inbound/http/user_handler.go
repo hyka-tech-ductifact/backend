@@ -35,9 +35,8 @@ func NewUserHandler(userService usecases.UserService) *UserHandler {
 
 // GetMe handles GET /users/me — returns the authenticated user's profile.
 func (h *UserHandler) GetMe(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 
@@ -52,9 +51,8 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 
 // UpdateMe handles PUT /users/me — updates the authenticated user's profile.
 func (h *UserHandler) UpdateMe(c *gin.Context) {
-	userID, err := helpers.GetUserIDFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
 		return
 	}
 

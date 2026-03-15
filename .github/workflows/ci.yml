@@ -81,13 +81,6 @@ jobs:
       - name: Run unit tests
         run: make test-unit CI=1
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-results
-          path: test-results.xml
-
   # ── 3. Integration tests (need Postgres) ──────────────────
   integration-tests:
     name: Integration Tests
@@ -107,13 +100,6 @@ jobs:
 
       - name: Run integration tests
         run: make test-integration CI=1
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-test-results
-          path: test-results.xml
 
   # ── 4. Contract tests (need Postgres + running API) ────────
   contract-tests:
@@ -141,13 +127,6 @@ jobs:
       - name: Run contract tests
         run: make test-contract CI=1
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: contract-test-results
-          path: test-results.xml
-
   # ── 5. E2E tests (need Postgres + running API) ────────────
   e2e-tests:
     name: E2E Tests
@@ -171,13 +150,6 @@ jobs:
       - name: Run E2E tests
         run: make test-e2e CI=1
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-results
-          path: test-results.xml
-
   # ── 6. Docker smoke test ─────────────────────────────────────
   docker-smoke:
     name: Docker Smoke
@@ -198,26 +170,3 @@ jobs:
         if: always()
         run: make prod-stop
 
-  # ── 7. Publish test results ────────────────────────────────
-  test-results:
-    name: Publish Test Results
-    if: always()
-    needs: [unit-tests, integration-tests, contract-tests, e2e-tests]
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-    steps:
-      - name: Download all test artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: "*-test-results"
-          merge-multiple: false
-
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        with:
-          artifact: /(.+-test-results)/
-          name: Test Summary
-          path: test-results.xml
-          only-summary: true
-          reporter: java-junit
