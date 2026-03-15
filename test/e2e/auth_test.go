@@ -87,7 +87,7 @@ func TestE2E_Register_DuplicateEmail_Returns409(t *testing.T) {
 
 	assert.Equal(t, http.StatusConflict, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["error"], "email already registered")
+	assert.Contains(t, body["error"], "email already in use")
 }
 
 func TestE2E_Register_EmptyBody_Returns400(t *testing.T) {
