@@ -25,7 +25,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	dev app-build app-start app-watch \
 	db-start db-stop \
 	test test-unit test-integration test-contract test-e2e test-clean \
-	prod-build prod-start prod-stop \
+	docker-build docker-start docker-stop \
 	fmt lint deps clean \
 	validate-branch fetch-contract
 
@@ -64,10 +64,10 @@ help:
 	@echo "  Contracts:"
 	@echo "    fetch-contract   - Download bundled.yaml from contracts release"
 	@echo ""
-	@echo "  Production:"
-	@echo "    prod-build       - Build Docker images"
-	@echo "    prod-start       - Start app + DB in Docker"
-	@echo "    prod-stop        - Stop production services"
+	@echo "  Docker (smoke test):"
+	@echo "    docker-build     - Build Docker image"
+	@echo "    docker-start     - Start app + DB in Docker (smoke test)"
+	@echo "    docker-stop      - Stop Docker services"
 	@echo ""
 	@echo "  Code quality:"
 	@echo "    fmt              - Format code"
@@ -110,12 +110,12 @@ app-watch:
 # Start database in Docker
 db-start:
 	@echo "Starting database..."
-	docker compose -f docker-compose.dev.yml up -d --wait
+	docker compose up -d postgres --wait
 
 # Stop database
 db-stop:
 	@echo "Stopping database..."
-	docker compose -f docker-compose.dev.yml down
+	docker compose down
 
 # ═══════════════════════════════════════════════════════════════
 # Testing
@@ -193,38 +193,38 @@ fetch-contract:
 	echo "✅ contracts/openapi/bundled.yaml (v$$CONTRACT_VERSION)"
 
 # ═══════════════════════════════════════════════════════════════
-# Production
+# Docker (smoke test — validates Dockerfile builds and app starts)
 # ═══════════════════════════════════════════════════════════════
 
 # Build Docker image
-prod-build:
+docker-build:
 	@echo "Building Docker image..."
-	docker compose build
+	docker compose --profile smoke build
 
-# Start app + DB in Docker
-prod-start:
-	@echo "Starting production services..."
-	docker compose up -d
+# Start app + DB in Docker (smoke test)
+docker-start:
+	@echo "Starting Docker services..."
+	docker compose --profile smoke up -d
 	@echo "Waiting for app to start..."
 	@sleep 3
-	@if [ "$$(docker inspect -f '{{.State.Running}}' microservice_app 2>/dev/null)" != "true" ]; then \
+	@if [ "$$(docker inspect -f '{{.State.Running}}' ductifact_dev_app 2>/dev/null)" != "true" ]; then \
 		echo "\n❌ App container is not running. Logs:"; \
-		docker compose logs --tail=30 app; \
+		docker compose --profile smoke logs --tail=30 app; \
 		exit 1; \
 	fi
-	@restart_count=$$(docker inspect -f '{{.RestartCount}}' microservice_app 2>/dev/null); \
+	@restart_count=$$(docker inspect -f '{{.RestartCount}}' ductifact_dev_app 2>/dev/null); \
 	if [ "$$restart_count" -gt 0 ] 2>/dev/null; then \
 		echo "\n❌ App crashed and restarted $$restart_count time(s). Logs:"; \
-		docker compose logs --tail=30 app; \
+		docker compose --profile smoke logs --tail=30 app; \
 		exit 1; \
 	fi
 	@echo "✓ Services running. App logs:"
-	@docker compose logs --tail=10 app
+	@docker compose --profile smoke logs --tail=10 app
 
-# Stop production services
-prod-stop:
-	@echo "Stopping production services..."
-	docker compose down
+# Stop Docker services
+docker-stop:
+	@echo "Stopping Docker services..."
+	docker compose --profile smoke down
 
 # ═══════════════════════════════════════════════════════════════
 # Code quality

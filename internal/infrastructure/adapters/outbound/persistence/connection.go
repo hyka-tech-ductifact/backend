@@ -21,10 +21,8 @@ func NewPostgresConnection(cfg config.Database, logLevel string) (*gorm.DB, erro
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if cfg.AutoMigrate {
-		if err := db.AutoMigrate(&UserModel{}, &ClientModel{}); err != nil {
-			slog.Warn("auto-migration failed", "error", err)
-		}
+	if err := db.AutoMigrate(&UserModel{}, &ClientModel{}); err != nil {
+		slog.Warn("auto-migration failed", "error", err)
 	}
 
 	return db, nil

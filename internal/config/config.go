@@ -34,12 +34,11 @@ type App struct {
 
 // Database holds PostgreSQL connection settings.
 type Database struct {
-	Host        string
-	Port        string
-	User        string
-	Password    string
-	Name        string
-	AutoMigrate bool // Only enable in development
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Name     string
 }
 
 // DSN returns the PostgreSQL connection string.
@@ -82,12 +81,11 @@ func Load() Config {
 			Port: required("APP_PORT"),
 		},
 		Database: Database{
-			Host:        required("DB_HOST"),
-			Port:        required("DB_PORT"),
-			User:        required("DB_USER"),
-			Password:    required("DB_PASSWORD"),
-			Name:        required("DB_NAME"),
-			AutoMigrate: optional("AUTO_MIGRATE", "false") == "true",
+			Host:     required("DB_HOST"),
+			Port:     required("DB_PORT"),
+			User:     required("DB_USER"),
+			Password: required("DB_PASSWORD"),
+			Name:     required("DB_NAME"),
 		},
 		JWT: JWT{
 			Secret:        required("JWT_SECRET"),
