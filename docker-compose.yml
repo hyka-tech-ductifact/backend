@@ -1,7 +1,13 @@
+# Development & CI compose — NOT for production deployment (see infra/ repo).
+# Usage:
+#   make db-start       → only postgres (dev, tests)
+#   make docker-build   → build app image (CI smoke test)
+#   make docker-start   → postgres + app (CI smoke test)
+
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: microservice_postgres
+    container_name: ductifact_dev_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -11,7 +17,6 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
@@ -19,11 +24,12 @@ services:
       retries: 5
 
   app:
+    profiles: [smoke]
     build:
       context: .
       args:
         APP_PORT: ${APP_PORT}
-    container_name: microservice_app
+    container_name: ductifact_dev_app
     restart: unless-stopped
     ports:
       - "${APP_PORT}:${APP_PORT}"

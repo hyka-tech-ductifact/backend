@@ -1,7 +1,8 @@
-# Guía de CD — Despliegue en Hetzner VPS
+# Guía de CD — Despliegue en Debian 12 con Cloudflare Tunnel
 
 > **Fase 7.3 + 7.4 del Roadmap**
 > Desplegar automáticamente a **staging** desde `main` y a **producción** desde tags `v*`.
+> Ambos entornos corren en el mismo servidor (`jcapsule.work`) con Cloudflare Tunnel.
 
 ---
 
@@ -23,7 +24,7 @@ El flujo completo de CI/CD sigue el modelo definido en `CONTRIBUTING.md`:
   CD → Build imagen → Deploy a STAGING
        │
        ▼
-  QA valida en staging
+  QA valida en staging (staging-api.ductifact.jcapsule.work)
        │
   Aprobado? ✅
        │
@@ -49,40 +50,76 @@ El flujo completo de CI/CD sigue el modelo definido en `CONTRIBUTING.md`:
 
 **CD (Continuous Deployment)** automatiza el despliegue después de que CI pasa:
 
-- **Staging**: se despliega automáticamente cada vez que un PR se mergea a `main`. No requiere intervención manual.
-- **Producción**: se despliega cuando se pushea un **tag** `v*`. El tag lo creas tú manualmente después de que QA valide staging (ver `CONTRIBUTING.md` §6).
+- **Staging**: se despliega automáticamente cada vez que un PR se mergea a `main`. No requiere intervención manual. Accesible en `staging-api.ductifact.jcapsule.work`.
+- **Producción**: se despliega cuando se pushea un **tag** `v*`. El tag lo creas tú manualmente después de que QA valide staging (ver `CONTRIBUTING.md` §6). Accesible en `api.ductifact.jcapsule.work`.
 
 Esto es **Continuous Delivery** (no Deployment) para producción — hay un paso manual intencional (el tag) que actúa como puerta de aprobación.
 
 ---
 
-## 2. Arquitectura en el VPS
+## 2. Arquitectura en el servidor
 
-El VPS tiene **dos entornos**: staging y producción. En esta guía empezamos con producción (staging se puede añadir en un segundo VPS o en el mismo con puertos/dominios separados).
+El servidor Debian 12 corre **dos entornos** (staging y producción) aislados con redes Docker separadas. **Cloudflare Tunnel** se encarga de TLS y de exponer los servicios a internet sin necesidad de abrir puertos en el servidor. **Caddy** (que ya tienes instalado) actúa como reverse proxy para ductifact y el resto de tus servicios.
 
 ```
-Internet (puerto 80/443)
+Internet
     │
     ▼
-  Nginx (reverse proxy + HTTPS)
+  Cloudflare Edge (TLS termination, WAF, DDoS protection)
     │
-    ├── /api/v1/*        → backend  (Go, :8080)    ── contenedor Docker
-    ├── /api/v1/metrics  → ❌ bloqueado desde internet
-    ├── /health          → ❌ bloqueado desde internet
-    └── /*               → (futuro frontend)
-    
-  PostgreSQL (:5432)   ── contenedor Docker (solo red interna)
-  Prometheus  (:9090)  ── contenedor Docker (solo red interna)
-  Grafana     (:3000)  ── contenedor Docker (accesible por Nginx si quieres)
+    ▼
+  Cloudflare Tunnel (conexión saliente desde tu servidor)
+    │
+    ▼
+  cloudflared (daemon en el servidor)
+    │
+    ▼
+  Caddy (reverse proxy, ya instalado en el host)
+    │
+    ├── api.ductifact.jcapsule.work     → app-prod (:8090)
+    ├── staging-api.ductifact.jcapsule.work  → app-staging (:8091)
+    ├── grafana.ductifact.jcapsule.work  → Grafana (:3000) (opcional)
+    └── ductifact.jcapsule.work          → (futuro frontend)
+
+  ┌─── Entorno PRODUCTION ────────────────────────┐
+  │  app-prod     (Go, :8090) ── contenedor Docker │
+  │  postgres-prod (:5432)    ── contenedor Docker │
+  │  prometheus   (:9090)     ── contenedor Docker │
+  │  grafana      (:3000)     ── contenedor Docker │
+  └────────────────────────────────────────────────┘
+
+  ┌─── Entorno STAGING ───────────────────────────┐
+  │  app-staging     (Go, :8091) ── contenedor Docker │
+  │  postgres-staging (:5433)    ── contenedor Docker │
+  └────────────────────────────────────────────────┘
 ```
 
-**¿Por qué Nginx?**
+### ¿Qué es Cloudflare Tunnel?
 
-Tu API Go escucha en el puerto 8080. Pero los usuarios acceden por el puerto 443 (HTTPS). Nginx actúa como intermediario:
-- Recibe tráfico en 80/443 (HTTP/HTTPS)
-- Termina TLS (gestiona el certificado SSL)
-- Enruta las peticiones al contenedor correcto
-- Bloquea rutas internas (`/metrics`, `/health`) para que no sean accesibles desde internet
+Normalmente, exponer un servicio requiere abrir puertos (80, 443) en el firewall y gestionar certificados TLS. Cloudflare Tunnel invierte este modelo:
+
+1. El daemon `cloudflared` en tu servidor establece una **conexión saliente** a Cloudflare.
+2. Cloudflare recibe el tráfico de los usuarios, termina TLS y lo reenvía por el túnel.
+3. Tu servidor **no necesita abrir ningún puerto al público** (ni 80, ni 443).
+
+| Ventaja | Explicación |
+|---------|-------------|
+| Sin puertos abiertos | El firewall bloquea **todo** el tráfico entrante de internet. SSH también va por el túnel. Superficie de ataque: cero puertos públicos. |
+| TLS automático | Cloudflare gestiona los certificados. No necesitas Certbot ni Let's Encrypt. |
+| DDoS protection | Cloudflare filtra ataques antes de que lleguen a tu servidor. |
+| WAF incluido | Web Application Firewall que bloquea ataques comunes (SQL injection, XSS). |
+| IP oculta | Tu IP real nunca se expone. Los atacantes no pueden escanear puertos directamente. |
+
+### ¿Por qué Caddy como reverse proxy?
+
+Ya tienes Caddy instalado en el servidor para otros servicios. Reutilizarlo para ductifact tiene sentido:
+- **Ya está corriendo** — no añades otro componente, solo entradas al Caddyfile existente
+- Enruta peticiones a los contenedores correctos según el subdominio
+- Bloquea rutas internas (`/metrics`, `/health`) con directivas simples
+- Pasa la IP real del cliente desde Cloudflare a tu API
+- Cuando añadas el frontend, solo es otra entrada en el Caddyfile
+
+> **¿Por qué no un Nginx containerizado?** Porque ya tienes Caddy en el host — añadir Nginx sería doble reverse proxy (Cloudflare → Caddy → Nginx → app) sin beneficio. Menos componentes = menos cosas que romper.
 
 ---
 
@@ -100,75 +137,93 @@ backend/                             ← repositorio Git del backend
 └── ...
 
 infra/                               ← repositorio Git de infraestructura (SEPARADO)
-├── docker-compose.prod.yml
+├── docker-compose.prod.yml          ← entorno de producción
+├── docker-compose.staging.yml       ← entorno de staging
 ├── .env.prod.example
-├── init.sql                         ← copia del schema (para inicializar la DB)
-├── nginx/
-│   └── nginx.conf
+├── .env.staging.example
 └── prometheus/
     └── prometheus.yml
 ```
 
 > **¿Por qué repos separados?** Porque cuando añadas un servicio `frontend/`, la infra orquestará ambos servicios. Si `infra/` estuviera dentro de `backend/`, el frontend no podría usarlo. Repos separados permiten que la infraestructura evolucione independientemente de cada servicio.
-```
 
 ---
 
-## 4. Setup inicial del VPS (una sola vez)
+## 4. Setup inicial del servidor (una sola vez)
 
-Esto lo haces una vez cuando contratas el VPS. Después, los deploys son automáticos.
+Esto lo haces una vez. Después, los deploys son automáticos.
 
-### 4.1 Contratar el VPS
+### 4.1 Requisitos previos
 
-1. Crea una cuenta en [hetzner.com](https://www.hetzner.com/cloud)
-2. Crea un servidor **CX22** (2 vCPU, 4GB RAM, €4.35/mes)
-3. Elige **Ubuntu 24.04** como sistema operativo
-4. Elige el datacenter más cercano (Falkenstein o Nuremberg para Europa)
-5. Añade tu **SSH key pública** (si no tienes una, genera con `ssh-keygen -t ed25519`)
-6. Anota la **IP pública** del servidor (ej: `65.108.xxx.xxx`)
+Tu servidor Debian 12 ya está funcionando con:
+- Host: `jcapsule.work`
+- Cloudflare Tunnel configurado (el tráfico ya llega al servidor)
+- Acceso SSH a través de Cloudflare Tunnel vía `ssh.jcapsule.work`
+
+> **Nota**: Como tu SSH va por Cloudflare Tunnel, necesitas `cloudflared` instalado también en tu **máquina local** y esta entrada en tu `~/.ssh/config`:
+>
+> ```
+> Host ssh.jcapsule.work
+>     ProxyCommand cloudflared access ssh --hostname %h
+> ```
+>
+> Así todos los comandos `ssh`, `scp` y `ssh-copy-id` que aparecen en esta guía funcionan transparentemente a través del túnel.
+
+Si aún no tienes acceso SSH con key, genera una:
+
+```bash
+# En tu máquina local
+ssh-keygen -t ed25519 -C "tu@email.com"
+ssh-copy-id tu-usuario@ssh.jcapsule.work
+```
 
 ### 4.2 Configuración inicial del servidor
 
-Conéctate al VPS:
+Conéctate al servidor:
 
 ```bash
-ssh root@TU_IP_DEL_VPS
+ssh tu-usuario@ssh.jcapsule.work
 ```
 
 Ejecuta estos comandos para preparar el servidor:
 
 ```bash
 # 1. Actualizar el sistema
-apt update && apt upgrade -y
+sudo apt update && sudo apt upgrade -y
 
-# 2. Crear usuario para deploys (no usar root)
-adduser deploy --disabled-password --gecos ""
-usermod -aG sudo deploy
+# 2. Crear usuario para deploys (no usar root ni tu usuario personal)
+sudo adduser deploy --disabled-password --gecos ""
+sudo usermod -aG sudo deploy
 
 # 3. Configurar SSH para el usuario deploy
-mkdir -p /home/deploy/.ssh
-cp ~/.ssh/authorized_keys /home/deploy/.ssh/
-chown -R deploy:deploy /home/deploy/.ssh
-chmod 700 /home/deploy/.ssh
-chmod 600 /home/deploy/.ssh/authorized_keys
+sudo mkdir -p /home/deploy/.ssh
+sudo cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+sudo chown -R deploy:deploy /home/deploy/.ssh
+sudo chmod 700 /home/deploy/.ssh
+sudo chmod 600 /home/deploy/.ssh/authorized_keys
 
 # 4. Instalar Docker
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker deploy
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker deploy
 
 # 5. Instalar Docker Compose plugin
-apt install -y docker-compose-plugin
+sudo apt install -y docker-compose-plugin
 
-# 6. Configurar firewall (UFW)
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
+# 6. Configurar firewall — solo red local
+#    (Cloudflare Tunnel no necesita puertos abiertos, ni siquiera SSH)
+sudo apt install -y ufw
+sudo ufw allow from 192.168.1.0/24   # ← subred LAN principal
+sudo ufw allow from 192.168.0.0/24   # ← subred LAN secundaria
+sudo ufw --force enable
 
-# 7. Verificar
+# 7. Crear directorio para backups
+sudo mkdir -p /home/deploy/backups
+sudo chown deploy:deploy /home/deploy/backups
+
+# 8. Verificar
 docker --version
 docker compose version
-ufw status
+sudo ufw status
 ```
 
 **¿Qué hace cada paso?**
@@ -178,48 +233,179 @@ ufw status
 | `adduser deploy` | Creas un usuario sin privilegios para los despliegues. Nunca uses `root` para correr tu aplicación — si alguien compromete tu app, no tendrá acceso root al servidor. |
 | `--disabled-password` | El usuario `deploy` no tiene contraseña. Solo se puede acceder por SSH key. Más seguro. |
 | `usermod -aG docker deploy` | Permite al usuario `deploy` ejecutar Docker sin `sudo`. |
-| `ufw allow 80/443` | Abre solo los puertos necesarios (HTTP y HTTPS). Todo lo demás está bloqueado por el firewall. |
+| `ufw allow from 192.168.1.0/24` | Permite que dispositivos de tu red local accedan a todos los puertos (Samba, Jellyfin, SSH local, etc.). Ajusta a tu subred real — compruébala con `ip -4 addr show`. Desde internet **todos los puertos están cerrados** — cero superficie de ataque. SSH llega por Cloudflare Tunnel (conexión saliente → localhost), así que no necesita puerto abierto. |
 
-### 4.3 Crear la estructura en el servidor
+> **Importante**: después de añadir `deploy` al grupo `docker`, cierra la sesión y vuelve a conectar como `deploy` para que el cambio de grupo surta efecto.
+
+### 4.3 Instalar cloudflared
+
+`cloudflared` es el daemon que mantiene el túnel con Cloudflare. Si aún no lo tienes instalado:
+
+```bash
+# Como root o con sudo
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+  -o /tmp/cloudflared.deb
+sudo dpkg -i /tmp/cloudflared.deb
+rm /tmp/cloudflared.deb
+
+# Verificar
+cloudflared --version
+```
+
+### 4.4 Configurar Cloudflare Tunnel
+
+Si ya tienes un túnel configurado, puedes saltar al paso de **añadir los subdominios**. Si no:
+
+```bash
+# 1. Autenticarse con Cloudflare
+cloudflared tunnel login
+# Se abrirá un navegador. Selecciona tu dominio jcapsule.work.
+
+# 2. Crear el túnel
+cloudflared tunnel create ductifact
+# Anota el UUID del túnel (ej: a1b2c3d4-e5f6-...)
+# Esto genera un archivo de credenciales en ~/.cloudflared/<UUID>.json
+
+# 3. Configurar DNS en Cloudflare para los subdominios
+cloudflared tunnel route dns ductifact api.ductifact.jcapsule.work
+cloudflared tunnel route dns ductifact staging-api.ductifact.jcapsule.work
+cloudflared tunnel route dns ductifact grafana.ductifact.jcapsule.work   # opcional
+```
+
+**¿Qué hace cada paso?**
+
+| Paso | Explicación |
+|------|-------------|
+| `tunnel login` | Obtiene un certificado que autoriza a tu servidor a crear túneles bajo tu dominio. |
+| `tunnel create` | Crea un túnel con nombre `ductifact`. Genera un UUID único y unas credenciales. |
+| `tunnel route dns` | Crea un registro CNAME en Cloudflare que apunta cada subdominio al túnel. Así `api.ductifact.jcapsule.work` → túnel → tu servidor. |
+
+### 4.5 Crear archivo de configuración de cloudflared
+
+```bash
+# Si cloudflared lo instalaste como servicio del sistema:
+sudo mkdir -p /etc/cloudflared
+
+# Crear el config
+sudo nano /etc/cloudflared/config.yml
+```
+
+Contenido de `config.yml`:
+
+```yaml
+tunnel: <UUID-DE-TU-TUNEL>
+credentials-file: /etc/cloudflared/<UUID-DE-TU-TUNEL>.json
+
+ingress:
+  # ── Producción ─────────────────────────────────────────────
+  - hostname: api.ductifact.jcapsule.work
+    service: http://localhost:80
+
+  # ── Staging ────────────────────────────────────────────────
+  - hostname: staging-api.ductifact.jcapsule.work
+    service: http://localhost:80
+
+  # ── Grafana (opcional) ─────────────────────────────────────
+  - hostname: grafana.ductifact.jcapsule.work
+    service: http://localhost:80
+
+  # ── Futuro frontend ───────────────────────────────────────
+  # - hostname: ductifact.jcapsule.work
+  #   service: http://localhost:80
+
+  # ── Catch-all (obligatorio, debe ser el último) ────────────
+  - service: http_status:404
+```
+
+> **Nota**: Todas las rutas HTTP apuntan a Caddy en `localhost:80`. Caddy se encarga de distinguir por hostname y enviar cada petición al contenedor Docker correcto. La ruta SSH apunta directamente al daemon SSH del servidor (`localhost:22`). Así cloudflared solo tiene una responsabilidad: reenviar tráfico del túnel al servicio correcto.
+
+Copia las credenciales del túnel:
+
+```bash
+# Si las credenciales están en tu home, cópialas
+sudo cp ~/.cloudflared/<UUID>.json /etc/cloudflared/
+```
+
+Instala cloudflared como servicio del sistema:
+
+```bash
+sudo cloudflared service install
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+
+# Verificar que está corriendo
+sudo systemctl status cloudflared
+```
+
+### 4.6 Crear la estructura en el servidor
 
 Como usuario `deploy`:
 
 ```bash
-ssh deploy@TU_IP_DEL_VPS
+ssh deploy@ssh.jcapsule.work
 
 # Crear directorios
 mkdir -p ~/ductifact
+mkdir -p ~/backups
 ```
 
-### 4.4 Configurar SSH key para GitHub Actions
+### 4.7 Configurar SSH key para GitHub Actions
 
-GitHub Actions necesita poder hacer SSH al VPS para desplegar. Genera una key **dedicada** para CI/CD:
+GitHub Actions necesita poder hacer SSH al servidor para desplegar. Genera una key **dedicada** para CI/CD:
 
 ```bash
-# En tu máquina local (no en el VPS)
+# En tu máquina local (no en el servidor)
 ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/ductifact_deploy
 ```
 
 Esto genera dos archivos:
 - `~/.ssh/ductifact_deploy` — la clave **privada** (la sube a GitHub como Secret)
-- `~/.ssh/ductifact_deploy.pub` — la clave **pública** (la pones en el VPS)
+- `~/.ssh/ductifact_deploy.pub` — la clave **pública** (la pones en el servidor)
 
 ```bash
-# Copiar la clave pública al VPS
-ssh-copy-id -i ~/.ssh/ductifact_deploy.pub deploy@TU_IP_DEL_VPS
+# Copiar la clave pública al servidor
+ssh-copy-id -i ~/.ssh/ductifact_deploy.pub deploy@ssh.jcapsule.work
 ```
 
-### 4.5 Configurar GitHub Secrets
+### 4.8 Crear Service Token en Cloudflare Access
+
+GitHub Actions necesita autenticarse ante Cloudflare para usar el túnel SSH. Para eso creas un **Service Token** (credencial máquina-a-máquina):
+
+1. Ve a **Cloudflare Dashboard → Zero Trust → Access → Service Auth → Service Tokens**
+2. Click en **Create Service Token**
+3. Nombre: `github-actions-deploy`
+4. Cloudflare te da dos valores:
+   - **Client ID** — algo como `abc123.access`
+   - **Client Secret** — solo se muestra una vez, cópialo
+
+Después, crea una **Access Application** que permita este token:
+
+1. Ve a **Zero Trust → Access → Applications → Add an application**
+2. Tipo: **Self-hosted**
+3. Application name: `SSH Deploy`
+4. Subdomain: `ssh.jcapsule.work`
+5. En **Policies**, crea una política:
+   - Policy name: `Allow GitHub Actions`
+   - Action: **Service Auth**
+   - Include: **Service Token** → selecciona `github-actions-deploy`
+
+Esto autoriza al Service Token a acceder a `ssh.jcapsule.work` a través del túnel.
+
+> **¿Qué es un Service Token?** Es un par de credenciales (ID + Secret) diseñado para que máquinas (no personas) se autentiquen ante Cloudflare Access. `cloudflared` envía estas credenciales como headers HTTP (`CF-Access-Client-Id` y `CF-Access-Client-Secret`) al establecer la conexión. Sin ellas, Cloudflare bloquea el acceso SSH.
+
+### 4.9 Configurar GitHub Secrets
 
 En tu repositorio **`backend`** de GitHub, ve a **Settings → Secrets and variables → Actions** y crea estos secrets:
 
 | Secret | Valor | Descripción |
 |--------|-------|-------------|
-| `VPS_HOST` | `65.108.xxx.xxx` | IP pública del VPS |
+| `VPS_HOST` | `ssh.jcapsule.work` | Hostname SSH del servidor (a través de Cloudflare Tunnel) |
 | `VPS_USER` | `deploy` | Usuario SSH para deploys |
 | `VPS_SSH_KEY` | Contenido de `~/.ssh/ductifact_deploy` | La clave privada completa (incluye `-----BEGIN...` y `-----END...`) |
+| `CF_ACCESS_CLIENT_ID` | Client ID del Service Token | El que Cloudflare te dio al crear el Service Token (sección 4.8) |
+| `CF_ACCESS_CLIENT_SECRET` | Client Secret del Service Token | Se muestra solo una vez al crearlo. Si lo pierdes, regenera el token. |
 
-> **Nota**: los secrets de base de datos, JWT y dominio (`PROD_DB_*`, `PROD_JWT_SECRET`, `PROD_DOMAIN`) no van en el repo de `backend`. Se configuran directamente en el archivo `.env.prod` del VPS, gestionado desde el repo `infra/`. Así se separan las responsabilidades: el backend solo sabe cómo construir y subir su imagen.
+> **Nota**: los secrets de base de datos, JWT y dominio no van en el repo de `backend`. Se configuran directamente en los archivos `.env.prod` y `.env.staging` del servidor, gestionados desde el repo `infra/`. Así se separan las responsabilidades: el backend solo sabe cómo construir y subir su imagen.
 
 ---
 
@@ -229,82 +415,55 @@ En tu repositorio **`backend`** de GitHub, ve a **Settings → Secrets and varia
 
 ### 5.1 `docker-compose.prod.yml`
 
-Este es el compose de producción que corre en el VPS. Orquesta todos los servicios.
+Compose de **producción**. Orquesta la API, PostgreSQL, Prometheus y Grafana.
 
 ```yaml
 services:
   # ── PostgreSQL ─────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: ductifact_postgres
+    container_name: ductifact_prod_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - prod_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - internal
+      - prod_internal
 
   # ── Backend API ────────────────────────────────────────────
   app:
     image: ghcr.io/${GITHUB_REPO}:latest
-    container_name: ductifact_app
+    container_name: ductifact_prod_app
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"  # Solo localhost — Caddy hace proxy aquí
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - APP_PORT=8080
+      - APP_PORT=8090
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - CONTRACT_VERSION=${CONTRACT_VERSION}
       - LOG_LEVEL=info
       - LOG_FORMAT=json
       - GIN_MODE=release
+      - AUTO_MIGRATE=true
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - internal
-
-  # ── Nginx (reverse proxy) ─────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: ductifact_nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - certbot_data:/etc/letsencrypt:ro
-      - certbot_webroot:/var/www/certbot:ro
-    depends_on:
-      - app
-    networks:
-      - internal
-      - external
-
-  # ── Certbot (HTTPS certificates) ──────────────────────────
-  certbot:
-    image: certbot/certbot
-    container_name: ductifact_certbot
-    volumes:
-      - certbot_data:/etc/letsencrypt
-      - certbot_webroot:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h; done'"
-    networks:
-      - external
+      - prod_internal
 
   # ── Prometheus (metrics scraping) ──────────────────────────
   prometheus:
@@ -315,31 +474,29 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
-      - internal
+      - prod_internal
 
   # ── Grafana (dashboards) ───────────────────────────────────
   grafana:
     image: grafana/grafana:latest
     container_name: ductifact_grafana
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"  # Solo localhost — Caddy hace proxy aquí
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
-      - internal
+      - prod_internal
 
 volumes:
-  postgres_data:
-  certbot_data:
-  certbot_webroot:
+  prod_postgres_data:
   prometheus_data:
   grafana_data:
 
 networks:
-  internal:
-    driver: bridge
-  external:
+  prod_internal:
     driver: bridge
 ```
 
@@ -347,13 +504,88 @@ networks:
 
 | Concepto | Explicación |
 |----------|-------------|
-| `networks: internal / external` | `internal` es la red privada donde viven todos los servicios. `external` es la red que tiene acceso a internet. Solo Nginx y Certbot están en `external`. PostgreSQL, Prometheus y la API **no son accesibles directamente desde internet**. |
-| `ghcr.io/${GITHUB_REPO}:latest` | La imagen Docker de tu API no se construye en el VPS. Se construye en GitHub Actions, se sube a GitHub Container Registry (ghcr.io) y el VPS solo hace `docker pull`. Así el VPS no necesita compilar Go ni tener el código fuente. |
-| `GIN_MODE=release` | Desactiva el modo debug de Gin. En desarrollo ves warnings y stack traces bonitos. En producción quieres que sea silencioso y rápido. |
-| `LOG_FORMAT=json` | En producción los logs van en JSON para poder parsearlos con herramientas (Grafana/Loki). En desarrollo usas `text` para legibilidad. |
-| `certbot` | Contenedor que renueva automáticamente los certificados HTTPS cada 12 horas. Let's Encrypt los emite gratis pero expiran cada 90 días. |
+| `127.0.0.1:8090:8090` | Expone el puerto **solo en localhost**. Caddy (corriendo en el host) puede acceder, pero no es accesible desde internet. Si pusieras `0.0.0.0:8090:8090`, cualquiera con la IP podría acceder directamente saltando Caddy. |
+| Sin Nginx | Caddy ya está en el host — no necesitamos otro reverse proxy dentro de Docker. Menos contenedores = menos complejidad y menos memoria. |
+| Sin redes `external` | Cada compose es independiente. Caddy accede a los contenedores por los puertos expuestos en localhost, no por redes Docker compartidas. |
+| `ghcr.io/${GITHUB_REPO}:latest` | La imagen Docker no se construye en el servidor. Se construye en GitHub Actions, se sube a ghcr.io y el servidor solo hace `docker pull`. |
+| `GIN_MODE=release` | Desactiva el modo debug de Gin. En producción quieres que sea silencioso y rápido. |
+| `LOG_FORMAT=json` | En producción los logs van en JSON para poder parsearlos con herramientas (Grafana/Loki). |
 
-### 5.2 `.env.prod.example`
+### 5.2 `docker-compose.staging.yml`
+
+Compose de **staging**. Más ligero — solo la API y PostgreSQL. No necesita Prometheus ni Grafana.
+
+```yaml
+services:
+  # ── PostgreSQL (staging) ───────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: ductifact_staging_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - staging_internal
+
+  # ── Backend API (staging) ──────────────────────────────────
+  app:
+    image: ghcr.io/${GITHUB_REPO}:staging
+    container_name: ductifact_staging_app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:8091"  # Solo localhost — Caddy hace proxy aquí
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - APP_PORT=8091
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CONTRACT_VERSION=${CONTRACT_VERSION}
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=json
+      - GIN_MODE=release
+      - AUTO_MIGRATE=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - staging_internal
+
+volumes:
+  staging_postgres_data:
+
+networks:
+  staging_internal:
+    driver: bridge
+```
+
+**Diferencias clave entre staging y producción:**
+
+| Concepto | Staging | Producción |
+|----------|---------|------------|
+| Imagen Docker | `ghcr.io/.../...:staging` | `ghcr.io/.../...:latest` |
+| Puerto de la API | `8091` | `8090` |
+| Log level | `debug` (más detallado) | `info` (solo lo importante) |
+| Prometheus / Grafana | No (innecesario) | Sí |
+| Base de datos | Separada (puede llenarse de datos de test) | Separada (datos reales) |
+| Red Docker | `staging_internal` | `prod_internal` |
+| Contenedores | Prefijo `ductifact_staging_*` | Prefijo `ductifact_prod_*` |
+
+> **¿Por qué redes separadas?** Para que staging y producción estén completamente aislados. Un bug en staging que tire la base de datos no afecta a producción. Cada entorno tiene su propio PostgreSQL con sus propios datos.
+
+### 5.3 `.env.prod.example`
 
 Plantilla de las variables de producción. El archivo `.env.prod` real **nunca se commitea**.
 
@@ -365,7 +597,7 @@ DB_NAME=ductifact_db
 
 # ── Application ──────────────────────────────────────────────
 JWT_SECRET=CHANGE_ME_generate_with_openssl_rand_-base64_32
-CORS_ORIGINS=https://tudominio.com,https://www.tudominio.com
+CORS_ORIGINS=https://ductifact.jcapsule.work,https://api.ductifact.jcapsule.work
 CONTRACT_VERSION=1.0.0
 
 # ── GitHub image ─────────────────────────────────────────────
@@ -373,105 +605,28 @@ GITHUB_REPO=tu-usuario/ductifact
 
 # ── Grafana ──────────────────────────────────────────────────
 GRAFANA_PASSWORD=CHANGE_ME_secure_password
-
-# ── Domain (used by Certbot/Nginx) ───────────────────────────
-DOMAIN=api.tudominio.com
 ```
 
-### 5.3 `nginx/nginx.conf`
+### 5.4 `.env.staging.example`
 
-```nginx
-events {
-    worker_connections 1024;
-}
+```dotenv
+# ── Database ─────────────────────────────────────────────────
+DB_USER=ductifact_staging_user
+DB_PASSWORD=CHANGE_ME_different_from_prod
+DB_NAME=ductifact_staging_db
 
-http {
-    # ── Logging ──────────────────────────────────────────────
-    log_format main '$remote_addr - $remote_user [$time_local] '
-                    '"$request" $status $body_bytes_sent '
-                    '"$http_referer" "$http_user_agent"';
+# ── Application ──────────────────────────────────────────────
+JWT_SECRET=CHANGE_ME_different_from_prod
+CORS_ORIGINS=https://staging-api.ductifact.jcapsule.work
+CONTRACT_VERSION=1.0.0
 
-    access_log /var/log/nginx/access.log main;
-    error_log  /var/log/nginx/error.log warn;
-
-    # ── Security headers ─────────────────────────────────────
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # ── Upstream: backend API ────────────────────────────────
-    upstream backend {
-        server app:8080;
-    }
-
-    # ── HTTP → HTTPS redirect ────────────────────────────────
-    server {
-        listen 80;
-        server_name _;
-
-        # Certbot challenge (needed for certificate renewal)
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-        }
-
-        # Redirect everything else to HTTPS
-        location / {
-            return 301 https://$host$request_uri;
-        }
-    }
-
-    # ── HTTPS server ─────────────────────────────────────────
-    server {
-        listen 443 ssl;
-        server_name _;
-
-        # SSL certificates (managed by Certbot)
-        ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-
-        # Modern TLS config
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers HIGH:!aNULL:!MD5;
-
-        # ── Block internal endpoints from internet ───────────
-        location = /api/v1/metrics {
-            return 403;
-        }
-
-        location = /health {
-            return 403;
-        }
-
-        # ── Proxy to backend API ─────────────────────────────
-        location /api/ {
-            proxy_pass http://backend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-
-        # ── Future: frontend ─────────────────────────────────
-        # location / {
-        #     proxy_pass http://frontend:3000;
-        #     proxy_set_header Host $host;
-        # }
-    }
-}
+# ── GitHub image ─────────────────────────────────────────────
+GITHUB_REPO=tu-usuario/ductifact
 ```
 
-**¿Qué hace cada bloque?**
+> **Importante**: staging y producción usan **contraseñas, JWT secrets y bases de datos diferentes**. Si compartiesen credenciales, un token generado en staging funcionaría en producción — un riesgo de seguridad.
 
-| Bloque | Explicación |
-|--------|-------------|
-| `upstream backend` | Define el grupo de servidores backend. `app:8080` es el nombre del contenedor Docker en la red interna. Nginx resuelve `app` a la IP del contenedor automáticamente gracias a la red Docker. |
-| `server listen 80` | Recibe tráfico HTTP. Su único trabajo es redirigir a HTTPS (`return 301 https://...`). La excepción es `/.well-known/acme-challenge/` que Certbot necesita para validar el dominio. |
-| `server listen 443 ssl` | El servidor real. Recibe HTTPS, desencripta y pasa las peticiones al backend. |
-| `location = /api/v1/metrics` | `= ` es un match exacto. Devuelve 403 (Forbidden) para que nadie desde internet pueda ver las métricas de Prometheus. Prometheus las lee desde la red interna Docker. |
-| `proxy_set_header X-Real-IP` | Tu API recibe la IP del cliente real, no la IP de Nginx. Sin esto, todos los requests vendrían de `172.18.0.x` (la IP interna de Nginx). |
-| `X-Forwarded-Proto` | Le dice a tu API si la petición original fue HTTP o HTTPS. Útil para generar URLs correctas en las respuestas. |
-
-### 5.4 `prometheus/prometheus.yml`
+### 5.5 `prometheus/prometheus.yml`
 
 ```yaml
 global:
@@ -479,50 +634,57 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "ductifact-api"
+  - job_name: "ductifact-api-prod"
     metrics_path: "/api/v1/metrics"
     static_configs:
-      - targets: ["app:8080"]
+      - targets: ["ductifact_prod_app:8090"]
 ```
 
-Prometheus hace scrape (lee las métricas) del endpoint `/api/v1/metrics` de tu API cada 15 segundos. Como está en la misma red Docker (`internal`), puede acceder al contenedor `app` directamente. Desde internet está bloqueado por Nginx.
+Prometheus solo monitoriza producción. Hace scrape del endpoint `/api/v1/metrics` cada 15 segundos. Como está en la misma red Docker (`prod_internal`), puede acceder al contenedor directamente. Desde internet está bloqueado por Caddy.
 
 ---
 
 ## 6. GitHub Actions CD: `.github/workflows/cd.yml`
 
-Este workflow vive en el repositorio **`backend`** (`backend/.github/workflows/cd.yml`). Su responsabilidad es construir la imagen Docker del backend, subirla a ghcr.io y desplegar en el VPS.
+Este workflow vive en el repositorio **`backend`** (`backend/.github/workflows/cd.yml`). Tiene **dos jobs**: uno para staging (desde `main`) y otro para producción (desde tags `v*`).
 
 ```yaml
 name: CD
 
-# Se ejecuta solo cuando CI pasa en main
 on:
+  # Staging: cuando CI pasa en main
   workflow_run:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
+
+  # Producción: cuando se pushea un tag v*
+  push:
+    tags:
+      - "v*"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  # ══════════════════════════════════════════════════════════
+  # STAGING — se ejecuta cuando CI pasa en main
+  # ══════════════════════════════════════════════════════════
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    # Solo se ejecuta si CI pasó correctamente
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
 
     permissions:
       contents: read
       packages: write
 
     steps:
-      # ── 1. Checkout code ───────────────────────────────────
       - uses: actions/checkout@v4
 
-      # ── 2. Login to GitHub Container Registry ──────────────
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -530,140 +692,213 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 3. Build and push Docker image ─────────────────────
-      - name: Build and push
+      - name: Build and push (staging tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+            -o /tmp/cloudflared.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+
+      - name: Deploy to staging via Cloudflare Tunnel
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          # Preparar clave SSH
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Deploy via SSH a través del túnel de Cloudflare
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
+              -i ~/.ssh/deploy_key \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_SCRIPT'
+          cd ~/ductifact/infra
+
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+
+          docker compose --env-file .env.staging \
+            -f docker-compose.staging.yml up -d app
+
+          sleep 5
+          if ! docker inspect --format='{{.State.Running}}' \
+            ductifact_staging_app | grep -q true; then
+            echo "ERROR: staging app container is not running"
+            docker logs --tail=30 ductifact_staging_app
+            exit 1
+          fi
+
+          docker image prune -f
+          echo "Staging deploy successful!"
+          DEPLOY_SCRIPT
+
+  # ══════════════════════════════════════════════════════════
+  # PRODUCTION — se ejecuta cuando se pushea un tag v*
+  # ══════════════════════════════════════════════════════════
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push (production tags)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
 
-      # ── 4. Deploy to VPS via SSH ───────────────────────────
-      - name: Deploy to Hetzner VPS
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ~/ductifact/infra
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+            -o /tmp/cloudflared.deb
+          sudo dpkg -i /tmp/cloudflared.deb
 
-            # Pull the latest backend image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Deploy to production via Cloudflare Tunnel
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          # Preparar clave SSH
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
-            # Restart only the app service (zero-downtime for DB)
-            docker compose -f docker-compose.prod.yml up -d app
+          # Deploy via SSH a través del túnel de Cloudflare
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
+              -i ~/.ssh/deploy_key \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_SCRIPT'
+          cd ~/ductifact/infra
 
-            # Verify the app is healthy
-            sleep 5
-            if ! docker inspect --format='{{.State.Running}}' ductifact_app | grep -q true; then
-              echo "ERROR: app container is not running"
-              docker logs --tail=30 ductifact_app
-              exit 1
-            fi
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-            # Clean up old images
-            docker image prune -f
+          docker compose --env-file .env.prod \
+            -f docker-compose.prod.yml up -d app
 
-            echo "Deploy successful!"
+          sleep 5
+          if ! docker inspect --format='{{.State.Running}}' \
+            ductifact_prod_app | grep -q true; then
+            echo "ERROR: production app container is not running"
+            docker logs --tail=30 ductifact_prod_app
+            exit 1
+          fi
+
+          docker image prune -f
+          echo "Production deploy successful!"
+          DEPLOY_SCRIPT
 ```
 
 ### Explicación del flujo:
 
-**1. ¿Cuándo se ejecuta?**
+**1. Dos triggers, dos jobs**
 
-```yaml
-on:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
-```
+| Trigger | Job | Cuándo |
+|---------|-----|--------|
+| `workflow_run` (CI pasa en main) | `deploy-staging` | Cada PR mergeada a main |
+| `push` tag `v*` | `deploy-production` | Cuando creas un tag de release |
 
-`workflow_run` es un trigger especial: "ejecuta este workflow cuando el workflow `CI` termine en la rama `main`". Con el `if: conclusion == 'success'`, solo despliega **si CI pasó**. Esto encadena CI → CD sin duplicar los tests.
+Cada job tiene su condición `if` para que no se ejecuten ambos a la vez.
 
-**2. GitHub Container Registry (ghcr.io)**
+**2. Tags de imagen diferentes**
 
-En vez de Docker Hub (que tiene límites en el free tier), usamos **ghcr.io** que viene incluido gratis con GitHub. La imagen se publica como:
+| Entorno | Tags |
+|---------|------|
+| Staging | `:staging`, `:staging-abc123f` |
+| Producción | `:latest`, `:v0.4.0` |
 
-```
-ghcr.io/tu-usuario/ductifact-backend:latest
-ghcr.io/tu-usuario/ductifact-backend:abc123f   ← commit SHA (para rollback)
-```
+Staging siempre usa `:staging`. Producción usa `:latest` + el tag semántico. El tag con SHA o versión permite rollback.
 
-El tag `latest` siempre apunta a la última versión. El tag con `github.sha` permite volver a una versión anterior si algo falla.
+**3. GitHub Container Registry (ghcr.io)**
 
-**3. SSH deploy**
+En vez de Docker Hub (que tiene límites en el free tier), usamos **ghcr.io** que viene incluido gratis con GitHub.
 
-`appleboy/ssh-action` se conecta al VPS por SSH y ejecuta los comandos. El workflow:
-1. Descarga la nueva imagen (`docker pull`)
-2. Reinicia solo el contenedor `app` (`docker compose up -d app`)
-3. Verifica que arrancó correctamente
-4. Limpia imágenes viejas para no llenar el disco
+**4. SSH deploy vía Cloudflare Tunnel**
 
-> **¿Por qué no reconstruir en el VPS?** Porque compilar Go consume CPU y RAM. Tu VPS de 4GB podría quedarse corto. Construir en GitHub Actions (que tiene 7GB de RAM) y solo hacer `pull` en el VPS es más eficiente.
+Como tu servidor no expone el puerto SSH a internet (todo va por Cloudflare Tunnel), el workflow:
+1. Instala `cloudflared` en el runner de GitHub Actions
+2. Usa `cloudflared access ssh` como `ProxyCommand` — esto establece la conexión SSH a través del túnel
+3. Las variables `CF_ACCESS_CLIENT_ID` y `CF_ACCESS_CLIENT_SECRET` autentican al runner ante Cloudflare Access
+4. Una vez conectado por SSH, ejecuta los comandos de deploy: pull de la imagen, restart del contenedor, verificación
+
+> **¿Por qué no `appleboy/ssh-action`?** Esa action asume una conexión SSH directa al host. Como tu SSH pasa por Cloudflare Tunnel, necesitas `cloudflared` como proxy. Usar SSH nativo con `ProxyCommand` es la forma estándar de hacer esto.
+
+> **¿Por qué no reconstruir en el servidor?** Porque compilar Go consume CPU y RAM. Construir en GitHub Actions (que tiene 7GB de RAM) y solo hacer `pull` en el servidor es más eficiente y no afecta al tráfico en producción.
 
 ---
 
 ## 7. Primer despliegue manual
 
-El CD automático funciona después el primer setup. La primera vez necesitas configurar el VPS manualmente.
+El CD automático funciona después del primer setup. La primera vez necesitas configurar el servidor manualmente.
 
-### 7.1 Clonar el repo de infraestructura en el VPS
+### 7.1 Clonar el repo de infraestructura en el servidor
 
 ```bash
-ssh deploy@TU_IP_VPS
+ssh deploy@ssh.jcapsule.work
 cd ~
 
 # Clonar el repo de infra
 git clone https://github.com/tu-usuario/ductifact-infra.git ~/ductifact/infra
-
-# Copiar init.sql desde tu máquina local (o añádelo al repo infra)
-# scp backend/init.sql deploy@TU_IP_VPS:~/ductifact/infra/
 ```
 
-> **¿Por qué clonar?** Así puedes hacer `git pull` en el VPS para actualizar la configuración de infra (nginx, compose, prometheus) sin tener que copiar archivos manualmente cada vez.
+> **¿Por qué clonar?** Así puedes hacer `git pull` en el servidor para actualizar la configuración de infra (compose, prometheus, Caddyfile de referencia) sin tener que copiar archivos manualmente cada vez.
 
-### 7.2 Crear el `.env.prod` en el VPS
+### 7.2 Crear los archivos `.env` en el servidor
 
 ```bash
-ssh deploy@TU_IP_VPS
+ssh deploy@ssh.jcapsule.work
 cd ~/ductifact/infra
 
-# Copiar el example y editar con valores reales
+# Producción
 cp .env.prod.example .env.prod
-nano .env.prod   # o vim, el editor que prefieras
+nano .env.prod   # editar con valores reales
+
+# Staging
+cp .env.staging.example .env.staging
+nano .env.staging   # editar con valores reales (DIFERENTES a prod)
 ```
 
-### 7.3 Obtener certificado HTTPS (primera vez)
-
-Si tienes un dominio apuntando al VPS:
+Genera passwords seguros:
 
 ```bash
-cd ~/ductifact/infra
-
-# 1. Primero, comenta las líneas de SSL en nginx.conf y usa solo HTTP
-#    (Certbot necesita que Nginx esté corriendo para validar el dominio)
-
-# 2. Levantar Nginx en modo HTTP-only
-docker compose -f docker-compose.prod.yml up -d nginx
-
-# 3. Obtener el certificado
-docker compose -f docker-compose.prod.yml run --rm certbot \
-  certbot certonly --webroot -w /var/www/certbot \
-  -d tu-dominio.com --email tu@email.com --agree-tos --no-eff-email
-
-# 4. Descomentar las líneas de SSL en nginx.conf
-
-# 5. Reiniciar todo
-docker compose -f docker-compose.prod.yml up -d
+# Generar contraseñas random
+openssl rand -base64 24   # para DB_PASSWORD
+openssl rand -base64 32   # para JWT_SECRET
 ```
 
-Si **no tienes dominio aún**, puedes usar la IP directamente pero sin HTTPS. Comenta el bloque `server listen 443` y configura el bloque `listen 80` para hacer proxy directamente (sin redirect a HTTPS).
+> **Usa contraseñas DIFERENTES para staging y producción.** Si son iguales, un token de staging podría funcionar en producción.
 
-### 7.4 Levantar todo
+### 7.3 Levantar todo
 
 ```bash
 cd ~/ductifact/infra
@@ -671,26 +906,75 @@ cd ~/ductifact/infra
 # Login en ghcr.io (necesitas un Personal Access Token de GitHub con scope `read:packages`)
 echo "TU_GITHUB_TOKEN" | docker login ghcr.io -u TU_USUARIO --password-stdin
 
-# Levantar todos los servicios
+# Levantar staging
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+
+# Levantar producción (incluye Prometheus, Grafana)
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
-# Verificar
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs --tail=20 app
+# Verificar todos los contenedores
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+Deberías ver algo como:
+
+```
+NAMES                       STATUS                   PORTS
+ductifact_prod_app          Up 2 minutes             127.0.0.1:8090->8090/tcp
+ductifact_prod_postgres     Up 2 minutes (healthy)
+ductifact_staging_app       Up 3 minutes             127.0.0.1:8091->8091/tcp
+ductifact_staging_postgres  Up 3 minutes (healthy)
+ductifact_prometheus        Up 2 minutes
+ductifact_grafana           Up 2 minutes             127.0.0.1:3000->3000/tcp
+```
+
+> **Nota**: los puertos solo aparecen en `127.0.0.1` (localhost). No son accesibles desde internet — Caddy es quien los expone a través de Cloudflare Tunnel.
+
+### 7.4 Configurar Caddy
+
+Añade las entradas de ductifact a tu Caddyfile existente:
+
+```bash
+# Editar el Caddyfile
+sudo nano /etc/caddy/Caddyfile
+
+# Añadir los bloques de ductifact (ver sección 2 para la arquitectura de subdominios)
+
+# Recargar Caddy (sin downtime)
+sudo caddy reload --config /etc/caddy/Caddyfile
+
+# Verificar que no hay errores
+sudo systemctl status caddy
 ```
 
 ### 7.5 Verificar desde tu máquina
 
 ```bash
-# Health check
-curl https://tu-dominio.com/api/v1/health
+# Health check de producción
+curl https://api.ductifact.jcapsule.work/api/v1/health
 
-# O si no tienes dominio:
-curl http://TU_IP_VPS/api/v1/health
+# Health check de staging
+curl https://staging-api.ductifact.jcapsule.work/api/v1/health
 
 # Verificar que /metrics está bloqueado
-curl -I https://tu-dominio.com/api/v1/metrics
+curl -I https://api.ductifact.jcapsule.work/api/v1/metrics
 # Debería devolver 403 Forbidden
+
+# Verificar Grafana (si configuraste el subdominio)
+curl https://grafana.ductifact.jcapsule.work
+```
+
+### 7.6 Verificar Cloudflare Tunnel
+
+```bash
+# En el servidor
+sudo systemctl status cloudflared
+
+# Ver logs del túnel
+sudo journalctl -u cloudflared -f --no-pager | tail -20
+
+# Verificar conexiones activas
+cloudflared tunnel info ductifact
 ```
 
 ---
@@ -712,15 +996,15 @@ curl -I https://tu-dominio.com/api/v1/metrics
     │
     ▼ (todo pasa ✅)
     │
- GitHub Actions CD (.github/workflows/cd.yml)
+ GitHub Actions CD (.github/workflows/cd.yml) — job: deploy-staging
     ├── docker build (multi-stage, Go → Alpine)
-    ├── docker push → ghcr.io/user/ductifact-backend:staging
-    └── SSH → VPS (staging)
+    ├── docker push → ghcr.io/user/ductifact:staging
+    └── SSH → jcapsule.work
          ├── docker pull :staging
-         └── docker compose up -d app  (en ~/ductifact/infra)
+         └── docker compose -f docker-compose.staging.yml up -d app
                 │
                 ▼
-         STAGING ─ QA validates here
+         STAGING (staging-api.ductifact.jcapsule.work) ─ QA validates here
                 │
            Approved? ✅
                 │
@@ -729,28 +1013,39 @@ curl -I https://tu-dominio.com/api/v1/metrics
    git tag -a v0.4.0 → git push origin v0.4.0
                 │
                 ▼
- GitHub Actions CD (triggered by tag v*)
+ GitHub Actions CD — job: deploy-production
     ├── docker build
-    ├── docker push → ghcr.io/user/ductifact-backend:0.4.0 + :latest
-    └── SSH → VPS (production)
+    ├── docker push → ghcr.io/user/ductifact:v0.4.0 + :latest
+    └── SSH → jcapsule.work
          ├── docker pull :latest
-         └── docker compose up -d app  (en ~/ductifact/infra)
+         └── docker compose -f docker-compose.prod.yml up -d app
                 │
                 ▼
-         Hetzner VPS (Production)
-         ┌──────────────────────────────────┐
-         │  Nginx (:80/:443)                │
-         │    ├── /api/* → app:8080         │
-         │    └── /metrics → ❌ 403          │
-         │                                  │
-         │  App (Go, :8080)                 │
-         │    ├── API endpoints             │
-         │    └── Prometheus metrics        │
-         │                                  │
-         │  PostgreSQL (:5432, internal)    │
-         │  Prometheus (:9090, internal)    │
-         │  Grafana (:3000, internal)       │
-         └──────────────────────────────────┘
+         Servidor Debian 12 (jcapsule.work)
+         ┌──────────────────────────────────────────────┐
+         │  Cloudflare Tunnel (cloudflared)              │
+         │    ├── api.ductifact.jcapsule.work            │
+         │    ├── staging-api.ductifact.jcapsule.work        │
+         │    └── grafana.ductifact.jcapsule.work        │
+         │                                              │
+         │  Caddy (reverse proxy, host-level)           │
+         │    ├── api.ductifact.../api/* → :8090        │
+         │    ├── staging.ductifact.../api/* → :8091    │
+         │    ├── /metrics → ❌ 403                      │
+         │    └── grafana.ductifact... → :3000           │
+         │                                              │
+         │  ┌─ Producción ─────────────────────────┐    │
+         │  │  App (Go, :8090)                     │    │
+         │  │  PostgreSQL (:5432)                  │    │
+         │  │  Prometheus (:9090)                  │    │
+         │  │  Grafana (:3000)                     │    │
+         │  └──────────────────────────────────────┘    │
+         │                                              │
+         │  ┌─ Staging ────────────────────────────┐    │
+         │  │  App (Go, :8091)                     │    │
+         │  │  PostgreSQL (:5433)                  │    │
+         │  └──────────────────────────────────────┘    │
+         └──────────────────────────────────────────────┘
 
  ─── Hotfix flow ────────────────────────────────
 
@@ -768,39 +1063,57 @@ curl -I https://tu-dominio.com/api/v1/metrics
 
 ---
 
-## 9. Mantenimiento del VPS
+## 9. Mantenimiento del servidor
 
 ### 9.1 Ver logs
 
 ```bash
-# Logs de la API (últimos 100 líneas, en tiempo real)
-docker logs -f --tail=100 ductifact_app
+# Logs de la API de producción (últimas 100 líneas, en tiempo real)
+docker logs -f --tail=100 ductifact_prod_app
 
-# Logs de Nginx
-docker logs -f --tail=100 ductifact_nginx
+# Logs de la API de staging
+docker logs -f --tail=100 ductifact_staging_app
 
-# Logs de todos los servicios
+# Logs de Caddy
+sudo journalctl -u caddy -f
+
+# Logs de Cloudflare Tunnel
+sudo journalctl -u cloudflared -f
+
+# Logs de todos los servicios de producción
 docker compose -f docker-compose.prod.yml logs -f
+
+# Logs de todos los servicios de staging
+docker compose -f docker-compose.staging.yml logs -f
 ```
 
 ### 9.2 Backup de la base de datos
 
 ```bash
-# Backup manual
-docker exec ductifact_postgres pg_dump -U ductifact_user ductifact_db > backup_$(date +%Y%m%d).sql
+# Backup manual (producción)
+docker exec ductifact_prod_postgres \
+  pg_dump -U ductifact_user ductifact_db > ~/backups/prod_$(date +%Y%m%d).sql
+
+# Backup manual (staging)
+docker exec ductifact_staging_postgres \
+  pg_dump -U ductifact_staging_user ductifact_staging_db > ~/backups/staging_$(date +%Y%m%d).sql
 
 # Restaurar
-cat backup_20260311.sql | docker exec -i ductifact_postgres psql -U ductifact_user ductifact_db
+cat ~/backups/prod_20260320.sql | docker exec -i ductifact_prod_postgres \
+  psql -U ductifact_user ductifact_db
 ```
 
-Es buena idea automatizar los backups con un cron job:
+Automatiza los backups con un cron job:
 
 ```bash
 # Editar crontab del usuario deploy
 crontab -e
 
-# Añadir: backup diario a las 3am, mantener los últimos 7 días
-0 3 * * * docker exec ductifact_postgres pg_dump -U ductifact_user ductifact_db | gzip > ~/backups/db_$(date +\%Y\%m\%d).sql.gz && find ~/backups -name "db_*.sql.gz" -mtime +7 -delete
+# Backup diario de producción a las 3am, mantener los últimos 7 días
+0 3 * * * docker exec ductifact_prod_postgres pg_dump -U ductifact_user ductifact_db | gzip > ~/backups/prod_$(date +\%Y\%m\%d).sql.gz && find ~/backups -name "prod_*.sql.gz" -mtime +7 -delete
+
+# Backup diario de staging a las 4am (opcional, menos crítico)
+0 4 * * * docker exec ductifact_staging_postgres pg_dump -U ductifact_staging_user ductifact_staging_db | gzip > ~/backups/staging_$(date +\%Y\%m\%d).sql.gz && find ~/backups -name "staging_*.sql.gz" -mtime +3 -delete
 ```
 
 ### 9.3 Rollback
@@ -810,14 +1123,16 @@ Si un deploy a producción rompe algo, tienes varias opciones:
 **Opción 1: Rollback rápido con Docker** (segundos)
 
 ```bash
+cd ~/ductifact/infra
+
 # Ver las versiones disponibles
-docker images ghcr.io/tu-usuario/ductifact-backend
+docker images ghcr.io/tu-usuario/ductifact
 
 # Volver a la versión anterior
-docker compose -f docker-compose.prod.yml stop app
+docker compose --env-file .env.prod -f docker-compose.prod.yml stop app
 
-# Editar docker-compose.prod.yml temporalmente para usar el tag anterior
-# image: ghcr.io/tu-usuario/ductifact-backend:0.3.0
+# Cambiar temporalmente la imagen en docker-compose.prod.yml
+# image: ghcr.io/tu-usuario/ductifact:v0.3.0
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d app
 ```
 
@@ -848,40 +1163,119 @@ git push origin main
 
 ```bash
 # Cada semana o dos semanas
-ssh deploy@TU_IP_VPS
+ssh deploy@ssh.jcapsule.work
 sudo apt update && sudo apt upgrade -y
 
 # Si se actualiza el kernel, reiniciar
 sudo reboot
 ```
 
+### 9.5 Actualizar cloudflared
+
+```bash
+# Verificar versión actual
+cloudflared --version
+
+# Actualizar
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+  -o /tmp/cloudflared.deb
+sudo dpkg -i /tmp/cloudflared.deb
+sudo systemctl restart cloudflared
+```
+
+### 9.6 Reset de staging
+
+A veces staging acumula datos de prueba y quieres empezar limpio:
+
+```bash
+cd ~/ductifact/infra
+
+# Parar staging completamente
+docker compose --env-file .env.staging -f docker-compose.staging.yml down
+
+# Eliminar el volumen de datos (¡solo staging!)
+docker volume rm ductifact_staging_postgres_data
+
+# Levantar de nuevo (GORM AutoMigrate recrea las tablas al arrancar la app)
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+```
+
 ---
 
-## 10. Orden de implementación
+## 10. Seguridad adicional con Cloudflare
 
-1. **Repo `infra/` + archivos de configuración** — crea el repo con docker-compose.prod.yml, nginx.conf, prometheus.yml
-2. **`backend/.github/workflows/ci.yml`** — primero que funcione CI
-3. **Contratar VPS + setup inicial** — sección 4 de esta guía
-4. **Primer despliegue manual** — sección 7 (clona `infra/` en el VPS)
-5. **`backend/.github/workflows/cd.yml`** — automatizar despliegues
-6. **Certificado HTTPS** — sección 7.3
-7. **Grafana** — opcional, conectar a Prometheus para dashboards
+### 10.1 Verificar que solo Cloudflare accede
+
+Aunque no hay puertos abiertos (gracias al túnel), es buena práctica verificar:
+
+```bash
+# Ver puertos escuchando en el servidor
+sudo ss -tlnp
+
+# Deberías ver servicios escuchando, pero UFW los bloquea desde internet:
+#   *:22    (SSH — solo accesible desde LAN y Cloudflare Tunnel)
+#   *:80    (Caddy — solo accesible desde localhost/cloudflared)
+#   *:3000  (Grafana — solo accesible desde localhost/Caddy)
+```
+
+Ningún puerto está abierto al público en el firewall. `cloudflared` y Caddy se comunican por localhost. La LAN accede por las reglas `ufw allow from 192.168.x.0/24`.
+
+### 10.2 Configuraciones recomendadas en Cloudflare Dashboard
+
+En tu panel de Cloudflare, configura:
+
+| Setting | Valor | Explicación |
+|---------|-------|-------------|
+| SSL/TLS mode | **Full (strict)** | Cloudflare verifica el certificado entre su edge y tu servidor. Con tunnel, Full es suficiente. |
+| Always Use HTTPS | **On** | Redirige HTTP a HTTPS automáticamente. |
+| Minimum TLS Version | **1.2** | Bloquea clientes con TLS antiguo (inseguro). |
+| Browser Integrity Check | **On** | Bloquea requests con user-agents sospechosos. |
+| Bot Fight Mode | **On** | Protección adicional contra bots maliciosos. |
+
+### 10.3 Restringir acceso a staging (opcional)
+
+Si quieres que staging solo sea accesible para ti:
+
+1. Ve a **Cloudflare Dashboard → Zero Trust → Access → Applications**
+2. Crea una aplicación para `staging-api.ductifact.jcapsule.work`
+3. Configura una política que solo permita tu email
+4. Cloudflare pedirá autenticación antes de permitir acceso
+
+Esto es útil para evitar que bots o curiosos accedan a staging.
 
 ---
 
-## 11. Checklist final
+## 11. Orden de implementación
 
-- [ ] VPS contratado y configurado (Docker, firewall, usuario `deploy`)
+1. **Configurar servidor** — sección 4 (usuario deploy, Docker, cloudflared)
+2. **Configurar Cloudflare Tunnel** — sección 4.4–4.5 (túnel + subdominios)
+3. **Repo `infra/` + archivos de configuración** — sección 5
+4. **Añadir entradas al Caddyfile** — sección 7.4 (directamente en el servidor)
+5. **`backend/.github/workflows/ci.yml`** — primero que funcione CI (si no lo tienes ya)
+6. **Primer despliegue manual** — sección 7
+7. **`backend/.github/workflows/cd.yml`** — automatizar despliegues
+8. **Verificar seguridad** — sección 10
+9. **Grafana** — opcional, conectar a Prometheus para dashboards
+
+---
+
+## 12. Checklist final
+
+- [ ] Servidor configurado (Docker, UFW solo LAN, usuario `deploy`)
+- [ ] `cloudflared` instalado y corriendo como servicio
+- [ ] Túnel creado con subdominios: `ssh.jcapsule.work`, `api.ductifact.jcapsule.work`, `staging-api.ductifact.jcapsule.work`
 - [ ] SSH key de deploy configurada
-- [ ] GitHub Secrets configurados en el repo `backend` (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`)
-- [ ] Repo `infra/` creado con docker-compose.prod.yml, nginx.conf, prometheus.yml
-- [ ] Repo `infra/` clonado en el VPS (`~/ductifact/infra/`)
-- [ ] `backend/.github/workflows/ci.yml` funciona en `main` y `release` (todos los checks pasan)
+- [ ] Service Token de Cloudflare Access creado (sección 4.8)
+- [ ] GitHub Secrets configurados en el repo `backend` (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`)
+- [ ] Repo `infra/` creado con docker-compose.prod.yml, docker-compose.staging.yml, Caddyfile.ductifact, prometheus.yml
+- [ ] Repo `infra/` clonado en el servidor (`~/ductifact/infra/`)
+- [ ] `.env.prod` y `.env.staging` creados en el servidor (con credenciales DIFERENTES)
+- [ ] `backend/.github/workflows/ci.yml` funciona en `main` y `release`
 - [ ] `backend/.github/workflows/cd.yml` despliega a staging (desde main) y producción (desde tags)
 - [ ] `.dockerignore` creado en la raíz de `backend/`
 - [ ] Dockerfile optimizado (ldflags, non-root user)
-- [ ] HTTPS configurado con Let's Encrypt
-- [ ] `/metrics` y `/health` bloqueados desde internet
+- [ ] `/metrics` y `/health` bloqueados desde internet (Caddy devuelve 403)
+- [ ] Entradas de ductifact añadidas al Caddyfile del servidor
+- [ ] Cloudflare SSL/TLS mode en Full (strict)
 - [ ] Backup de DB automatizado con cron
-- [ ] Variables de entorno de producción configuradas en `.env.prod` del VPS
 - [ ] Rama `release` creada tras primer tag (ver `CONTRIBUTING.md` §6–7)

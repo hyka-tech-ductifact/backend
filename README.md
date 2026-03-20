@@ -55,11 +55,11 @@ Flags: `CI=1` (race detector + JUnit XML), `COVERAGE=1` (coverage report), `TEST
 
 ---
 
-## Production
+## Docker (smoke test)
 
 ```bash
-make prod-start    # build image and start app + DB in Docker
-make prod-stop     # stop all services
+make docker-start    # build image and start app + DB in Docker
+make docker-stop     # stop all services
 ```
 
 ---
