@@ -141,6 +141,8 @@ infra/                               ← repositorio Git de infraestructura (SEP
 ├── docker-compose.staging.yml       ← entorno de staging
 ├── .env.prod.example
 ├── .env.staging.example
+├── scripts/
+│   └── deploy.sh                    ← script de deploy (llamado desde CD)
 └── prometheus/
     └── prometheus.yml
 ```
@@ -712,35 +714,16 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
-          # Preparar clave SSH
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          # Deploy via SSH a través del túnel de Cloudflare
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o "ProxyCommand=cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_SCRIPT'
-          cd ~/ductifact/infra
-
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
-
-          docker compose --env-file .env.staging \
-            -f docker-compose.staging.yml up -d app
-
-          sleep 5
-          if ! docker inspect --format='{{.State.Running}}' \
-            ductifact_staging_app | grep -q true; then
-            echo "ERROR: staging app container is not running"
-            docker logs --tail=30 ductifact_staging_app
-            exit 1
-          fi
-
-          docker image prune -f
-          echo "Staging deploy successful!"
-          DEPLOY_SCRIPT
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "~/ductifact/infra/scripts/deploy.sh staging ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
 
   # ══════════════════════════════════════════════════════════
   # PRODUCTION — se ejecuta cuando se pushea un tag v*
@@ -788,35 +771,16 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
-          # Preparar clave SSH
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          # Deploy via SSH a través del túnel de Cloudflare
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o "ProxyCommand=cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_SCRIPT'
-          cd ~/ductifact/infra
-
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-          docker compose --env-file .env.prod \
-            -f docker-compose.prod.yml up -d app
-
-          sleep 5
-          if ! docker inspect --format='{{.State.Running}}' \
-            ductifact_prod_app | grep -q true; then
-            echo "ERROR: production app container is not running"
-            docker logs --tail=30 ductifact_prod_app
-            exit 1
-          fi
-
-          docker image prune -f
-          echo "Production deploy successful!"
-          DEPLOY_SCRIPT
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "~/ductifact/infra/scripts/deploy.sh prod ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 ```
 
 ### Explicación del flujo:
@@ -849,7 +813,19 @@ Como tu servidor no expone el puerto SSH a internet (todo va por Cloudflare Tunn
 1. Instala `cloudflared` en el runner de GitHub Actions
 2. Usa `cloudflared access ssh` como `ProxyCommand` — esto establece la conexión SSH a través del túnel
 3. Las variables `CF_ACCESS_CLIENT_ID` y `CF_ACCESS_CLIENT_SECRET` autentican al runner ante Cloudflare Access
-4. Una vez conectado por SSH, ejecuta los comandos de deploy: pull de la imagen, restart del contenedor, verificación
+4. Una vez conectado por SSH, ejecuta `~/ductifact/infra/scripts/deploy.sh` que:
+   - Hace `git pull` del repo `infra` para tener la config más reciente
+   - Hace `docker pull` de la imagen
+   - Reinicia el contenedor con `docker compose up -d app`
+   - Verifica que el contenedor está corriendo
+   - Limpia imágenes antiguas
+
+**5. Script de deploy en `infra/scripts/deploy.sh`**
+
+La lógica de deploy vive en el repo `infra`, no en el workflow del backend. Esto tiene varias ventajas:
+- Puedes probar el script directamente en el servidor (`./scripts/deploy.sh staging ghcr.io/...`)
+- Cambios en la lógica de deploy no requieren tocar el repo backend
+- El workflow queda limpio — solo hace build, push y SSH
 
 > **¿Por qué no `appleboy/ssh-action`?** Esa action asume una conexión SSH directa al host. Como tu SSH pasa por Cloudflare Tunnel, necesitas `cloudflared` como proxy. Usar SSH nativo con `ProxyCommand` es la forma estándar de hacer esto.
 
