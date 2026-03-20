@@ -446,21 +446,21 @@ services:
     container_name: ductifact_prod_app
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8090:8090"  # Solo localhost — Caddy hace proxy aquí
+      - "127.0.0.1:${APP_PORT}:${APP_PORT}"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - APP_PORT=8090
+      - APP_PORT=${APP_PORT}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - CONTRACT_VERSION=${CONTRACT_VERSION}
-      - LOG_LEVEL=info
-      - LOG_FORMAT=json
-      - GIN_MODE=release
-      - AUTO_MIGRATE=true
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_FORMAT=${LOG_FORMAT}
+      - GIN_MODE=${GIN_MODE}
+      - AUTO_MIGRATE=${AUTO_MIGRATE}
     depends_on:
       postgres:
         condition: service_healthy
@@ -506,12 +506,11 @@ networks:
 
 | Concepto | Explicación |
 |----------|-------------|
-| `127.0.0.1:8090:8090` | Expone el puerto **solo en localhost**. Caddy (corriendo en el host) puede acceder, pero no es accesible desde internet. Si pusieras `0.0.0.0:8090:8090`, cualquiera con la IP podría acceder directamente saltando Caddy. |
+| `127.0.0.1:${APP_PORT}:${APP_PORT}` | Expone el puerto **solo en localhost**. Caddy (corriendo en el host) puede acceder, pero no es accesible desde internet. El puerto se define en `.env` (`APP_PORT=8090` en prod, `8091` en staging). |
 | Sin Nginx | Caddy ya está en el host — no necesitamos otro reverse proxy dentro de Docker. Menos contenedores = menos complejidad y menos memoria. |
 | Sin redes `external` | Cada compose es independiente. Caddy accede a los contenedores por los puertos expuestos en localhost, no por redes Docker compartidas. |
 | `ghcr.io/${GITHUB_REPO}:latest` | La imagen Docker no se construye en el servidor. Se construye en GitHub Actions, se sube a ghcr.io y el servidor solo hace `docker pull`. |
-| `GIN_MODE=release` | Desactiva el modo debug de Gin. En producción quieres que sea silencioso y rápido. |
-| `LOG_FORMAT=json` | En producción los logs van en JSON para poder parsearlos con herramientas (Grafana/Loki). |
+| Toda la config en `.env` | Siguiendo 12-Factor App, todas las variables (puertos, log level, secrets) viven en un solo archivo `.env`. El compose solo referencia `${VAR}`. Un solo sitio para mirar y cambiar la configuración. |
 
 ### 5.2 `docker-compose.staging.yml`
 
@@ -544,21 +543,21 @@ services:
     container_name: ductifact_staging_app
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8091:8091"  # Solo localhost — Caddy hace proxy aquí
+      - "127.0.0.1:${APP_PORT}:${APP_PORT}"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - APP_PORT=8091
+      - APP_PORT=${APP_PORT}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - CONTRACT_VERSION=${CONTRACT_VERSION}
-      - LOG_LEVEL=debug
-      - LOG_FORMAT=json
-      - GIN_MODE=release
-      - AUTO_MIGRATE=true
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_FORMAT=${LOG_FORMAT}
+      - GIN_MODE=${GIN_MODE}
+      - AUTO_MIGRATE=${AUTO_MIGRATE}
     depends_on:
       postgres:
         condition: service_healthy
@@ -618,9 +617,14 @@ DB_PASSWORD=CHANGE_ME_different_from_prod
 DB_NAME=ductifact_staging_db
 
 # ── Application ──────────────────────────────────────────────
+APP_PORT=8091
 JWT_SECRET=CHANGE_ME_different_from_prod
 CORS_ORIGINS=https://staging-api.ductifact.jcapsule.work
 CONTRACT_VERSION=1.0.0
+LOG_LEVEL=debug
+LOG_FORMAT=json
+GIN_MODE=release
+AUTO_MIGRATE=true
 
 # ── GitHub image ─────────────────────────────────────────────
 GITHUB_REPO=tu-usuario/ductifact
