@@ -46,12 +46,8 @@ func ConnectTestDB() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 
-	// AutoMigrate only when configured (local dev).
-	// In CI, init.sql is the source of truth for the schema.
-	if cfg.Database.AutoMigrate {
-		if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
-			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
-		}
+	if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
+		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 	}
 
 	return db, nil
