@@ -73,11 +73,18 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
             https://${{ secrets.VPS_HOST }})
           echo "HTTP status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" = "403" ]; then
-            echo "ERROR: Service Token rejected (403). Check CF_ACCESS_CLIENT_ID/SECRET and Access Application policy."
+          if [ "$HTTP_STATUS" = "403" ] || [ "$HTTP_STATUS" = "302" ]; then
+            echo "ERROR: Service Token NOT accepted (HTTP $HTTP_STATUS)."
+            echo "302 = redirect to login (token ignored). 403 = token rejected."
+            echo ""
+            echo "Fix in Cloudflare Dashboard:"
+            echo "  1. Zero Trust → Access → Applications"
+            echo "  2. Find the app for ssh.jcapsule.work"
+            echo "  3. Add a policy with Action: SERVICE AUTH (not Allow)"
+            echo "  4. Include → Service Token → github-actions-deploy"
             exit 1
           fi
-          echo "Service Token accepted."
+          echo "Service Token accepted (HTTP $HTTP_STATUS)."
 
           echo "=== Checking SSH key ==="
           mkdir -p ~/.ssh
@@ -85,19 +92,19 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
 
-          echo "=== Checking VPS_HOST and VPS_USER ==="
-          echo "Host: ${{ secrets.VPS_HOST }}"
-          echo "User: ${{ secrets.VPS_USER }}"
-
       - name: Deploy to staging server
         run: |
+          # Pre-authenticate: get a cached JWT token for cloudflared access ssh
+          cloudflared access token --hostname ${{ secrets.VPS_HOST }} --app-token-id $CF_ACCESS_CLIENT_ID --app-token-secret $CF_ACCESS_CLIENT_SECRET || \
+          cloudflared access token --hostname ${{ secrets.VPS_HOST }} || true
+
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
           ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=env CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }} cloudflared access ssh --hostname %h" \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh staging ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
@@ -156,11 +163,18 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
             https://${{ secrets.VPS_HOST }})
           echo "HTTP status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" = "403" ]; then
-            echo "ERROR: Service Token rejected (403). Check CF_ACCESS_CLIENT_ID/SECRET and Access Application policy."
+          if [ "$HTTP_STATUS" = "403" ] || [ "$HTTP_STATUS" = "302" ]; then
+            echo "ERROR: Service Token NOT accepted (HTTP $HTTP_STATUS)."
+            echo "302 = redirect to login (token ignored). 403 = token rejected."
+            echo ""
+            echo "Fix in Cloudflare Dashboard:"
+            echo "  1. Zero Trust → Access → Applications"
+            echo "  2. Find the app for ssh.jcapsule.work"
+            echo "  3. Add a policy with Action: SERVICE AUTH (not Allow)"
+            echo "  4. Include → Service Token → github-actions-deploy"
             exit 1
           fi
-          echo "Service Token accepted."
+          echo "Service Token accepted (HTTP $HTTP_STATUS)."
 
           echo "=== Checking SSH key ==="
           mkdir -p ~/.ssh
@@ -168,19 +182,19 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
 
-          echo "=== Checking VPS_HOST and VPS_USER ==="
-          echo "Host: ${{ secrets.VPS_HOST }}"
-          echo "User: ${{ secrets.VPS_USER }}"
-
       - name: Deploy to production server
         run: |
+          # Pre-authenticate: get a cached JWT token for cloudflared access ssh
+          cloudflared access token --hostname ${{ secrets.VPS_HOST }} --app-token-id $CF_ACCESS_CLIENT_ID --app-token-secret $CF_ACCESS_CLIENT_SECRET || \
+          cloudflared access token --hostname ${{ secrets.VPS_HOST }} || true
+
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
           ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=env CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }} cloudflared access ssh --hostname %h" \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh prod ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
