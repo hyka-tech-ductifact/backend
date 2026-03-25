@@ -93,9 +93,6 @@ jobs:
           ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
 
       - name: Deploy to staging server
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           # Pre-authenticate: get a cached JWT token for cloudflared access ssh
           cloudflared access token --hostname ${{ secrets.VPS_HOST }} --app-token-id $CF_ACCESS_CLIENT_ID --app-token-secret $CF_ACCESS_CLIENT_SECRET || \
@@ -186,9 +183,6 @@ jobs:
           ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
 
       - name: Deploy to production server
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           # Pre-authenticate: get a cached JWT token for cloudflared access ssh
           cloudflared access token --hostname ${{ secrets.VPS_HOST }} --app-token-id $CF_ACCESS_CLIENT_ID --app-token-secret $CF_ACCESS_CLIENT_SECRET || \
