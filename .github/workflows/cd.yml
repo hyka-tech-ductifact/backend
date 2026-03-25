@@ -71,9 +71,9 @@ jobs:
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          ssh -o StrictHostKeyChecking=no \
+          ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${CF_ACCESS_CLIENT_ID} --secret ${CF_ACCESS_CLIENT_SECRET}" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh staging ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
@@ -130,9 +130,9 @@ jobs:
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          ssh -o StrictHostKeyChecking=no \
+          ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h" \
+              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${CF_ACCESS_CLIENT_ID} --secret ${CF_ACCESS_CLIENT_SECRET}" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh prod ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
