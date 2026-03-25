@@ -62,10 +62,34 @@ jobs:
             -o /tmp/cloudflared.deb
           sudo dpkg -i /tmp/cloudflared.deb
 
+      - name: Verify tunnel connectivity
+        run: |
+          echo "=== cloudflared version ==="
+          cloudflared --version
+
+          echo "=== Checking CF Access Service Token ==="
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            https://${{ secrets.VPS_HOST }})
+          echo "HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "403" ]; then
+            echo "ERROR: Service Token rejected (403). Check CF_ACCESS_CLIENT_ID/SECRET and Access Application policy."
+            exit 1
+          fi
+          echo "Service Token accepted."
+
+          echo "=== Checking SSH key ==="
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
+
+          echo "=== Checking VPS_HOST and VPS_USER ==="
+          echo "Host: ${{ secrets.VPS_HOST }}"
+          echo "User: ${{ secrets.VPS_USER }}"
+
       - name: Deploy to staging server
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -73,7 +97,7 @@ jobs:
 
           ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${CF_ACCESS_CLIENT_ID} --secret ${CF_ACCESS_CLIENT_SECRET}" \
+              -o "ProxyCommand=env CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }} cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh staging ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
@@ -121,10 +145,34 @@ jobs:
             -o /tmp/cloudflared.deb
           sudo dpkg -i /tmp/cloudflared.deb
 
+      - name: Verify tunnel connectivity
+        run: |
+          echo "=== cloudflared version ==="
+          cloudflared --version
+
+          echo "=== Checking CF Access Service Token ==="
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+            https://${{ secrets.VPS_HOST }})
+          echo "HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "403" ]; then
+            echo "ERROR: Service Token rejected (403). Check CF_ACCESS_CLIENT_ID/SECRET and Access Application policy."
+            exit 1
+          fi
+          echo "Service Token accepted."
+
+          echo "=== Checking SSH key ==="
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -l -f ~/.ssh/deploy_key && echo "SSH key is valid" || { echo "ERROR: Invalid SSH key"; exit 1; }
+
+          echo "=== Checking VPS_HOST and VPS_USER ==="
+          echo "Host: ${{ secrets.VPS_HOST }}"
+          echo "User: ${{ secrets.VPS_USER }}"
+
       - name: Deploy to production server
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -132,7 +180,7 @@ jobs:
 
           ssh -v -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${CF_ACCESS_CLIENT_ID} --secret ${CF_ACCESS_CLIENT_SECRET}" \
+              -o "ProxyCommand=env CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }} cloudflared access ssh --hostname %h" \
               -i ~/.ssh/deploy_key \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "~/ductifact/infra/scripts/deploy.sh prod ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
