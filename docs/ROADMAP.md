@@ -68,7 +68,7 @@
 | 6.1 | OpenAPI spec (`contracts/openapi/`) | ✅ |
 | 6.2 | Contract tests (auth, user, client, health) | ✅ |
 | 6.3 | Spec validation in CI (`redocly lint`) | ✅ |
-| 6.4 | Swagger UI in development | ✅ |
+| 6.4 | Swagger UI embedded in API (`/docs`) | ✅ |
 | 6.5 | TypeScript type generation for frontend | ✅ |
 
 ### 7. Observability
@@ -101,7 +101,7 @@
 | 9.3 | `docker-compose` (dev + prod) | ✅ |
 | 9.4 | Automated deploy to Hetzner VPS | ✅ |
 | 9.5 | Nginx reverse proxy + HTTPS (Let's Encrypt) | ✅ |
-| 9.6 | Block `/metrics` and `/health` from internet | ✅ |
+| 9.6 | Block `/metrics`, `/health`, `/docs` from internet | ✅ |
 
 ---
 

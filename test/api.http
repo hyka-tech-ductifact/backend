@@ -12,7 +12,7 @@
 @token = <paste-token-here>
 
 # =============================================================================
-# HEALTH & METRICS (public)
+# HEALTH, METRICS & DOCS (public)
 # =============================================================================
 
 ### Health Check
@@ -20,6 +20,12 @@ GET http://localhost:8080/health
 
 ### Prometheus Metrics
 GET http://localhost:8080/metrics
+
+### Swagger UI (API documentation)
+GET http://localhost:8080/docs
+
+### Raw OpenAPI spec
+GET http://localhost:8080/docs/openapi.yaml
 
 # =============================================================================
 # AUTH (public)

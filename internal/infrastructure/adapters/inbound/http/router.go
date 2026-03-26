@@ -73,6 +73,10 @@ func SetupRoutes(
 	r.GET("/health", healthHandler.Check)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	docsHandler := NewDocsHandler()
+	r.GET("/docs", docsHandler.UI)
+	r.GET("/docs/openapi.yaml", docsHandler.Spec)
+
 	// --- Versioned API routes ---
 
 	v1 := r.Group("/v1")

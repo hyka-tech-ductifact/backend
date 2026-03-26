@@ -66,12 +66,14 @@ make docker-stop     # stop all services
 
 ## API
 
-Infrastructure endpoints (`/health`, `/metrics`) are at the root level. All business endpoints are prefixed with `/v1`.
+Infrastructure endpoints (`/health`, `/metrics`, `/docs`) are at the root level. All business endpoints are prefixed with `/v1`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/health` | No | Health check |
 | GET | `/metrics` | No | Prometheus metrics |
+| GET | `/docs` | No | Swagger UI (interactive docs) |
+| GET | `/docs/openapi.yaml` | No | Raw OpenAPI spec |
 | POST | `/auth/register` | No | Register user |
 | POST | `/auth/login` | No | Login |
 | GET | `/users/me` | Yes | Get current user |

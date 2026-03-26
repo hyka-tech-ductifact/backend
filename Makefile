@@ -1,5 +1,9 @@
 # Ductifact Backend Makefile
 
+# Load .env if it exists (ignored in CI where env vars are set externally)
+-include .env
+export
+
 .DEFAULT_GOAL := help
 
 # ─── Variables ───────────────────────────────────────────────
@@ -85,7 +89,7 @@ help:
 # ═══════════════════════════════════════════════════════════════
 
 # Quick dev shortcut: build, start DB and run with hot reload
-dev: app-build db-start app-watch
+dev: ensure-contract app-build db-start app-watch
 
 # Compile binary to bin/api
 app-build:
@@ -93,7 +97,7 @@ app-build:
 	go build -o bin/api ./cmd/api
 
 # Build and start API in background (used in CI and local testing)
-app-start: app-build
+app-start: ensure-contract app-build
 	./bin/api &
 	@sleep 3
 	@echo "✅ API running in background"
@@ -191,6 +195,14 @@ fetch-contract:
 		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$$CONTRACT_VERSION/bundled.yaml" \
 		-o contracts/openapi/bundled.yaml; \
 	echo "✅ contracts/openapi/bundled.yaml (v$$CONTRACT_VERSION)"
+
+# Fetch contract only if bundled.yaml doesn't exist yet.
+# Used by dev/app-start to avoid failing offline.
+ensure-contract:
+	@if [ ! -f contracts/openapi/bundled.yaml ]; then \
+		echo "OpenAPI spec not found, fetching..."; \
+		$(MAKE) fetch-contract; \
+	fi
 
 # ═══════════════════════════════════════════════════════════════
 # Docker (smoke test — validates Dockerfile builds and app starts)

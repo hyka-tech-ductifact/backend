@@ -22,6 +22,10 @@ RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/app .
 
+# Copy OpenAPI spec for /docs endpoint (if available)
+# The spec is fetched by CI/CD before docker build (make fetch-contract)
+COPY --from=builder /app/contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml
+
 ARG APP_PORT=8080
 EXPOSE ${APP_PORT}
 
