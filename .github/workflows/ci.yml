@@ -164,7 +164,7 @@ jobs:
         run: make docker-start
 
       - name: Health check
-        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/api/v1/health
+        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/health
 
       - name: Teardown
         if: always()

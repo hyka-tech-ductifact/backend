@@ -53,7 +53,12 @@ func clean(t *testing.T) {
 	helpers.CleanDB(t, env.db)
 }
 
-// url builds a full URL using the shared base URL.
+// url builds a full URL: baseURL + /v1 + path (for versioned endpoints).
 func url(path string) string {
-	return fmt.Sprintf("%s/api/v1%s", env.baseURL, path)
+	return fmt.Sprintf("%s/v1%s", env.baseURL, path)
+}
+
+// rootURL builds a full URL: baseURL + path (for unversioned endpoints like /health).
+func rootURL(path string) string {
+	return fmt.Sprintf("%s%s", env.baseURL, path)
 }

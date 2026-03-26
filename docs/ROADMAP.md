@@ -31,7 +31,7 @@
 
 | # | Task | Status |
 |---|------|--------|
-| 3.1 | Gin router + versioned `/api/v1/` | ✅ |
+| 3.1 | Gin router + versioned `/v1/` | ✅ |
 | 3.2 | Handlers (User, Client, Auth, Health) | ✅ |
 | 3.3 | Middleware: Logging (structured) | ✅ |
 | 3.4 | Middleware: Recovery (panic → 500) | ✅ |

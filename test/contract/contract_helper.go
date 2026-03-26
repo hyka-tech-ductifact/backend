@@ -38,7 +38,7 @@ type ContractValidator struct {
 
 // NewContractValidator loads the OpenAPI spec from specPath and creates a
 // router for matching requests to operations.
-// serverBaseURL must include the API prefix, e.g. "http://localhost:8080/api/v1".
+// serverBaseURL is the base URL of the API server, e.g. "http://localhost:8080".
 // It overrides the spec's servers list so route matching works with the actual
 // test server URL.
 func NewContractValidator(t *testing.T, specPath, serverBaseURL string, tracker *CoverageTracker) *ContractValidator {

@@ -12,7 +12,7 @@ import (
 // Output example (JSON format):
 //
 //	{"time":"2026-03-09T10:00:00Z","level":"INFO","msg":"request completed",
-//	 "request_id":"abc-123","method":"POST","path":"/api/v1/users",
+//	 "request_id":"abc-123","method":"POST","path":"/v1/users",
 //	 "status":201,"duration_ms":23.45,"client_ip":"192.168.1.1"}
 //
 // Log level is chosen based on status code:

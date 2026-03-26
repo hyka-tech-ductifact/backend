@@ -60,7 +60,7 @@ func MetricsMiddleware() gin.HandlerFunc {
 
 		status := strconv.Itoa(c.Writer.Status())
 		method := c.Request.Method
-		path := c.FullPath() // e.g. "/api/v1/users/:id" — avoids high cardinality
+		path := c.FullPath() // e.g. "/v1/users/:id" — avoids high cardinality
 
 		// If the route was not matched (404), use a fixed label
 		if path == "" {

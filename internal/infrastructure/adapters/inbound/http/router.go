@@ -67,13 +67,15 @@ func SetupRoutes(
 		MaxAge:           12 * time.Hour,
 	}))
 
-	v1 := r.Group("/api/v1")
-
-	// --- Public routes (no auth required) ---
+	// --- Infrastructure routes (unversioned) ---
 
 	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractCfg.Version)
-	v1.GET("/health", healthHandler.Check)
-	v1.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/health", healthHandler.Check)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// --- Versioned API routes ---
+
+	v1 := r.Group("/v1")
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)

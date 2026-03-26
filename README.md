@@ -66,7 +66,7 @@ make docker-stop     # stop all services
 
 ## API
 
-All endpoints are prefixed with `/api/v1`.
+Infrastructure endpoints (`/health`, `/metrics`) are at the root level. All business endpoints are prefixed with `/v1`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
