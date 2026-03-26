@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+.env.example
+
+# Build artifacts
+bin/
+tmp/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Test files — not needed in production image
+test/
+*_test.go
+
+# Test & coverage
+coverage.out
+coverage.html
+*.test
+
+# Documentation
+docs/
+README.md
+CONTRIBUTING.md
+ai-devkit/
+
+# Docker (avoid recursive copy)
+Dockerfile
+docker-compose*.yml
+
+# CI/CD
+.github/
+
+# Development tools
+.air.toml
+*.log

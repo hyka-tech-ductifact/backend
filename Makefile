@@ -295,25 +295,10 @@ validate-branch:
 # Maintenance
 # ═══════════════════════════════════════════════════════════════
 
-# Clean build artifacts and temporary files
+# Clean all untracked and ignored files, except .env (contains local secrets).
+# Uses git as the source of truth — anything not in git is an artifact.
 clean:
-	@echo "Cleaning build artifacts..."
-	rm -rf bin/
-	rm -f coverage.out coverage.html
-	rm -f *-test-results.xml
-	rm -f api ductifact
-	@echo "Cleaning test cache..."
+	@echo "Cleaning all generated files..."
+	git clean -fdx --exclude=.env
 	go clean -testcache
-	@echo "Cleaning temporary files and directories..."
-	rm -rf tmp/ temp/
-	rm -f *.log *.tmp *.temp
-	rm -f .DS_Store .DS_Store? ._*
-	rm -f *.swp *.swo *~
-	rm -f *.test *.out
-	rm -f *.db *.sqlite *.sqlite3
-	@echo "Cleaning Docker temporary files..."
-	docker system prune -f 2>/dev/null || true
-	docker image prune -f 2>/dev/null || true
-	@echo "Removing empty directories..."
-	find . -type d -empty -delete 2>/dev/null || true
-	@echo "Cleanup completed!"
+	@echo "✅ Cleanup completed!"

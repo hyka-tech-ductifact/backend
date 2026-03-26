@@ -64,6 +64,3 @@ temp/
 # Go build artifacts
 /api
 *.exe
-
-# Docker
-.dockerignore
