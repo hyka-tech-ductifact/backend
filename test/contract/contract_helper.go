@@ -54,7 +54,13 @@ func NewContractValidator(t *testing.T, specPath, serverBaseURL string, tracker 
 	// Override servers to match the actual test server URL.
 	// This ensures FindRoute matches requests regardless of the host/port
 	// defined in the spec file.
+	//
+	// The spec uses "{protocol}://{host}/v1" as the global server and a
+	// path-level server override on /health (no /v1 prefix). However,
+	// the legacy router only checks doc.Servers for matching, so we add
+	// both base URLs at the global level.
 	doc.Servers = openapi3.Servers{
+		{URL: serverBaseURL + "/v1"},
 		{URL: serverBaseURL},
 	}
 
