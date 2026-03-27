@@ -26,7 +26,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 # ─── .PHONY ─────────────────────────────────────────────────
 
 .PHONY: help \
-	dev app-build app-start app-watch \
+	dev app-build app-start \
 	db-start db-stop \
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
@@ -41,10 +41,9 @@ help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "  Development:"
-	@echo "    dev              - Build, start DB and run with hot reload"
+	@echo "    dev              - Start DB and run with hot reload (auto build)"
 	@echo "    app-build        - Compile binary to bin/api"
 	@echo "    app-start        - Build and start API in background"
-	@echo "    app-watch        - Run app with hot reloading (air)"
 	@echo ""
 	@echo "  Database:"
 	@echo "    db-start         - Start database in Docker"
@@ -54,8 +53,8 @@ help:
 	@echo "    test             - Run all tests"
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
-	@echo "    test-contract    - Run contract tests (requires DB + running server)"
-	@echo "    test-e2e         - Run E2E tests (requires DB + running server)"
+	@echo "    test-contract    - Run contract tests (requires running server)"
+	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
@@ -88,8 +87,10 @@ help:
 # Development
 # ═══════════════════════════════════════════════════════════════
 
-# Quick dev shortcut: build, start DB and run with hot reload
-dev: ensure-contract app-build db-start app-watch
+# Start DB and run with hot reload (main dev workflow)
+dev: ensure-contract db-start
+	@echo "Running ductifact with hot reloading..."
+	air
 
 # Compile binary to bin/api
 app-build:
@@ -97,15 +98,10 @@ app-build:
 	go build -o bin/api ./cmd/api
 
 # Build and start API in background (used in CI and local testing)
-app-start: ensure-contract app-build
+app-start: ensure-contract app-build db-start
 	./bin/api &
 	@sleep 3
 	@echo "✅ API running in background"
-
-# Run the application with hot reloading
-app-watch:
-	@echo "Running ductifact with hot reloading..."
-	air
 
 # ═══════════════════════════════════════════════════════════════
 # Database
@@ -160,12 +156,12 @@ test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,integration,./test/integration/...)
 
-# Run contract tests — requires DB + server running (make db-start && make app-start)
+# Run contract tests — requires server running (make app-start)
 test-contract:
 	@echo "Running contract tests..."
 	$(call run-tests,contract,./test/contract/...)
 
-# Run E2E tests — requires DB + server running (make db-start && make app-start)
+# Run E2E tests — requires server running (make app-start)
 test-e2e:
 	@echo "Running E2E tests..."
 	$(call run-tests,e2e,./test/e2e/...)
