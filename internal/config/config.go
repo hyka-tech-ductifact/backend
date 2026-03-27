@@ -23,7 +23,6 @@ type Config struct {
 	JWT      JWT
 	Log      Log
 	CORS     CORS
-	Contract Contract
 }
 
 // App holds general application settings.
@@ -66,11 +65,6 @@ type CORS struct {
 	AllowedOrigins []string
 }
 
-// Contract holds API contract metadata.
-type Contract struct {
-	Version string // Semantic version matching openapi.yaml info.version
-}
-
 // Load reads all configuration from environment variables.
 // Required variables panic if missing — call this at startup
 // before any other initialization.
@@ -97,9 +91,6 @@ func Load() Config {
 		},
 		CORS: CORS{
 			AllowedOrigins: parseList(required("CORS_ORIGINS")),
-		},
-		Contract: Contract{
-			Version: required("CONTRACT_VERSION"),
 		},
 	}
 }

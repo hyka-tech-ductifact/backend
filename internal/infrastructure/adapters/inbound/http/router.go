@@ -27,7 +27,6 @@ func SetupRoutes(
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	corsCfg config.CORS,
-	contractCfg config.Contract,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
@@ -69,7 +68,7 @@ func SetupRoutes(
 
 	// --- Infrastructure routes (unversioned) ---
 
-	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractCfg.Version)
+	healthHandler := NewHealthHandler(healthChecker, time.Now(), config.ContractVersion)
 	r.GET("/health", healthHandler.Check)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 

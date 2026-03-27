@@ -176,21 +176,21 @@ test-clean:
 # Contracts
 # ═══════════════════════════════════════════════════════════════
 
-# Download bundled.yaml from the contracts GitHub Release matching CONTRACT_VERSION.
-# Requires CONTRACT_VERSION env var (from .env or CI).
+# Download bundled.yaml from the contracts GitHub Release matching ContractVersion.
+# The version is read from the Go source (internal/config/contract_version.go).
 # The file is saved to contracts/openapi/bundled.yaml (git-ignored).
 fetch-contract:
-	@if [ -z "$$CONTRACT_VERSION" ]; then \
-		echo "❌ CONTRACT_VERSION env var is required"; \
-		echo "   Set it in .env or export it: export CONTRACT_VERSION=0.1.0"; \
+	$(eval CONTRACT_VERSION := $(shell grep 'ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
+	@if [ -z "$(CONTRACT_VERSION)" ]; then \
+		echo "❌ Could not read ContractVersion from internal/config/contract_version.go"; \
 		exit 1; \
 	fi; \
-	echo "Fetching contracts v$$CONTRACT_VERSION..."; \
+	echo "Fetching contracts v$(CONTRACT_VERSION)..."; \
 	mkdir -p contracts/openapi; \
 	curl -fsSL \
-		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$$CONTRACT_VERSION/bundled.yaml" \
+		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$(CONTRACT_VERSION)/bundled.yaml" \
 		-o contracts/openapi/bundled.yaml; \
-	echo "✅ contracts/openapi/bundled.yaml (v$$CONTRACT_VERSION)"
+	echo "✅ contracts/openapi/bundled.yaml (v$(CONTRACT_VERSION))"
 
 # Fetch contract only if bundled.yaml doesn't exist yet.
 # Used by dev/app-start to avoid failing offline.

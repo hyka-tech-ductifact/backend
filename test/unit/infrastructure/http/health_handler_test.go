@@ -3,11 +3,13 @@ package http_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"ductifact/internal/config"
 	handler "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/test/unit/mocks"
 
@@ -21,7 +23,7 @@ func init() {
 
 func setupHealthRouter(mock *mocks.MockHealthChecker) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(mock, time.Now(), "1.0.0")
+	h := handler.NewHealthHandler(mock, time.Now(), config.ContractVersion)
 	r.GET("/health", h.Check)
 	return r
 }
@@ -43,7 +45,7 @@ func TestHealthHandler_Check_Healthy(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"healthy"`)
 	assert.Contains(t, w.Body.String(), `"database":"connected"`)
 	assert.Contains(t, w.Body.String(), `"uptime"`)
-	assert.Contains(t, w.Body.String(), `"contract_version":"1.0.0"`)
+	assert.Contains(t, w.Body.String(), fmt.Sprintf(`"contract_version":"%s"`, config.ContractVersion))
 }
 
 func TestHealthHandler_Check_Unhealthy(t *testing.T) {
@@ -63,5 +65,5 @@ func TestHealthHandler_Check_Unhealthy(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"unhealthy"`)
 	assert.Contains(t, w.Body.String(), `"database":"disconnected"`)
 	assert.Contains(t, w.Body.String(), `"error":"connection refused"`)
-	assert.Contains(t, w.Body.String(), `"contract_version":"1.0.0"`)
+	assert.Contains(t, w.Body.String(), fmt.Sprintf(`"contract_version":"%s"`, config.ContractVersion))
 }
