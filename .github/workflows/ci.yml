@@ -12,6 +12,12 @@ on:
     branches: [main, release]
   workflow_call:
 
+# ─── Cancel outdated runs ───────────────────────────────────
+# If a new push arrives on the same branch, cancel the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # ─── Shared environment variables ────────────────────────────
 # Postgres runs via docker-compose.yml (single source of truth
 # for image version, healthcheck, and ports).
