@@ -213,12 +213,12 @@ ensure-contract:
 # ═══════════════════════════════════════════════════════════════
 
 # Build Docker image
-docker-build:
+docker-build: ensure-contract
 	@echo "Building Docker image..."
 	docker compose --profile smoke build
 
 # Start app + DB in Docker (smoke test)
-docker-start:
+docker-start: docker-build
 	@echo "Starting Docker services..."
 	docker compose --profile smoke up -d
 	@echo "Waiting for app to start..."
