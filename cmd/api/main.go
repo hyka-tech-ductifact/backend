@@ -53,7 +53,7 @@ func main() {
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS, cfg.Contract)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

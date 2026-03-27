@@ -27,7 +27,6 @@ func SetupRoutes(
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	corsCfg config.CORS,
-	contractCfg config.Contract,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
@@ -67,13 +66,19 @@ func SetupRoutes(
 		MaxAge:           12 * time.Hour,
 	}))
 
-	v1 := r.Group("/api/v1")
+	// --- Infrastructure routes (unversioned) ---
 
-	// --- Public routes (no auth required) ---
+	healthHandler := NewHealthHandler(healthChecker, time.Now(), config.ContractVersion)
+	r.GET("/health", healthHandler.Check)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	healthHandler := NewHealthHandler(healthChecker, time.Now(), contractCfg.Version)
-	v1.GET("/health", healthHandler.Check)
-	v1.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	docsHandler := NewDocsHandler()
+	r.GET("/docs", docsHandler.UI)
+	r.GET("/docs/openapi.yaml", docsHandler.Spec)
+
+	// --- Versioned API routes ---
+
+	v1 := r.Group("/v1")
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)

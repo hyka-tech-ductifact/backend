@@ -26,7 +26,6 @@ env:
   APP_PORT: "8080"
   JWT_SECRET: ci-test-secret-at-least-32-characters-long
   CORS_ORIGINS: "*"
-  CONTRACT_VERSION: "0.2.0"
   LOG_LEVEL: error
   LOG_FORMAT: text
 
@@ -108,12 +107,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch contract spec
-        run: make fetch-contract
-
-      - name: Start Postgres
-        run: make db-start
-
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -133,9 +126,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Start Postgres
-        run: make db-start
 
       - uses: actions/setup-go@v5
         with:
@@ -157,14 +147,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: make docker-build
-
       - name: Start containers
         run: make docker-start
 
       - name: Health check
-        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/api/v1/health
+        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/health
 
       - name: Teardown
         if: always()

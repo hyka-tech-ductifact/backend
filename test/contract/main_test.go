@@ -85,16 +85,21 @@ func clean(t *testing.T) {
 	helpers.CleanDB(t, env.db)
 }
 
-// url builds a full URL: baseURL + /api/v1 + path.
+// url builds a full URL: baseURL + /v1 + path (for versioned endpoints).
 func url(path string) string {
-	return fmt.Sprintf("%s/api/v1%s", env.baseURL, path)
+	return fmt.Sprintf("%s/v1%s", env.baseURL, path)
+}
+
+// rootURL builds a full URL: baseURL + path (for unversioned endpoints like /health).
+func rootURL(path string) string {
+	return fmt.Sprintf("%s%s", env.baseURL, path)
 }
 
 // newValidator creates a ContractValidator for the current test.
 func newValidator(t *testing.T) *contract.ContractValidator {
 	t.Helper()
 	specPath := contract.DefaultSpecPath()
-	return contract.NewContractValidator(t, specPath, url(""), env.tracker)
+	return contract.NewContractValidator(t, specPath, env.baseURL, env.tracker)
 }
 
 // registerAndLogin creates a user via /auth/register and returns the JWT token.

@@ -18,13 +18,13 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    profiles: [smoke]
+    profiles: [ smoke ]
     build:
       context: .
       args:
@@ -42,7 +42,6 @@ services:
       - APP_PORT=${APP_PORT}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
-      - CONTRACT_VERSION=${CONTRACT_VERSION}
       - LOG_LEVEL=${LOG_LEVEL}
       - LOG_FORMAT=${LOG_FORMAT}
       - GIN_MODE=${GIN_MODE}

@@ -22,6 +22,11 @@ RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/app .
 
+# Copy OpenAPI spec for /docs endpoint.
+# The spec must exist — run `make ensure-contract` before building.
+# CI does this automatically; locally `make docker-build` handles it.
+COPY contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml
+
 ARG APP_PORT=8080
 EXPOSE ${APP_PORT}
 

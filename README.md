@@ -46,8 +46,7 @@ make test                       # run all tests
 For contract/E2E tests, start the server first:
 
 ```bash
-make db-start
-make app-start
+make app-start      # starts DB + fetches contract + builds + runs API
 make test-e2e
 ```
 
@@ -66,12 +65,14 @@ make docker-stop     # stop all services
 
 ## API
 
-All endpoints are prefixed with `/api/v1`.
+Infrastructure endpoints (`/health`, `/metrics`, `/docs`) are at the root level. All business endpoints are prefixed with `/v1`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/health` | No | Health check |
 | GET | `/metrics` | No | Prometheus metrics |
+| GET | `/docs` | No | Swagger UI (interactive docs) |
+| GET | `/docs/openapi.yaml` | No | Raw OpenAPI spec |
 | POST | `/auth/register` | No | Register user |
 | POST | `/auth/login` | No | Login |
 | GET | `/users/me` | Yes | Get current user |
@@ -89,9 +90,21 @@ See [test/api.http](test/api.http) for request examples.
 ## Other commands
 
 ```bash
-make help           # list all available commands
-make app-build      # compile binary to bin/api
-make fmt            # format code
-make lint           # lint code
-make clean          # remove build artifacts
+make help              # list all available commands
+make app-build         # compile binary to bin/api
+make fetch-contract    # download OpenAPI spec matching ContractVersion
+make fmt               # format code
+make lint              # lint code
+make clean             # remove build artifacts
 ```
+
+---
+
+## Updating the API contract
+
+The contract version is defined as a Go constant in `internal/config/contract_version.go`.
+When the contracts repo publishes a new release:
+
+1. Update the constant: `const ContractVersion = "0.4.0"`
+2. Run `make fetch-contract` to download the matching spec
+3. Commit both changes in the same PR

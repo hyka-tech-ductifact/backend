@@ -1,5 +1,9 @@
 # Ductifact Backend Makefile
 
+# Load .env if it exists (ignored in CI where env vars are set externally)
+-include .env
+export
+
 .DEFAULT_GOAL := help
 
 # ─── Variables ───────────────────────────────────────────────
@@ -22,7 +26,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 # ─── .PHONY ─────────────────────────────────────────────────
 
 .PHONY: help \
-	dev app-build app-start app-watch \
+	dev app-build app-start \
 	db-start db-stop \
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
@@ -37,10 +41,9 @@ help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "  Development:"
-	@echo "    dev              - Build, start DB and run with hot reload"
+	@echo "    dev              - Start DB and run with hot reload (auto build)"
 	@echo "    app-build        - Compile binary to bin/api"
 	@echo "    app-start        - Build and start API in background"
-	@echo "    app-watch        - Run app with hot reloading (air)"
 	@echo ""
 	@echo "  Database:"
 	@echo "    db-start         - Start database in Docker"
@@ -50,8 +53,8 @@ help:
 	@echo "    test             - Run all tests"
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
-	@echo "    test-contract    - Run contract tests (requires DB + running server)"
-	@echo "    test-e2e         - Run E2E tests (requires DB + running server)"
+	@echo "    test-contract    - Run contract tests (requires running server)"
+	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
@@ -84,8 +87,10 @@ help:
 # Development
 # ═══════════════════════════════════════════════════════════════
 
-# Quick dev shortcut: build, start DB and run with hot reload
-dev: app-build db-start app-watch
+# Start DB and run with hot reload (main dev workflow)
+dev: ensure-contract db-start
+	@echo "Running ductifact with hot reloading..."
+	air
 
 # Compile binary to bin/api
 app-build:
@@ -93,15 +98,10 @@ app-build:
 	go build -o bin/api ./cmd/api
 
 # Build and start API in background (used in CI and local testing)
-app-start: app-build
+app-start: ensure-contract app-build db-start
 	./bin/api &
 	@sleep 3
 	@echo "✅ API running in background"
-
-# Run the application with hot reloading
-app-watch:
-	@echo "Running ductifact with hot reloading..."
-	air
 
 # ═══════════════════════════════════════════════════════════════
 # Database
@@ -156,12 +156,12 @@ test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,integration,./test/integration/...)
 
-# Run contract tests — requires DB + server running (make db-start && make app-start)
+# Run contract tests — requires server running (make app-start)
 test-contract:
 	@echo "Running contract tests..."
 	$(call run-tests,contract,./test/contract/...)
 
-# Run E2E tests — requires DB + server running (make db-start && make app-start)
+# Run E2E tests — requires server running (make app-start)
 test-e2e:
 	@echo "Running E2E tests..."
 	$(call run-tests,e2e,./test/e2e/...)
@@ -176,33 +176,49 @@ test-clean:
 # Contracts
 # ═══════════════════════════════════════════════════════════════
 
-# Download bundled.yaml from the contracts GitHub Release matching CONTRACT_VERSION.
-# Requires CONTRACT_VERSION env var (from .env or CI).
+# Download bundled.yaml from the contracts GitHub Release matching ContractVersion.
+# The version is read from the Go source (internal/config/contract_version.go).
 # The file is saved to contracts/openapi/bundled.yaml (git-ignored).
 fetch-contract:
-	@if [ -z "$$CONTRACT_VERSION" ]; then \
-		echo "❌ CONTRACT_VERSION env var is required"; \
-		echo "   Set it in .env or export it: export CONTRACT_VERSION=0.1.0"; \
+	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
+	@if [ -z "$(CONTRACT_VERSION)" ]; then \
+		echo "❌ Could not read ContractVersion from internal/config/contract_version.go"; \
 		exit 1; \
 	fi; \
-	echo "Fetching contracts v$$CONTRACT_VERSION..."; \
+	echo "Fetching contracts v$(CONTRACT_VERSION)..."; \
 	mkdir -p contracts/openapi; \
 	curl -fsSL \
-		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$$CONTRACT_VERSION/bundled.yaml" \
+		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$(CONTRACT_VERSION)/bundled.yaml" \
 		-o contracts/openapi/bundled.yaml; \
-	echo "✅ contracts/openapi/bundled.yaml (v$$CONTRACT_VERSION)"
+	echo "✅ contracts/openapi/bundled.yaml (v$(CONTRACT_VERSION))"
+
+# Fetch contract only if bundled.yaml doesn't exist or its version
+# doesn't match ContractVersion from Go source.
+ensure-contract:
+	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
+	@if [ ! -f contracts/openapi/bundled.yaml ]; then \
+		echo "OpenAPI spec not found, fetching..."; \
+		$(MAKE) fetch-contract; \
+	else \
+		SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
+		if [ "$$SPEC_VERSION" != "$(CONTRACT_VERSION)" ]; then \
+			echo "⚠️  bundled.yaml is v$$SPEC_VERSION but ContractVersion is $(CONTRACT_VERSION)"; \
+			echo "   Re-fetching to match..."; \
+			$(MAKE) fetch-contract; \
+		fi; \
+	fi
 
 # ═══════════════════════════════════════════════════════════════
 # Docker (smoke test — validates Dockerfile builds and app starts)
 # ═══════════════════════════════════════════════════════════════
 
 # Build Docker image
-docker-build:
+docker-build: ensure-contract
 	@echo "Building Docker image..."
 	docker compose --profile smoke build
 
 # Start app + DB in Docker (smoke test)
-docker-start:
+docker-start: docker-build
 	@echo "Starting Docker services..."
 	docker compose --profile smoke up -d
 	@echo "Waiting for app to start..."
@@ -283,25 +299,10 @@ validate-branch:
 # Maintenance
 # ═══════════════════════════════════════════════════════════════
 
-# Clean build artifacts and temporary files
+# Clean all untracked and ignored files, except .env (contains local secrets).
+# Uses git as the source of truth — anything not in git is an artifact.
 clean:
-	@echo "Cleaning build artifacts..."
-	rm -rf bin/
-	rm -f coverage.out coverage.html
-	rm -f *-test-results.xml
-	rm -f api ductifact
-	@echo "Cleaning test cache..."
+	@echo "Cleaning all generated files..."
+	git clean -fdx --exclude=.env
 	go clean -testcache
-	@echo "Cleaning temporary files and directories..."
-	rm -rf tmp/ temp/
-	rm -f *.log *.tmp *.temp
-	rm -f .DS_Store .DS_Store? ._*
-	rm -f *.swp *.swo *~
-	rm -f *.test *.out
-	rm -f *.db *.sqlite *.sqlite3
-	@echo "Cleaning Docker temporary files..."
-	docker system prune -f 2>/dev/null || true
-	docker image prune -f 2>/dev/null || true
-	@echo "Removing empty directories..."
-	find . -type d -empty -delete 2>/dev/null || true
-	@echo "Cleanup completed!"
+	@echo "✅ Cleanup completed!"

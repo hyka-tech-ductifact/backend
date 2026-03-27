@@ -8,18 +8,24 @@
 # CONFIGURATION
 # =============================================================================
 
-@baseUrl = http://localhost:8080/api/v1
+@baseUrl = http://localhost:8080/v1
 @token = <paste-token-here>
 
 # =============================================================================
-# HEALTH & METRICS (public)
+# HEALTH, METRICS & DOCS (public)
 # =============================================================================
 
 ### Health Check
-GET {{baseUrl}}/health
+GET http://localhost:8080/health
 
 ### Prometheus Metrics
-GET {{baseUrl}}/metrics
+GET http://localhost:8080/metrics
+
+### Swagger UI (API documentation)
+GET http://localhost:8080/docs
+
+### Raw OpenAPI spec
+GET http://localhost:8080/docs/openapi.yaml
 
 # =============================================================================
 # AUTH (public)

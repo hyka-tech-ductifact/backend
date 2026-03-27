@@ -61,11 +61,11 @@ func CleanDB(t *testing.T, db *gorm.DB) {
 	require.NoError(t, err)
 }
 
-// WaitForAPI polls baseURL/api/v1/health until the API responds 200 or retries are exhausted.
+// WaitForAPI polls baseURL/health until the API responds 200 or retries are exhausted.
 // Use this in TestMain to block until the server is ready.
 func WaitForAPI(baseURL string, maxRetries int) error {
 	for i := range maxRetries {
-		resp, err := http.Get(baseURL + "/api/v1/health")
+		resp, err := http.Get(baseURL + "/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			return nil
