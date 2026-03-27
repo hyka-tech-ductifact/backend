@@ -180,7 +180,7 @@ test-clean:
 # The version is read from the Go source (internal/config/contract_version.go).
 # The file is saved to contracts/openapi/bundled.yaml (git-ignored).
 fetch-contract:
-	$(eval CONTRACT_VERSION := $(shell grep 'ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
+	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
 	@if [ -z "$(CONTRACT_VERSION)" ]; then \
 		echo "❌ Could not read ContractVersion from internal/config/contract_version.go"; \
 		exit 1; \
@@ -192,12 +192,20 @@ fetch-contract:
 		-o contracts/openapi/bundled.yaml; \
 	echo "✅ contracts/openapi/bundled.yaml (v$(CONTRACT_VERSION))"
 
-# Fetch contract only if bundled.yaml doesn't exist yet.
-# Used by dev/app-start to avoid failing offline.
+# Fetch contract only if bundled.yaml doesn't exist or its version
+# doesn't match ContractVersion from Go source.
 ensure-contract:
+	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
 	@if [ ! -f contracts/openapi/bundled.yaml ]; then \
 		echo "OpenAPI spec not found, fetching..."; \
 		$(MAKE) fetch-contract; \
+	else \
+		SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
+		if [ "$$SPEC_VERSION" != "$(CONTRACT_VERSION)" ]; then \
+			echo "⚠️  bundled.yaml is v$$SPEC_VERSION but ContractVersion is $(CONTRACT_VERSION)"; \
+			echo "   Re-fetching to match..."; \
+			$(MAKE) fetch-contract; \
+		fi; \
 	fi
 
 # ═══════════════════════════════════════════════════════════════
