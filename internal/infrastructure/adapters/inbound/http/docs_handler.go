@@ -84,45 +84,33 @@ const swaggerHTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ductifact API — Documentation</title>
+  <title>Ductifact API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
   <style>
-    html { box-sizing: border-box; overflow-y: scroll; }
-    *, *:before, *:after { box-sizing: inherit; }
     body { margin: 0; background: #fafafa; }
-    /* Hide the default top bar */
     .swagger-ui .topbar { display: none; }
-    /* Softer tag group headers */
-    .swagger-ui .opblock-tag { font-size: 1.1em; border-bottom: 2px solid #e8e8e8; }
-    /* Accent color for try-it-out */
-    .swagger-ui .btn.execute { background-color: #4a90d9; border-color: #4a90d9; }
   </style>
 </head>
 <body>
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
-    // Detect current server URL so requests go to the same origin (no CORS issues).
-    const serverUrl = window.location.origin;
-
+    const origin = window.location.origin;
     const ui = SwaggerUIBundle({
       url: '/docs/openapi.yaml',
       dom_id: '#swagger-ui',
       deepLinking: true,
       docExpansion: 'list',
       defaultModelsExpandDepth: -1,
-      tagsSorter: 'alpha',
       operationsSorter: 'method',
-      presets: [
-        SwaggerUIBundle.presets.apis,
-        SwaggerUIBundle.SwaggerUIStandalonePreset
-      ],
-      layout: "BaseLayout",
-      onComplete: function() {
-        // Override the spec's server URL with the current origin.
-        ui.specActions.updateJsonSpec(Object.assign({}, ui.specSelectors.specJson().toJS(), {
-          servers: [{ url: serverUrl, description: 'Current server' }]
-        }));
+      presets: [SwaggerUIBundle.presets.apis],
+      layout: 'BaseLayout',
+      onComplete() {
+        const spec = ui.specSelectors.specJson().toJS();
+        spec.servers = [{ url: origin + '/v1' }];
+        for (const ops of Object.values(spec.paths || {}))
+          if (ops.servers) ops.servers = [{ url: origin }];
+        ui.specActions.updateJsonSpec(spec);
       }
     });
   </script>
