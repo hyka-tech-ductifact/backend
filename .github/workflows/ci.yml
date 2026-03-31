@@ -3,11 +3,8 @@ name: CI
 # ─── When it runs ───────────────────────────────────────────
 # - PRs to main: new features and fixes (deploys to staging after merge)
 # - PRs to release: hotfixes for production (see CONTRIBUTING.md §7)
-# - Push to main/release: final validation after merge
 # - workflow_call: allows CD to re-run CI before deploying (see cd.yml)
 on:
-  push:
-    branches: [main, release]
   pull_request:
     branches: [main, release]
   workflow_call:

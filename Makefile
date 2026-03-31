@@ -69,7 +69,7 @@ help:
 	@echo ""
 	@echo "  Docker (smoke test):"
 	@echo "    docker-build     - Build Docker image"
-	@echo "    docker-start     - Start app + DB in Docker (smoke test)"
+	@echo "    docker-start     - Start app + DB + Prometheus + Grafana in Docker"
 	@echo "    docker-stop      - Stop Docker services"
 	@echo ""
 	@echo "  Code quality:"
@@ -236,6 +236,9 @@ docker-start: docker-build
 	fi
 	@echo "✓ Services running. App logs:"
 	@docker compose --profile smoke logs --tail=10 app
+	@echo ""
+	@echo "Prometheus: http://localhost:9090"
+	@echo "Grafana:    http://localhost:3000  (admin/admin)"
 
 # Stop Docker services
 docker-stop:
