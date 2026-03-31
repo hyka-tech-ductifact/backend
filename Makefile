@@ -217,10 +217,12 @@ docker-build: ensure-contract
 	@echo "Building Docker image..."
 	docker compose --profile smoke build
 
-# Start app + DB in Docker (smoke test)
+# Start app + DB + monitoring in Docker (monitoring is skipped in CI mode)
+_monitoring_flag := $(if $(filter 1,$(CI)),,--profile monitoring)
+
 docker-start: docker-build
 	@echo "Starting Docker services..."
-	docker compose --profile smoke up -d
+	docker compose --profile smoke $(_monitoring_flag) up -d
 	@echo "Waiting for app to start..."
 	@sleep 3
 	@if [ "$$(docker inspect -f '{{.State.Running}}' ductifact_dev_app 2>/dev/null)" != "true" ]; then \
@@ -236,14 +238,16 @@ docker-start: docker-build
 	fi
 	@echo "✓ Services running. App logs:"
 	@docker compose --profile smoke logs --tail=10 app
-	@echo ""
-	@echo "Prometheus: http://localhost:9090"
-	@echo "Grafana:    http://localhost:3000  (admin/admin)"
+	@if [ "$(CI)" != "1" ]; then \
+		echo ""; \
+		echo "Prometheus: http://localhost:9090"; \
+		echo "Grafana:    http://localhost:3000  (admin/admin)"; \
+	fi
 
 # Stop Docker services
 docker-stop:
 	@echo "Stopping Docker services..."
-	docker compose --profile smoke down
+	docker compose --profile smoke --profile monitoring down
 
 # ═══════════════════════════════════════════════════════════════
 # Code quality

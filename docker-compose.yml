@@ -54,7 +54,7 @@ services:
     image: prom/prometheus:v3.3.0
     container_name: ductifact_dev_prometheus
     restart: unless-stopped
-    profiles: [ smoke ]
+    profiles: [ monitoring ]
     ports:
       - "9090:9090"
     volumes:
@@ -70,7 +70,7 @@ services:
     image: grafana/grafana:11.6.0
     container_name: ductifact_dev_grafana
     restart: unless-stopped
-    profiles: [ smoke ]
+    profiles: [ monitoring ]
     ports:
       - "3000:3000"
     environment:
