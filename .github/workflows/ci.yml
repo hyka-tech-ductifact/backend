@@ -32,7 +32,7 @@ env:
   CORS_ORIGINS: "*"
   LOG_LEVEL: error
   LOG_FORMAT: text
-  GIN_MODE: release
+  GIN_MODE: test
 
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
