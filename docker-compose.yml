@@ -1,8 +1,7 @@
-# Development & CI compose — NOT for production deployment (see infra/ repo).
-# Usage:
-#   make db-start       → only postgres (dev, tests)
-#   make docker-build   → build app image (CI smoke test)
-#   make docker-start   → postgres + app + prometheus + grafana
+# Development compose — two modes:
+#   make services-start → only postgres (dev, app runs on host with air)
+#   make docker-start  → postgres + app in Docker (smoke test)
+#   make docker-stop   → stop everything
 
 services:
   postgres:
@@ -18,28 +17,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    profiles: [ smoke ]
-    build:
-      context: .
-      args:
-        APP_PORT: ${APP_PORT}
+    profiles: [smoke]
+    build: .
     container_name: ductifact_dev_app
-    restart: unless-stopped
     ports:
-      - "${APP_PORT}:${APP_PORT}"
+      - "${APP_PORT}:8080"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - APP_PORT=${APP_PORT}
+      - APP_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=${LOG_LEVEL}
@@ -49,42 +44,5 @@ services:
       postgres:
         condition: service_healthy
 
-  # ── Prometheus ─────────────────────────────────────────────
-  prometheus:
-    image: prom/prometheus:v3.3.0
-    container_name: ductifact_dev_prometheus
-    restart: unless-stopped
-    profiles: [ monitoring ]
-    ports:
-      - "9090:9090"
-    volumes:
-      - ../infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../infra/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=15d"
-
-  # ── Grafana ────────────────────────────────────────────────
-  grafana:
-    image: grafana/grafana:11.6.0
-    container_name: ductifact_dev_grafana
-    restart: unless-stopped
-    profiles: [ monitoring ]
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - ../infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-
 volumes:
   postgres_data:
-  prometheus_data:
-  grafana_data:

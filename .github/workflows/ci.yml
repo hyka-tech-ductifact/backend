@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 # ─── Shared environment variables ────────────────────────────
-# Postgres runs via docker-compose.yml (single source of truth
-# for image version, healthcheck, and ports).
+# Dev dependencies (postgres) run via backend/docker-compose.yml.
+# Docker smoke test uses standalone docker build + run (no compose).
 env:
   CI: "1"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -32,6 +32,7 @@ env:
   CORS_ORIGINS: "*"
   LOG_LEVEL: error
   LOG_FORMAT: text
+  GIN_MODE: release
 
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
@@ -92,7 +93,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start Postgres
-        run: make db-start
+        run: make services-start
 
       - uses: actions/setup-go@v5
         with:
@@ -151,7 +152,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start containers
+      - name: Build and start services
         run: make docker-start
 
       - name: Health check

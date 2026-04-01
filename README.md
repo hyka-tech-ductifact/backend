@@ -57,8 +57,9 @@ Flags: `CI=1` (race detector + JUnit XML), `COVERAGE=1` (coverage report), `TEST
 ## Docker (smoke test)
 
 ```bash
-make docker-start    # build image and start app + DB in Docker
-make docker-stop     # stop all services
+make docker-build    # build Docker image
+make docker-start    # build + start app & DB in Docker
+make docker-stop     # stop Docker services
 ```
 
 ---

@@ -27,7 +27,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 
 .PHONY: help \
 	dev app-build app-start \
-	db-start db-stop \
+	services-start services-stop \
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
@@ -45,9 +45,9 @@ help:
 	@echo "    app-build        - Compile binary to bin/api"
 	@echo "    app-start        - Build and start API in background"
 	@echo ""
-	@echo "  Database:"
-	@echo "    db-start         - Start database in Docker"
-	@echo "    db-stop          - Stop database"
+	@echo "  Services:"
+	@echo "    services-start   - Start dev dependencies (postgres, etc.)"
+	@echo "    services-stop    - Stop dev dependencies"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test             - Run all tests"
@@ -69,7 +69,7 @@ help:
 	@echo ""
 	@echo "  Docker (smoke test):"
 	@echo "    docker-build     - Build Docker image"
-	@echo "    docker-start     - Start app + DB + Prometheus + Grafana in Docker"
+	@echo "    docker-start     - Build + start app & DB in Docker"
 	@echo "    docker-stop      - Stop Docker services"
 	@echo ""
 	@echo "  Code quality:"
@@ -88,7 +88,7 @@ help:
 # ═══════════════════════════════════════════════════════════════
 
 # Start DB and run with hot reload (main dev workflow)
-dev: ensure-contract db-start
+dev: ensure-contract services-start
 	@echo "Running ductifact with hot reloading..."
 	air
 
@@ -98,23 +98,23 @@ app-build:
 	go build -o bin/api ./cmd/api
 
 # Build and start API in background (used in CI and local testing)
-app-start: ensure-contract app-build db-start
+app-start: ensure-contract app-build services-start
 	./bin/api &
 	@sleep 3
 	@echo "✅ API running in background"
 
 # ═══════════════════════════════════════════════════════════════
-# Database
+# Services (dev dependencies)
 # ═══════════════════════════════════════════════════════════════
 
-# Start database in Docker
-db-start:
-	@echo "Starting database..."
-	docker compose up -d postgres --wait
+# Start dev dependencies (postgres, etc.)
+services-start:
+	@echo "Starting services..."
+	docker compose up -d --wait
 
-# Stop database
-db-stop:
-	@echo "Stopping database..."
+# Stop dev dependencies
+services-stop:
+	@echo "Stopping services..."
 	docker compose down
 
 # ═══════════════════════════════════════════════════════════════
@@ -151,7 +151,7 @@ test-unit:
 	@echo "Running unit tests..."
 	$(call run-tests,unit,./test/unit/...)
 
-# Run integration tests — requires DB running (make db-start)
+# Run integration tests — requires services running (make services-start)
 test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,integration,./test/integration/...)
@@ -209,7 +209,7 @@ ensure-contract:
 	fi
 
 # ═══════════════════════════════════════════════════════════════
-# Docker (smoke test — validates Dockerfile builds and app starts)
+# Docker (validates Dockerfile builds and app starts)
 # ═══════════════════════════════════════════════════════════════
 
 # Build Docker image
@@ -217,14 +217,12 @@ docker-build: ensure-contract
 	@echo "Building Docker image..."
 	docker compose --profile smoke build
 
-# Start app + DB + monitoring in Docker (monitoring is skipped in CI mode)
-_monitoring_flag := $(if $(filter 1,$(CI)),,--profile monitoring)
-
+# Build + start postgres & app in Docker (smoke test)
 docker-start: docker-build
-	@echo "Starting Docker services..."
-	docker compose --profile smoke $(_monitoring_flag) up -d
-	@echo "Waiting for app to start..."
-	@sleep 3
+	@echo "Starting smoke test..."
+	docker compose --profile smoke up -d --wait
+	@echo "Waiting for app to be ready..."
+	@sleep 2
 	@if [ "$$(docker inspect -f '{{.State.Running}}' ductifact_dev_app 2>/dev/null)" != "true" ]; then \
 		echo "\n❌ App container is not running. Logs:"; \
 		docker compose --profile smoke logs --tail=30 app; \
@@ -236,18 +234,13 @@ docker-start: docker-build
 		docker compose --profile smoke logs --tail=30 app; \
 		exit 1; \
 	fi
-	@echo "✓ Services running. App logs:"
+	@echo "✓ Smoke test passed. App logs:"
 	@docker compose --profile smoke logs --tail=10 app
-	@if [ "$(CI)" != "1" ]; then \
-		echo ""; \
-		echo "Prometheus: http://localhost:9090"; \
-		echo "Grafana:    http://localhost:3000  (admin/admin)"; \
-	fi
 
 # Stop Docker services
 docker-stop:
 	@echo "Stopping Docker services..."
-	docker compose --profile smoke --profile monitoring down
+	docker compose --profile smoke down
 
 # ═══════════════════════════════════════════════════════════════
 # Code quality
