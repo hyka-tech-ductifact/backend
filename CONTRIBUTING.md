@@ -10,14 +10,14 @@
 
 ## 1) Branches
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Integration branch, always deployable. Deploys to staging on merge. |
-| `release` | Tracks production. Hotfixes go here. Reset on each new release. |
-| `feat/*` | New features |
-| `fix/*` | Bug fixes |
-| `chore/*` | Everything else (docs, tests, refactor, deps, CI) |
-| `hotfix/*` | Urgent production fixes (targets `release`, not `main`) |
+| Branch | Purpose | Example |
+|--------|---------|---------|
+| `main` | Integration branch, always deployable. Deploys to staging on merge | — |
+| `release` | Tracks production. Hotfixes go here. Reset on each new release | — |
+| `feat/` | New features | `feat/add-login` |
+| `fix/` | Bug fixes | `fix/null-pointer-crash` |
+| `chore/` | Everything else (docs, tests, refactor, deps, CI) | `chore/update-deps` |
+| `hotfix/` | Urgent production fixes (targets `release`, not `main`) | `hotfix/fix-login-500` |
 
 ---
 
@@ -108,6 +108,5 @@ release:   v0.4.0 ── H1 ── H2
 ## 6) PR rules
 
 - No direct pushes to `main`
-- At least 1 approval
 - CI must pass (tests, lint, build)
-- Keep PRs small (5–20 min review)
+- Keep PRs small and focused
