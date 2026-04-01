@@ -276,13 +276,13 @@ deps:
 # BRANCH = source branch name (e.g. feat/add-login)
 # BASE   = target branch name (e.g. main) — only needed for target validation
 validate-branch:
-	@PATTERN='^(feat|fix|chore|docs|hotfix|test|refactor)/.+$$'; \
+	@PATTERN='^(feat|fix|chore|hotfix)/.+$$'; \
 	if [ -z "$$BRANCH" ]; then \
 		echo "❌ BRANCH env var is required"; exit 1; \
 	fi; \
 	if ! echo "$$BRANCH" | grep -qE "$$PATTERN"; then \
 		echo "❌ Branch '$$BRANCH' does not match: $$PATTERN"; \
-		echo "   Expected: feat/*, fix/*, chore/*, docs/*, hotfix/*, test/*, refactor/*"; \
+		echo "   Expected: feat/*, fix/*, chore/*, hotfix/*"; \
 		exit 1; \
 	fi; \
 	if [ -n "$$BASE" ]; then \

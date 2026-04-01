@@ -16,10 +16,7 @@
 | `release` | Tracks production. Hotfixes go here. Reset on each new release. |
 | `feat/*` | New features |
 | `fix/*` | Bug fixes |
-| `chore/*` | Maintenance tasks |
-| `docs/*` | Documentation |
-| `test/*` | Test changes |
-| `refactor/*` | Code restructuring |
+| `chore/*` | Everything else (docs, tests, refactor, deps, CI) |
 | `hotfix/*` | Urgent production fixes (targets `release`, not `main`) |
 
 ---
@@ -104,7 +101,7 @@ release:   v0.4.0 ── H1 ── H2
 
 [Conventional Commits](https://www.conventionalcommits.org/):
 
-`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`
+`feat:`, `fix:`, `chore:`
 
 ---
 
