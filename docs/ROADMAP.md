@@ -1,6 +1,6 @@
 # Roadmap — Ductifact Backend
 
-> **Stack**: Go 1.24 · Gin · GORM · PostgreSQL · JWT · Docker · Nginx · GitHub Actions · Prometheus
+> **Stack**: Go 1.24 · Gin · GORM · PostgreSQL · JWT · Docker · Caddy · GitHub Actions · Prometheus
 > **Architecture**: Hexagonal (Ports & Adapters)
 > **Started**: March 2026
 
@@ -100,7 +100,7 @@
 | 9.2 | Docker multi-stage + optimized cache | ✅ |
 | 9.3 | `docker-compose` (dev + prod) | ✅ |
 | 9.4 | Automated deploy to Hetzner VPS | ✅ |
-| 9.5 | Nginx reverse proxy + HTTPS (Let's Encrypt) | ✅ |
+| 9.5 | Caddy reverse proxy + HTTPS (Let's Encrypt) | ✅ |
 | 9.6 | Block `/metrics`, `/health`, `/docs` from internet | ✅ |
 
 ---

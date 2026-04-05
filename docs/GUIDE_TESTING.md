@@ -65,9 +65,9 @@ Black-box HTTP tests against the running server. They don't import any internal 
 
 ```bash
 make test-unit              # unit tests (no dependencies)
-make test-integration       # requires DB (make db-start)
-make test-contract          # requires DB + server (make db-start && make app-start)
-make test-e2e               # requires DB + server (make db-start && make app-start)
+make test-integration       # requires services (make services-start)
+make test-contract          # requires services + server (make services-start && make app-start)
+make test-e2e               # requires services + server (make services-start && make app-start)
 make test                   # all tests
 ```
 

@@ -1,4 +1,4 @@
-# Backend
+# Ductifact — Backend
 
 Go REST API following **Hexagonal Architecture** (Ports & Adapters) with PostgreSQL and Docker.
 
@@ -8,7 +8,6 @@ Go REST API following **Hexagonal Architecture** (Ports & Adapters) with Postgre
 
 - Go 1.24+
 - Docker + Compose plugin v2+
-- 
 
 ## Setup
 
@@ -21,8 +20,6 @@ make deps              # download Go dependencies and install dev tools
 >
 > For detailed environment setup (Podman, Docker, env vars), see [docs/GUIDE_SETUP.md](docs/GUIDE_SETUP.md).
 
----
-
 ## Development
 
 ```bash
@@ -30,8 +27,6 @@ make dev   # build + DB + the app with hot reload (air)
 ```
 
 > `.env` must have `DB_HOST=localhost` for this mode.
-
----
 
 ## Testing
 
@@ -52,16 +47,13 @@ make test-e2e
 
 Flags: `CI=1` (race detector + JUnit XML), `COVERAGE=1` (coverage report), `TEST_FORMAT=dots`.
 
----
-
 ## Docker (smoke test)
 
 ```bash
-make docker-start    # build image and start app + DB in Docker
-make docker-stop     # stop all services
+make docker-build    # build Docker image
+make docker-start    # build + start app & DB in Docker
+make docker-stop     # stop Docker services
 ```
-
----
 
 ## API
 
@@ -85,8 +77,6 @@ Infrastructure endpoints (`/health`, `/metrics`, `/docs`) are at the root level.
 
 See [test/api.http](test/api.http) for request examples.
 
----
-
 ## Other commands
 
 ```bash
@@ -98,8 +88,6 @@ make lint              # lint code
 make clean             # remove build artifacts
 ```
 
----
-
 ## Updating the API contract
 
 The contract version is defined as a Go constant in `internal/config/contract_version.go`.
@@ -108,3 +96,7 @@ When the contracts repo publishes a new release:
 1. Update the constant: `const ContractVersion = "0.4.0"`
 2. Run `make fetch-contract` to download the matching spec
 3. Commit both changes in the same PR
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, workflow, releases, and PR guidelines.
