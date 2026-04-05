@@ -5,6 +5,8 @@ name: CI
 # - PRs to release: hotfixes for production (see CONTRIBUTING.md §7)
 # - workflow_call: allows CD to re-run CI before deploying (see cd.yml)
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main, release]
   workflow_call:
