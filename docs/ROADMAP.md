@@ -109,87 +109,87 @@
 
 ### 10. Security
 
-| # | Task | Status |
-|---|------|--------|
-| 10.1 | Refresh tokens (JWT rotation) | ⬜ |
-| 10.2 | `POST /auth/refresh` endpoint | ⬜ |
-| 10.3 | Rate limiting (per IP and per user) | ⬜ |
-| 10.4 | Login brute-force protection | ⬜ |
-| 10.5 | Security headers middleware (HSTS, X-Frame, CSP) | ⬜ |
-| 10.6 | `POST /auth/logout` endpoint (token blacklist) | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 10.1 | Refresh tokens (JWT rotation) | ⬜ | 🔴 Now |
+| 10.2 | `POST /auth/refresh` endpoint | ⬜ | 🔴 Now |
+| 10.3 | Rate limiting (per IP and per user) | ⬜ | 🔴 Now |
+| 10.4 | Login brute-force protection | ⬜ | 🟡 Soon |
+| 10.5 | Security headers middleware (HSTS, X-Frame, CSP) | ⬜ | 🟡 Soon |
+| 10.6 | `POST /auth/logout` endpoint (token blacklist) | ⬜ | 🟡 Soon |
 
 ### 11. Database
 
-| # | Task | Status |
-|---|------|--------|
-| 11.1 | Versioned migrations (`golang-migrate`) | ⬜ |
-| 11.2 | Development data seeders | ⬜ |
-| 11.3 | Soft delete (`deleted_at` logical deletion) | ⬜ |
-| 11.4 | Optimized indexes for frequent queries | ⬜ |
-| 11.5 | Connection pooling tuning | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 11.1 | Versioned migrations (`golang-migrate`) | ⬜ | 🔴 Now |
+| 11.2 | Development data seeders | ⬜ | 🟡 Soon |
+| 11.3 | Soft delete (`deleted_at` logical deletion) | ⬜ | 🟡 Soon |
+| 11.4 | Optimized indexes for frequent queries | ⬜ | 🔵 Later |
+| 11.5 | Connection pooling tuning | ⬜ | 🔵 Later |
 
 ### 12. Developer Experience
 
-| # | Task | Status |
-|---|------|--------|
-| 12.1 | Pre-commit hooks (auto lint + format) | ⬜ |
-| 12.2 | Dependabot / Renovate (dependency updates) | ⬜ |
-| 12.3 | Automated changelog (conventional commits) | ⬜ |
-| 12.4 | Makefile targets for all operations | ✅ |
-| 12.5 | Hot reload in development (`air`) | ✅ |
-| 12.6 | Coverage report (HTML) | ✅ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 12.1 | Pre-commit hooks (auto lint + format) | ✅ | — |
+| 12.2 | Dependabot / Renovate (dependency updates) | ⬜ | 🟡 Soon |
+| 12.3 | Automated changelog (conventional commits) | ⬜ | 🔵 Later |
+| 12.4 | Makefile targets for all operations | ✅ | — |
+| 12.5 | Hot reload in development (`air`) | ✅ | — |
+| 12.6 | Coverage report (HTML) | ✅ | — |
 
 ### 13. Advanced API
 
-| # | Task | Status |
-|---|------|--------|
-| 13.1 | Pagination on list endpoints | ⬜ |
-| 13.2 | Filtering and sorting (query params) | ⬜ |
-| 13.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ |
-| 13.4 | Bulk operations (batch create/update) | ⬜ |
-| 13.5 | Partial responses (field selection) | ⬜ |
-| 13.6 | Full-text search | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 13.1 | Pagination on list endpoints | ⬜ | 🔴 Now |
+| 13.2 | Filtering and sorting (query params) | ⬜ | 🟡 Soon |
+| 13.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🔵 Later |
+| 13.4 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
+| 13.5 | Partial responses (field selection) | ⬜ | ⚪ Maybe never |
+| 13.6 | Full-text search | ⬜ | 🔵 Later |
 
 ### 14. Caching & Performance
 
-| # | Task | Status |
-|---|------|--------|
-| 14.1 | Load testing with k6 or Vegeta (baselines) | ⬜ |
-| 14.2 | Profiling with `pprof` | ⬜ |
-| 14.3 | Redis cache (sessions, frequent data) | ⬜ |
-| 14.4 | Cache-Control headers on responses | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 14.1 | Load testing with k6 or Vegeta (baselines) | ⬜ | 🔵 Later |
+| 14.2 | Profiling with `pprof` | ⬜ | 🔵 Later |
+| 14.3 | Redis cache (sessions, frequent data) | ⬜ | 🔵 Later |
+| 14.4 | Cache-Control headers on responses | ⬜ | 🔵 Later |
 
 ### 15. Advanced Observability
 
-| # | Task | Status |
-|---|------|--------|
-| 15.1 | Grafana dashboards (latency, errors, throughput) | ⬜ |
-| 15.2 | Alerts (Alertmanager / Grafana alerts) | ⬜ |
-| 15.3 | Log aggregation (Loki + Grafana) | ⬜ |
-| 15.4 | Distributed tracing with OpenTelemetry | ⬜ |
-| 15.5 | Audit log (user action tracking) | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 15.1 | Grafana dashboards (latency, errors, throughput) | ⬜ | 🟡 Soon |
+| 15.2 | Alerts (Alertmanager / Grafana alerts) | ⬜ | 🟡 Soon |
+| 15.3 | Log aggregation (Loki + Grafana) | ⬜ | 🔵 Later |
+| 15.4 | Distributed tracing with OpenTelemetry | ⬜ | 🔵 Later |
+| 15.5 | Audit log (user action tracking) | ⬜ | 🔵 Later |
 
 ### 16. Business Features
 
-| # | Task | Status |
-|---|------|--------|
-| 16.1 | Email service (verification, password reset) | ⬜ |
-| 16.2 | Background jobs / task queue (cron, async) | ⬜ |
-| 16.3 | Roles and permissions (RBAC) | ⬜ |
-| 16.4 | File upload (S3 / MinIO) | ⬜ |
-| 16.5 | Notifications (WebSocket or SSE) | ⬜ |
-| 16.6 | Data export (CSV, PDF) | ⬜ |
-| 16.7 | Multi-tenancy | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 16.1 | Email service (verification, password reset) | ⬜ | 🟡 Soon |
+| 16.2 | Background jobs / task queue (cron, async) | ⬜ | 🔵 Later |
+| 16.3 | Roles and permissions (RBAC) | ⬜ | 🔵 Later |
+| 16.4 | File upload (S3 / MinIO) | ⬜ | 🔵 Later |
+| 16.5 | Notifications (WebSocket or SSE) | ⬜ | 🔵 Later |
+| 16.6 | Data export (CSV, PDF) | ⬜ | 🔵 Later |
+| 16.7 | Multi-tenancy | ⬜ | ⚪ Maybe never |
 
 ### 17. Resilience & Advanced Patterns
 
-| # | Task | Status |
-|---|------|--------|
-| 17.1 | Configurable timeouts per operation | ⬜ |
-| 17.2 | Retry with exponential backoff | ⬜ |
-| 17.3 | Circuit breaker (for external services) | ⬜ |
-| 17.4 | Idempotency keys on write endpoints | ⬜ |
-| 17.5 | Feature flags | ⬜ |
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 17.1 | Configurable timeouts per operation | ⬜ | 🔵 Later |
+| 17.2 | Retry with exponential backoff | ⬜ | 🔵 Later |
+| 17.3 | Circuit breaker (for external services) | ⬜ | 🔵 Later |
+| 17.4 | Idempotency keys on write endpoints | ⬜ | 🔵 Later |
+| 17.5 | Feature flags | ⬜ | ⚪ Maybe never |
 
 ---
 
@@ -217,3 +217,12 @@ Resilience                 ░░░░░░░░░░░░░░░░░�
 
 > **Total progress**: 51/86 tasks completed (~59%)
 > **Recommendation**: Sections 10 (Security) and 11 (Database) have the highest immediate impact.
+
+### Priority Legend
+
+| Flag | Meaning |
+|------|---------|
+| 🔴 Now | High impact, implement immediately |
+| 🟡 Soon | Important, implement before scaling |
+| 🔵 Later | Low priority, wait until needed |
+| ⚪ Maybe never | Likely unnecessary for this project |
