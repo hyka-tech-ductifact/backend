@@ -32,6 +32,7 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyInUse, http.StatusConflict, "email already in use")
 	helpers.RegisterDomainError(services.ErrInvalidCredentials, http.StatusUnauthorized, "invalid email or password")
+	helpers.RegisterDomainError(services.ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid or expired refresh token")
 	helpers.RegisterDomainError(services.ErrClientNotFound, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(services.ErrClientNotOwned, http.StatusForbidden, "client does not belong to this user")
 	helpers.RegisterDomainError(entities.ErrEmptyUserName, http.StatusBadRequest, "user name cannot be empty")
@@ -86,6 +87,7 @@ func SetupRoutes(
 	{
 		authRoutes.POST("/register", authHandler.Register)
 		authRoutes.POST("/login", authHandler.Login)
+		authRoutes.POST("/refresh", authHandler.Refresh)
 	}
 
 	// --- Protected routes (auth required) ---

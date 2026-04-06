@@ -24,7 +24,8 @@ func TestE2E_Register_Success(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 
-	assert.NotEmpty(t, body["token"])
+	assert.NotEmpty(t, body["access_token"])
+	assert.NotEmpty(t, body["refresh_token"])
 	user := body["user"].(map[string]any)
 	assert.NotEmpty(t, user["id"])
 	assert.Equal(t, "Juan", user["name"])
@@ -121,7 +122,8 @@ func TestE2E_Login_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.NotEmpty(t, body["token"])
+	assert.NotEmpty(t, body["access_token"])
+	assert.NotEmpty(t, body["refresh_token"])
 	user := body["user"].(map[string]any)
 	assert.Equal(t, regUser["id"], user["id"])
 	assert.Equal(t, "Juan", user["name"])

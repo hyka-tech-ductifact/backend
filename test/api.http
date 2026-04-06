@@ -2,14 +2,14 @@
 # Use with REST Client plugin in VS Code (humao.rest-client)
 # Make sure the server is running: make app-watch or make docker-start
 #
-# Workflow: Register → Login → copy token → use protected endpoints
+# Workflow: Register → Login → copy access_token → use protected endpoints
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
 @baseUrl = http://localhost:8080/v1
-@token = <paste-token-here>
+@token = <paste-access-token-here>
 
 # =============================================================================
 # HEALTH, METRICS & DOCS (public)
@@ -90,6 +90,34 @@ Content-Type: application/json
 {
   "email": "juan@example.com",
   "password": "wrongpassword"
+}
+
+# =============================================================================
+# REFRESH TOKEN (public — uses refresh_token from register/login response)
+# =============================================================================
+
+@refreshToken = <paste-refresh-token-here>
+
+### Refresh access token — valid → 200
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refreshToken}}"
+}
+
+### Refresh — missing body → 400
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{}
+
+### Refresh — invalid token → 401
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "invalid-token"
 }
 
 # =============================================================================

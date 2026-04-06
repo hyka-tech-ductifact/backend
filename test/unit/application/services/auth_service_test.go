@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
@@ -28,15 +29,18 @@ func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenFn: func(userID uuid.UUID, email string) (string, error) {
-			return "jwt-token-123", nil
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{
+				AccessToken:  "access-token-123",
+				RefreshToken: "refresh-token-123",
+			}, nil
 		},
 	}
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	require.NoError(t, err)
@@ -44,7 +48,8 @@ func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
 	assert.Equal(t, "juan@example.com", user.Email)
 	assert.NotEmpty(t, user.PasswordHash)
 	assert.NotEmpty(t, user.ID)
-	assert.Equal(t, "jwt-token-123", token)
+	assert.Equal(t, "access-token-123", tokens.AccessToken)
+	assert.Equal(t, "refresh-token-123", tokens.RefreshToken)
 }
 
 func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
@@ -65,11 +70,11 @@ func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
 }
 
@@ -83,10 +88,10 @@ func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
-	user, token, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123")
 
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
 }
 
@@ -100,10 +105,10 @@ func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
-	user, token, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123")
 
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
 }
 
@@ -117,10 +122,10 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short")
 
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
 }
 
@@ -139,11 +144,11 @@ func TestRegister_WhenRepoCreateFails_ReturnsError(t *testing.T) {
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "db connection lost")
 }
 
@@ -155,19 +160,19 @@ func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenFn: func(userID uuid.UUID, email string) (string, error) {
-			return "", errors.New("token generation failed")
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return nil, errors.New("token generation failed")
 		},
 	}
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "token generation failed")
 }
 
@@ -195,22 +200,26 @@ func TestLogin_WithValidCredentials_ReturnsUserAndToken(t *testing.T) {
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenFn: func(userID uuid.UUID, email string) (string, error) {
-			return "jwt-token-456", nil
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{
+				AccessToken:  "access-token-456",
+				RefreshToken: "refresh-token-456",
+			}, nil
 		},
 	}
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
+	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
 
 	// ASSERT
 	require.NoError(t, err)
 	assert.Equal(t, storedUser.ID, user.ID)
 	assert.Equal(t, "Juan", user.Name)
 	assert.Equal(t, "juan@example.com", user.Email)
-	assert.Equal(t, "jwt-token-456", token)
+	assert.Equal(t, "access-token-456", tokens.AccessToken)
+	assert.Equal(t, "refresh-token-456", tokens.RefreshToken)
 }
 
 func TestLogin_WithWrongPassword_ReturnsInvalidCredentials(t *testing.T) {
@@ -234,11 +243,11 @@ func TestLogin_WithWrongPassword_ReturnsInvalidCredentials(t *testing.T) {
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Login(context.Background(), "juan@example.com", "wrongpassword")
+	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "wrongpassword")
 
 	// ASSERT
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, services.ErrInvalidCredentials)
 }
 
@@ -253,12 +262,12 @@ func TestLogin_WithNonExistentEmail_ReturnsInvalidCredentials(t *testing.T) {
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
-	// ACT
-	user, token, err := svc.Login(context.Background(), "noexiste@example.com", "securepass123")
+	// ACT: same generic error — don't reveal if email exists
+	user, tokens, err := svc.Login(context.Background(), "noexiste@example.com", "securepass123")
 
 	// ASSERT: same generic error — don't reveal if email exists
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, services.ErrInvalidCredentials)
 }
 
@@ -279,19 +288,19 @@ func TestLogin_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 		},
 	}
 	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenFn: func(userID uuid.UUID, email string) (string, error) {
-			return "", errors.New("token signing failed")
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return nil, errors.New("token signing failed")
 		},
 	}
 
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
+	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
 
 	// ASSERT
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "token signing failed")
 }
 
@@ -307,10 +316,135 @@ func TestRegister_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	svc := services.NewAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, token, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
 
 	// ASSERT: DB error is propagated instead of silently ignored
 	assert.Nil(t, user)
-	assert.Empty(t, token)
+	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "db connection lost")
+}
+
+// =============================================================================
+// RefreshToken
+// =============================================================================
+
+func TestRefreshToken_WithValidRefreshToken_ReturnsNewTokenPair(t *testing.T) {
+	// ARRANGE
+	userID := uuid.New()
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return &entities.User{
+				ID:    userID,
+				Name:  "Juan",
+				Email: "juan@example.com",
+			}, nil
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		ValidateRefreshTokenFn: func(tokenString string) (*ports.TokenClaims, error) {
+			return &ports.TokenClaims{
+				UserID: userID,
+				Email:  "juan@example.com",
+			}, nil
+		},
+		GenerateTokenPairFn: func(uid uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{
+				AccessToken:  "new-access-token",
+				RefreshToken: "new-refresh-token",
+			}, nil
+		},
+	}
+
+	svc := services.NewAuthService(mockRepo, mockToken)
+
+	// ACT
+	tokens, err := svc.RefreshToken(context.Background(), "old-refresh-token")
+
+	// ASSERT
+	require.NoError(t, err)
+	assert.Equal(t, "new-access-token", tokens.AccessToken)
+	assert.Equal(t, "new-refresh-token", tokens.RefreshToken)
+}
+
+func TestRefreshToken_WithInvalidRefreshToken_ReturnsError(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{}
+	mockToken := &mocks.MockTokenProvider{
+		ValidateRefreshTokenFn: func(tokenString string) (*ports.TokenClaims, error) {
+			return nil, errors.New("invalid token")
+		},
+	}
+
+	svc := services.NewAuthService(mockRepo, mockToken)
+
+	// ACT
+	tokens, err := svc.RefreshToken(context.Background(), "garbage-token")
+
+	// ASSERT
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, services.ErrInvalidRefreshToken)
+}
+
+func TestRefreshToken_WhenUserNoLongerExists_ReturnsError(t *testing.T) {
+	// ARRANGE
+	userID := uuid.New()
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return nil, errors.New("not found")
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		ValidateRefreshTokenFn: func(tokenString string) (*ports.TokenClaims, error) {
+			return &ports.TokenClaims{
+				UserID: userID,
+				Email:  "deleted@example.com",
+			}, nil
+		},
+	}
+
+	svc := services.NewAuthService(mockRepo, mockToken)
+
+	// ACT
+	tokens, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
+
+	// ASSERT
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, services.ErrInvalidRefreshToken)
+}
+
+func TestRefreshToken_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
+	// ARRANGE
+	userID := uuid.New()
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return &entities.User{
+				ID:    userID,
+				Name:  "Juan",
+				Email: "juan@example.com",
+			}, nil
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		ValidateRefreshTokenFn: func(tokenString string) (*ports.TokenClaims, error) {
+			return &ports.TokenClaims{
+				UserID: userID,
+				Email:  "juan@example.com",
+			}, nil
+		},
+		GenerateTokenPairFn: func(uid uuid.UUID, email string) (*ports.TokenPair, error) {
+			return nil, errors.New("signing failure")
+		},
+	}
+
+	svc := services.NewAuthService(mockRepo, mockToken)
+
+	// ACT
+	tokens, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
+
+	// ASSERT
+	assert.Nil(t, tokens)
+	assert.EqualError(t, err, "signing failure")
 }

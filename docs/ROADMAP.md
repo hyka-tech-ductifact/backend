@@ -111,8 +111,8 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 10.1 | Refresh tokens (JWT rotation) | ⬜ | 🔴 Now |
-| 10.2 | `POST /auth/refresh` endpoint | ⬜ | 🔴 Now |
+| 10.1 | Refresh tokens (JWT rotation) | ✅ | 🔴 Now |
+| 10.2 | `POST /auth/refresh` endpoint | ✅ | 🔴 Now |
 | 10.3 | Rate limiting (per IP and per user) | ⬜ | 🔴 Now |
 | 10.4 | Login brute-force protection | ⬜ | 🟡 Soon |
 | 10.5 | Security headers middleware (HSTS, X-Frame, CSP) | ⬜ | 🟡 Soon |

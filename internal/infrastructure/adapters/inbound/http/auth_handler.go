@@ -22,9 +22,19 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 type AuthResponse struct {
-	User  UserResponse `json:"user"`
-	Token string       `json:"token"`
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+}
+
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // --- Handler ---
@@ -44,15 +54,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password)
+	user, tokens, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, AuthResponse{
-		User:  *toUserResponse(user),
-		Token: token,
+		User:         *toUserResponse(user),
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
 	})
 }
 
@@ -63,14 +74,34 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
+	user, tokens, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, AuthResponse{
-		User:  *toUserResponse(user),
-		Token: token,
+		User:         *toUserResponse(user),
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	})
+}
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tokens, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, TokenResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
 	})
 }

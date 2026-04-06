@@ -114,9 +114,9 @@ func registerAndLogin(t *testing.T, name, email, password string) string {
 	})
 
 	body := helpers.ParseBody(t, resp)
-	token, ok := body["token"].(string)
+	token, ok := body["access_token"].(string)
 	if !ok || token == "" {
-		t.Fatalf("registerAndLogin: expected token in response, got: %v", body)
+		t.Fatalf("registerAndLogin: expected access_token in response, got: %v", body)
 	}
 	return token
 }
