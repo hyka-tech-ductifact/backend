@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
+	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
@@ -16,6 +18,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// newTestAuthService creates an AuthService with a no-op blacklist and test durations.
+func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, 15*time.Minute, 7*24*time.Hour)
+}
+
+// newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
+func newTestAuthServiceWithBlacklist(
+	repo *mocks.MockUserRepository,
+	token *mocks.MockTokenProvider,
+	blacklist *mocks.MockTokenBlacklist,
+) usecases.AuthService {
+	return services.NewAuthService(repo, token, blacklist, 15*time.Minute, 7*24*time.Hour)
+}
 
 // =============================================================================
 // Register
@@ -37,7 +53,7 @@ func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
@@ -67,7 +83,7 @@ func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
@@ -86,7 +102,7 @@ func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	user, tokens, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123")
 
@@ -103,7 +119,7 @@ func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	user, tokens, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123")
 
@@ -120,7 +136,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short")
 
@@ -141,7 +157,7 @@ func TestRegister_WhenRepoCreateFails_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
@@ -165,7 +181,7 @@ func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
@@ -208,7 +224,7 @@ func TestLogin_WithValidCredentials_ReturnsUserAndToken(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
@@ -240,7 +256,7 @@ func TestLogin_WithWrongPassword_ReturnsInvalidCredentials(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "wrongpassword")
@@ -260,7 +276,7 @@ func TestLogin_WithNonExistentEmail_ReturnsInvalidCredentials(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT: same generic error — don't reveal if email exists
 	user, tokens, err := svc.Login(context.Background(), "noexiste@example.com", "securepass123")
@@ -293,7 +309,7 @@ func TestLogin_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
@@ -313,7 +329,7 @@ func TestRegister_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	}
 	mockToken := &mocks.MockTokenProvider{}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
@@ -356,7 +372,7 @@ func TestRefreshToken_WithValidRefreshToken_ReturnsNewTokenPair(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	tokens, err := svc.RefreshToken(context.Background(), "old-refresh-token")
@@ -376,7 +392,7 @@ func TestRefreshToken_WithInvalidRefreshToken_ReturnsError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	tokens, err := svc.RefreshToken(context.Background(), "garbage-token")
@@ -404,7 +420,7 @@ func TestRefreshToken_WhenUserNoLongerExists_ReturnsError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	tokens, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
@@ -439,7 +455,7 @@ func TestRefreshToken_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewAuthService(mockRepo, mockToken)
+	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
 	tokens, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
@@ -447,4 +463,72 @@ func TestRefreshToken_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 	// ASSERT
 	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "signing failure")
+}
+
+func TestRefreshToken_WithBlacklistedToken_ReturnsError(t *testing.T) {
+	// ARRANGE
+	blacklist := &mocks.MockTokenBlacklist{
+		IsBlacklistedFn: func(token string) bool {
+			return token == "revoked-refresh-token"
+		},
+	}
+	mockRepo := &mocks.MockUserRepository{}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithBlacklist(mockRepo, mockToken, blacklist)
+
+	// ACT
+	tokens, err := svc.RefreshToken(context.Background(), "revoked-refresh-token")
+
+	// ASSERT
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, services.ErrInvalidRefreshToken)
+}
+
+// =============================================================================
+// Logout
+// =============================================================================
+
+func TestLogout_BlacklistsBothTokens(t *testing.T) {
+	// ARRANGE
+	var addedTokens []string
+	blacklist := &mocks.MockTokenBlacklist{
+		AddFn: func(token string, expiry time.Duration) {
+			addedTokens = append(addedTokens, token)
+		},
+	}
+	mockRepo := &mocks.MockUserRepository{}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithBlacklist(mockRepo, mockToken, blacklist)
+
+	// ACT
+	err := svc.Logout(context.Background(), "access-token-123", "refresh-token-456")
+
+	// ASSERT
+	require.NoError(t, err)
+	assert.Contains(t, addedTokens, "access-token-123")
+	assert.Contains(t, addedTokens, "refresh-token-456")
+	assert.Len(t, addedTokens, 2)
+}
+
+func TestLogout_UsesCorrectDurations(t *testing.T) {
+	// ARRANGE
+	durations := make(map[string]time.Duration)
+	blacklist := &mocks.MockTokenBlacklist{
+		AddFn: func(token string, expiry time.Duration) {
+			durations[token] = expiry
+		},
+	}
+	mockRepo := &mocks.MockUserRepository{}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithBlacklist(mockRepo, mockToken, blacklist)
+
+	// ACT
+	_ = svc.Logout(context.Background(), "access-tok", "refresh-tok")
+
+	// ASSERT: access token uses 15min, refresh uses 7 days
+	assert.Equal(t, 15*time.Minute, durations["access-tok"])
+	assert.Equal(t, 7*24*time.Hour, durations["refresh-tok"])
 }

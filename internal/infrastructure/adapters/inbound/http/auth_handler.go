@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -23,6 +24,10 @@ type LoginRequest struct {
 }
 
 type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
@@ -104,4 +109,26 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	})
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req LogoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Extract the access token from the Authorization header
+	authHeader := c.GetHeader("Authorization")
+	accessToken := ""
+	if parts := strings.SplitN(authHeader, " ", 2); len(parts) == 2 {
+		accessToken = parts[1]
+	}
+
+	if err := h.authService.Logout(c.Request.Context(), accessToken, req.RefreshToken); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }

@@ -47,13 +47,15 @@ func main() {
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
-	authService := services.NewAuthService(userRepo, tokenProvider)
+	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
+	defer blacklist.Stop()
+	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, blacklist, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

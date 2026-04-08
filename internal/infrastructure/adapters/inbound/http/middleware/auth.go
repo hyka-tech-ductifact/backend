@@ -14,12 +14,13 @@ const UserIDKey contextKey = "userID"
 
 // AuthMiddleware creates a Gin middleware that validates JWT tokens.
 // It extracts the token from the Authorization header, validates it,
-// and puts the userID in the request context for downstream handlers.
+// checks the blacklist (for logout support), and puts the userID
+// in the request context for downstream handlers.
 //
 // This is an inbound adapter — it does NOT implement any interface.
-// It consumes ports.TokenProvider (an outbound port) to validate tokens,
+// It consumes ports.TokenProvider and ports.TokenBlacklist (outbound ports),
 // and translates HTTP authentication concerns into application-level context.
-func AuthMiddleware(tokenProvider ports.TokenProvider) gin.HandlerFunc {
+func AuthMiddleware(tokenProvider ports.TokenProvider, blacklist ports.TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Step 1: Get the Authorization header
 		authHeader := c.GetHeader("Authorization")
@@ -41,7 +42,15 @@ func AuthMiddleware(tokenProvider ports.TokenProvider) gin.HandlerFunc {
 
 		tokenString := parts[1]
 
-		// Step 3: Validate the token via the outbound port
+		// Step 3: Check if the token has been revoked (logout)
+		if blacklist.IsBlacklisted(tokenString) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "token has been revoked",
+			})
+			return
+		}
+
+		// Step 4: Validate the token via the outbound port
 		claims, err := tokenProvider.ValidateToken(tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
@@ -50,10 +59,10 @@ func AuthMiddleware(tokenProvider ports.TokenProvider) gin.HandlerFunc {
 			return
 		}
 
-		// Step 4: Put the userID in Gin's context (available to all downstream handlers)
+		// Step 5: Put the userID in Gin's context (available to all downstream handlers)
 		c.Set(string(UserIDKey), claims.UserID)
 
-		// Step 5: Continue to the next handler in the chain
+		// Step 6: Continue to the next handler in the chain
 		c.Next()
 	}
 }

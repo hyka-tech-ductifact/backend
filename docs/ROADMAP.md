@@ -116,7 +116,7 @@
 | 10.3 | Rate limiting (per IP and per user) | ⬜ | 🔴 Now |
 | 10.4 | Login brute-force protection | ⬜ | 🟡 Soon |
 | 10.5 | Security headers middleware (HSTS, X-Frame, CSP) | ⬜ | 🟡 Soon |
-| 10.6 | `POST /auth/logout` endpoint (token blacklist) | ⬜ | 🟡 Soon |
+| 10.6 | `POST /auth/logout` endpoint (token blacklist) | ✅ | 🟡 Soon |
 
 ### 11. Database
 

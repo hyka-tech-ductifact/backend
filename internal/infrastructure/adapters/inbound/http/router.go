@@ -26,6 +26,7 @@ func SetupRoutes(
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
+	blacklist ports.TokenBlacklist,
 	corsCfg config.CORS,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
@@ -93,7 +94,13 @@ func SetupRoutes(
 	// --- Protected routes (auth required) ---
 
 	protected := v1.Group("")
-	protected.Use(middleware.AuthMiddleware(tokenProvider))
+	protected.Use(middleware.AuthMiddleware(tokenProvider, blacklist))
+
+	// Auth routes that require authentication
+	protectedAuth := protected.Group("/auth")
+	{
+		protectedAuth.POST("/logout", authHandler.Logout)
+	}
 
 	// User routes — userID comes from the JWT token, not the URL
 	userHandler := NewUserHandler(userService)

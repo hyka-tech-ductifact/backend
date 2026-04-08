@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"time"
 
 	"ductifact/internal/application/ports"
 	"ductifact/internal/domain/entities"
@@ -19,15 +20,27 @@ var (
 
 // authService implements usecases.AuthService.
 type authService struct {
-	userRepo      repositories.UserRepository
-	tokenProvider ports.TokenProvider
+	userRepo             repositories.UserRepository
+	tokenProvider        ports.TokenProvider
+	blacklist            ports.TokenBlacklist
+	accessTokenDuration  time.Duration
+	refreshTokenDuration time.Duration
 }
 
 // NewAuthService creates a new AuthService.
-func NewAuthService(userRepo repositories.UserRepository, tokenProvider ports.TokenProvider) *authService {
+func NewAuthService(
+	userRepo repositories.UserRepository,
+	tokenProvider ports.TokenProvider,
+	blacklist ports.TokenBlacklist,
+	accessTokenDuration time.Duration,
+	refreshTokenDuration time.Duration,
+) *authService {
 	return &authService{
-		userRepo:      userRepo,
-		tokenProvider: tokenProvider,
+		userRepo:             userRepo,
+		tokenProvider:        tokenProvider,
+		blacklist:            blacklist,
+		accessTokenDuration:  accessTokenDuration,
+		refreshTokenDuration: refreshTokenDuration,
 	}
 }
 
@@ -90,7 +103,12 @@ func (s *authService) Login(ctx context.Context, email, password string) (*entit
 // This implements JWT rotation: each refresh invalidates the old pair
 // and issues a completely new access + refresh token pair.
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*ports.TokenPair, error) {
-	// Step 1: Validate the refresh token
+	// Step 1: Check if the refresh token has been revoked (logout)
+	if s.blacklist.IsBlacklisted(refreshToken) {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	// Step 2: Validate the refresh token
 	claims, err := s.tokenProvider.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		return nil, ErrInvalidRefreshToken
@@ -109,4 +127,12 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*p
 	}
 
 	return tokens, nil
+}
+
+// Logout revokes both the access and refresh tokens by adding them
+// to the blacklist. They will remain blacklisted until they naturally expire.
+func (s *authService) Logout(_ context.Context, accessToken, refreshToken string) error {
+	s.blacklist.Add(accessToken, s.accessTokenDuration)
+	s.blacklist.Add(refreshToken, s.refreshTokenDuration)
+	return nil
 }
