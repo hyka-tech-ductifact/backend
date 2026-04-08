@@ -57,10 +57,13 @@ func SetupRoutes(
 	// 3. Recovery: third, to catch panics from anything below
 	r.Use(middleware.RecoveryMiddleware())
 
-	// 4. Metrics: fourth, to record request count and latency
+	// 4. Security headers: fourth, so ALL responses include them (even errors)
+	r.Use(middleware.SecurityHeadersMiddleware())
+
+	// 5. Metrics: fifth, to record request count and latency
 	r.Use(middleware.MetricsMiddleware())
 
-	// 5. CORS: fifth, before any business logic
+	// 6. CORS: sixth, before any business logic
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     corsCfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -70,7 +73,7 @@ func SetupRoutes(
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// 6. Rate limit by IP: sixth, applied globally to all routes
+	// 7. Rate limit by IP: seventh, applied globally to all routes
 	r.Use(middleware.IPRateLimitMiddleware(ipLimiter))
 
 	// --- Infrastructure routes (unversioned) ---
