@@ -27,6 +27,8 @@ func SetupRoutes(
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
+	ipLimiter ports.RateLimiter,
+	userLimiter ports.RateLimiter,
 	corsCfg config.CORS,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
@@ -68,6 +70,9 @@ func SetupRoutes(
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// 6. Rate limit by IP: sixth, applied globally to all routes
+	r.Use(middleware.IPRateLimitMiddleware(ipLimiter))
+
 	// --- Infrastructure routes (unversioned) ---
 
 	healthHandler := NewHealthHandler(healthChecker, time.Now(), config.ContractVersion)
@@ -95,6 +100,7 @@ func SetupRoutes(
 
 	protected := v1.Group("")
 	protected.Use(middleware.AuthMiddleware(tokenProvider, blacklist))
+	protected.Use(middleware.UserRateLimitMiddleware(userLimiter))
 
 	// Auth routes that require authentication
 	protectedAuth := protected.Group("/auth")

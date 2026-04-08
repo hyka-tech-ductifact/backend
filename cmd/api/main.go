@@ -15,6 +15,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/internal/infrastructure/auth"
 	"ductifact/internal/infrastructure/logging"
+	"ductifact/internal/infrastructure/ratelimit"
 
 	"github.com/joho/godotenv"
 )
@@ -54,8 +55,23 @@ func main() {
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
+	// --- Rate limiters ---
+	ipLimiter := ratelimit.NewMemoryRateLimiter(
+		cfg.RateLimit.IPMaxRequests,
+		cfg.RateLimit.IPWindow,
+		1*time.Minute,
+	)
+	defer ipLimiter.Stop()
+
+	userLimiter := ratelimit.NewMemoryRateLimiter(
+		cfg.RateLimit.UserMaxRequests,
+		cfg.RateLimit.UserWindow,
+		1*time.Minute,
+	)
+	defer userLimiter.Stop()
+
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, blacklist, cfg.CORS)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

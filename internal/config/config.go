@@ -12,17 +12,19 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Config holds all application configuration, grouped by concern.
 type Config struct {
-	App      App
-	Database Database
-	JWT      JWT
-	Log      Log
-	CORS     CORS
+	App       App
+	Database  Database
+	JWT       JWT
+	Log       Log
+	CORS      CORS
+	RateLimit RateLimit
 }
 
 // App holds general application settings.
@@ -66,6 +68,14 @@ type CORS struct {
 	AllowedOrigins []string
 }
 
+// RateLimit holds rate limiting configuration.
+type RateLimit struct {
+	IPMaxRequests   int           // Max requests per IP per window
+	IPWindow        time.Duration // Time window for IP rate limiting
+	UserMaxRequests int           // Max requests per authenticated user per window
+	UserWindow      time.Duration // Time window for user rate limiting
+}
+
 // Load reads all configuration from environment variables.
 // Required variables panic if missing — call this at startup
 // before any other initialization.
@@ -93,6 +103,12 @@ func Load() Config {
 		},
 		CORS: CORS{
 			AllowedOrigins: parseList(required("CORS_ORIGINS")),
+		},
+		RateLimit: RateLimit{
+			IPMaxRequests:   parseInt(optional("RATE_LIMIT_IP_MAX", "100")),
+			IPWindow:        parseDuration(optional("RATE_LIMIT_IP_WINDOW", "1m")),
+			UserMaxRequests: parseInt(optional("RATE_LIMIT_USER_MAX", "60")),
+			UserWindow:      parseDuration(optional("RATE_LIMIT_USER_WINDOW", "1m")),
 		},
 	}
 }
@@ -136,4 +152,14 @@ func parseDuration(s string) time.Duration {
 		panic(fmt.Sprintf("invalid duration %q: %v", s, err))
 	}
 	return d
+}
+
+// parseInt parses a string as an integer.
+// Panics if the format is invalid — this is a configuration error.
+func parseInt(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		panic(fmt.Sprintf("invalid integer %q: %v", s, err))
+	}
+	return n
 }
