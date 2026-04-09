@@ -1,6 +1,6 @@
 # API Test Suite
 # Use with REST Client plugin in VS Code (humao.rest-client)
-# Make sure the server is running: make app-watch or make docker-start
+# Make sure the server is running: make dev or make app-start
 #
 # Workflow: Register → Login → copy access_token → use protected endpoints
 

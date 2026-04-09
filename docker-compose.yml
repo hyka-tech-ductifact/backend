@@ -1,8 +1,7 @@
-# Development & CI compose — NOT for production deployment (see infra/ repo).
-# Usage:
-#   make db-start       → only postgres (dev, tests)
-#   make docker-build   → build app image (CI smoke test)
-#   make docker-start   → postgres + app (CI smoke test)
+# Development compose — two modes:
+#   make services-start → only postgres (dev, app runs on host with air)
+#   make docker-start  → postgres + app in Docker (smoke test)
+#   make docker-stop   → stop everything
 
 services:
   postgres:
@@ -18,28 +17,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    profiles: [ smoke ]
-    build:
-      context: .
-      args:
-        APP_PORT: ${APP_PORT}
+    profiles: [smoke]
+    build: .
     container_name: ductifact_dev_app
-    restart: unless-stopped
     ports:
-      - "${APP_PORT}:${APP_PORT}"
+      - "${APP_PORT}:8080"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - APP_PORT=${APP_PORT}
+      - APP_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=${LOG_LEVEL}
