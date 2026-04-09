@@ -19,12 +19,13 @@ import (
 
 // Config holds all application configuration, grouped by concern.
 type Config struct {
-	App       App
-	Database  Database
-	JWT       JWT
-	Log       Log
-	CORS      CORS
-	RateLimit RateLimit
+	App           App
+	Database      Database
+	JWT           JWT
+	Log           Log
+	CORS          CORS
+	RateLimit     RateLimit
+	LoginThrottle LoginThrottle
 }
 
 // App holds general application settings.
@@ -76,6 +77,13 @@ type RateLimit struct {
 	UserWindow      time.Duration // Time window for user rate limiting
 }
 
+// LoginThrottle holds brute-force protection configuration.
+type LoginThrottle struct {
+	MaxAttempts     int           // Max failed login attempts before lockout
+	Window          time.Duration // Time window for counting failures
+	LockoutDuration time.Duration // How long to lock the account after max failures
+}
+
 // Load reads all configuration from environment variables.
 // Required variables panic if missing — call this at startup
 // before any other initialization.
@@ -109,6 +117,11 @@ func Load() Config {
 			IPWindow:        parseDuration(optional("RATE_LIMIT_IP_WINDOW", "1m")),
 			UserMaxRequests: parseInt(optional("RATE_LIMIT_USER_MAX", "60")),
 			UserWindow:      parseDuration(optional("RATE_LIMIT_USER_WINDOW", "1m")),
+		},
+		LoginThrottle: LoginThrottle{
+			MaxAttempts:     parseInt(optional("LOGIN_THROTTLE_MAX_ATTEMPTS", "10")),
+			Window:          parseDuration(optional("LOGIN_THROTTLE_WINDOW", "15m")),
+			LockoutDuration: parseDuration(optional("LOGIN_THROTTLE_LOCKOUT", "15m")),
 		},
 	}
 }

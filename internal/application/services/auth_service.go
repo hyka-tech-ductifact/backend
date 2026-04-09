@@ -16,6 +16,7 @@ import (
 var (
 	ErrInvalidCredentials  = errors.New("invalid email or password")
 	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
+	ErrAccountLocked       = errors.New("account temporarily locked due to too many failed login attempts")
 )
 
 // authService implements usecases.AuthService.
@@ -23,6 +24,7 @@ type authService struct {
 	userRepo             repositories.UserRepository
 	tokenProvider        ports.TokenProvider
 	blacklist            ports.TokenBlacklist
+	loginThrottler       ports.LoginThrottler
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 }
@@ -32,6 +34,7 @@ func NewAuthService(
 	userRepo repositories.UserRepository,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
+	loginThrottler ports.LoginThrottler,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 ) *authService {
@@ -39,6 +42,7 @@ func NewAuthService(
 		userRepo:             userRepo,
 		tokenProvider:        tokenProvider,
 		blacklist:            blacklist,
+		loginThrottler:       loginThrottler,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 	}
@@ -77,20 +81,30 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 
 // Login verifies credentials and returns a token pair.
 func (s *authService) Login(ctx context.Context, email, password string) (*entities.User, *ports.TokenPair, error) {
-	// Step 1: Find user by email
+	// Step 1: Check if the account is locked due to too many failed attempts
+	if s.loginThrottler.IsBlocked(email) {
+		return nil, nil, ErrAccountLocked
+	}
+
+	// Step 2: Find user by email
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		// Don't reveal whether the email exists or not (security)
+		s.loginThrottler.RecordFailure(email)
 		return nil, nil, ErrInvalidCredentials
 	}
 
-	// Step 2: Compare password with stored hash
+	// Step 3: Compare password with stored hash
 	pwd := valueobjects.NewPasswordFromHash(user.PasswordHash)
 	if err := pwd.Compare(password); err != nil {
+		s.loginThrottler.RecordFailure(email)
 		return nil, nil, ErrInvalidCredentials
 	}
 
-	// Step 3: Generate token pair
+	// Step 4: Login succeeded — clear any previous failures
+	s.loginThrottler.Reset(email)
+
+	// Step 5: Generate token pair
 	tokens, err := s.tokenProvider.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
 		return nil, nil, err

@@ -50,7 +50,17 @@ func main() {
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
 	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
 	defer blacklist.Stop()
-	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
+
+	// --- Login throttler ---
+	loginThrottler := ratelimit.NewMemoryLoginThrottler(
+		cfg.LoginThrottle.MaxAttempts,
+		cfg.LoginThrottle.Window,
+		cfg.LoginThrottle.LockoutDuration,
+		1*time.Minute,
+	)
+	defer loginThrottler.Stop()
+
+	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)

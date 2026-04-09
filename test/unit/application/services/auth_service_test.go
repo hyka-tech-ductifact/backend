@@ -19,9 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestAuthService creates an AuthService with a no-op blacklist and test durations.
+// newTestAuthService creates an AuthService with a no-op blacklist, no-op throttler and test durations.
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, 15*time.Minute, 7*24*time.Hour)
 }
 
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
@@ -30,7 +30,16 @@ func newTestAuthServiceWithBlacklist(
 	token *mocks.MockTokenProvider,
 	blacklist *mocks.MockTokenBlacklist,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, blacklist, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, token, blacklist, &mocks.MockLoginThrottler{}, 15*time.Minute, 7*24*time.Hour)
+}
+
+// newTestAuthServiceWithThrottler creates an AuthService with a custom login throttler.
+func newTestAuthServiceWithThrottler(
+	repo *mocks.MockUserRepository,
+	token *mocks.MockTokenProvider,
+	throttler *mocks.MockLoginThrottler,
+) usecases.AuthService {
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, throttler, 15*time.Minute, 7*24*time.Hour)
 }
 
 // =============================================================================
@@ -531,4 +540,123 @@ func TestLogout_UsesCorrectDurations(t *testing.T) {
 	// ASSERT: access token uses 15min, refresh uses 7 days
 	assert.Equal(t, 15*time.Minute, durations["access-tok"])
 	assert.Equal(t, 7*24*time.Hour, durations["refresh-tok"])
+}
+
+// =============================================================================
+// Login — Brute-force protection
+// =============================================================================
+
+func TestLogin_WhenAccountIsBlocked_ReturnsAccountLocked(t *testing.T) {
+	throttler := &mocks.MockLoginThrottler{
+		IsBlockedFn: func(key string) bool { return true },
+	}
+	mockRepo := &mocks.MockUserRepository{}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
+
+	user, tokens, err := svc.Login(context.Background(), "juan@example.com", "any-password")
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, services.ErrAccountLocked)
+}
+
+func TestLogin_WithWrongPassword_RecordsFailure(t *testing.T) {
+	failureRecorded := false
+	throttler := &mocks.MockLoginThrottler{
+		RecordFailureFn: func(key string) {
+			assert.Equal(t, "juan@example.com", key)
+			failureRecorded = true
+		},
+	}
+
+	existingUser, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existingUser, nil
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
+
+	_, _, err := svc.Login(context.Background(), "juan@example.com", "wrong-password")
+
+	assert.ErrorIs(t, err, services.ErrInvalidCredentials)
+	assert.True(t, failureRecorded)
+}
+
+func TestLogin_WithNonexistentEmail_RecordsFailure(t *testing.T) {
+	failureRecorded := false
+	throttler := &mocks.MockLoginThrottler{
+		RecordFailureFn: func(key string) {
+			assert.Equal(t, "unknown@example.com", key)
+			failureRecorded = true
+		},
+	}
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
+
+	_, _, err := svc.Login(context.Background(), "unknown@example.com", "any-password")
+
+	assert.ErrorIs(t, err, services.ErrInvalidCredentials)
+	assert.True(t, failureRecorded)
+}
+
+func TestLogin_WithCorrectPassword_ResetsThrottler(t *testing.T) {
+	resetCalled := false
+	throttler := &mocks.MockLoginThrottler{
+		ResetFn: func(key string) {
+			assert.Equal(t, "juan@example.com", key)
+			resetCalled = true
+		},
+	}
+
+	existingUser, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existingUser, nil
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "at", RefreshToken: "rt"}, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
+
+	_, _, err := svc.Login(context.Background(), "juan@example.com", "securepass123")
+
+	require.NoError(t, err)
+	assert.True(t, resetCalled)
+}
+
+func TestLogin_WhenBlocked_DoesNotQueryDatabase(t *testing.T) {
+	dbQueried := false
+	throttler := &mocks.MockLoginThrottler{
+		IsBlockedFn: func(key string) bool { return true },
+	}
+
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			dbQueried = true
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
+
+	svc.Login(context.Background(), "juan@example.com", "any-password")
+
+	assert.False(t, dbQueried, "should not query DB when account is blocked")
 }
