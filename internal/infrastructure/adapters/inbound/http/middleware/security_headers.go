@@ -1,6 +1,10 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
 
 // SecurityHeadersMiddleware adds HTTP security headers to every response.
 // These headers instruct browsers to enable built-in protections against
@@ -18,6 +22,17 @@ import "github.com/gin-gonic/gin"
 //   - X-XSS-Protection: legacy XSS filter (for older browsers)
 //   - Permissions-Policy: disables access to sensitive browser APIs
 func SecurityHeadersMiddleware() gin.HandlerFunc {
+	// Strict CSP for API endpoints.
+	const apiCSP = "default-src 'self'; frame-ancestors 'none'"
+
+	// Relaxed CSP for /docs — Swagger UI loads JS/CSS from unpkg.com
+	// and uses inline scripts/styles for initialization.
+	const docsCSP = "default-src 'self'; " +
+		"script-src 'self' https://unpkg.com 'unsafe-inline'; " +
+		"style-src 'self' https://unpkg.com 'unsafe-inline'; " +
+		"img-src 'self' data:; " +
+		"frame-ancestors 'none'"
+
 	return func(c *gin.Context) {
 		h := c.Writer.Header()
 
@@ -34,10 +49,13 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		h.Set("X-Frame-Options", "DENY")
 
 		// CSP — restrict where the browser can load resources from.
-		// default-src 'self' = only allow resources from our own origin.
-		// This is a strict baseline; loosen per-directive as needed
-		// (e.g. allow a CDN for styles, or 'unsafe-inline' for Swagger UI).
-		h.Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
+		// Docs pages get a relaxed policy to allow Swagger UI's CDN resources;
+		// all other routes use the strict default.
+		if strings.HasPrefix(c.Request.URL.Path, "/docs") {
+			h.Set("Content-Security-Policy", docsCSP)
+		} else {
+			h.Set("Content-Security-Policy", apiCSP)
+		}
 
 		// Control how much URL info is sent in the Referer header.
 		// strict-origin-when-cross-origin = send full path for same-origin,

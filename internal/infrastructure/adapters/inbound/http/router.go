@@ -13,7 +13,6 @@ import (
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -65,14 +64,7 @@ func SetupRoutes(
 	r.Use(middleware.MetricsMiddleware())
 
 	// 6. CORS: sixth, before any business logic
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     corsCfg.AllowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Request-ID"},
-		ExposeHeaders:    []string{"X-Request-ID"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	r.Use(middleware.CORSMiddleware(corsCfg.AllowedOrigins))
 
 	// 7. Rate limit by IP: seventh, applied globally to all routes
 	r.Use(middleware.IPRateLimitMiddleware(ipLimiter))

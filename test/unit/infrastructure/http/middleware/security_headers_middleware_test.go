@@ -33,10 +33,42 @@ func TestSecurityHeaders_SetsXFrameOptions(t *testing.T) {
 	assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
 }
 
-func TestSecurityHeaders_SetsContentSecurityPolicy(t *testing.T) {
+func TestSecurityHeaders_SetsStrictCSPForAPIRoutes(t *testing.T) {
 	w := performSecurityHeadersRequest(t)
 
 	assert.Equal(t, "default-src 'self'; frame-ancestors 'none'", w.Header().Get("Content-Security-Policy"))
+}
+
+func TestSecurityHeaders_SetsRelaxedCSPForDocsRoute(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecurityHeadersMiddleware())
+	r.GET("/docs", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "https://unpkg.com")
+	assert.Contains(t, csp, "'unsafe-inline'")
+	assert.Contains(t, csp, "frame-ancestors 'none'")
+}
+
+func TestSecurityHeaders_SetsRelaxedCSPForDocsSubpath(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecurityHeadersMiddleware())
+	r.GET("/docs/openapi.yaml", func(c *gin.Context) {
+		c.String(http.StatusOK, "openapi: 3.0.3")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/docs/openapi.yaml", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "https://unpkg.com")
 }
 
 func TestSecurityHeaders_SetsReferrerPolicy(t *testing.T) {
