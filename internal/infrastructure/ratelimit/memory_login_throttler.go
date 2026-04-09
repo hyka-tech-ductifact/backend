@@ -8,6 +8,7 @@ import (
 // throttleEntry tracks the failed login attempts for a single key (email).
 type throttleEntry struct {
 	failures    int
+	windowEnd   time.Time
 	lockedUntil time.Time
 }
 
@@ -57,17 +58,17 @@ func (lt *MemoryLoginThrottler) IsBlocked(key string) bool {
 	defer lt.mu.Unlock()
 
 	e, exists := lt.entries[key]
-	if !exists {
+	if !exists || e.lockedUntil.IsZero() {
 		return false
 	}
 
-	now := lt.now()
-
 	// If there's an active lockout, check if it has expired
-	if !e.lockedUntil.IsZero() && now.Before(e.lockedUntil) {
+	if lt.now().Before(e.lockedUntil) {
 		return true
 	}
 
+	// Lockout expired, reset the entry
+	delete(lt.entries, key)
 	return false
 }
 
@@ -79,21 +80,20 @@ func (lt *MemoryLoginThrottler) RecordFailure(key string) {
 
 	e, exists := lt.entries[key]
 	if !exists {
-		lt.entries[key] = &throttleEntry{failures: 1}
+		lt.entries[key] = &throttleEntry{failures: 1, windowEnd: lt.now().Add(lt.window)}
 		return
 	}
 
 	now := lt.now()
 
-	// If lockout expired, reset and count this as the first new failure
-	if !e.lockedUntil.IsZero() && now.After(e.lockedUntil) {
+	if e.windowEnd.Before(now) {
+		// Window expired, reset counter and start new window
 		e.failures = 1
-		e.lockedUntil = time.Time{}
+		e.windowEnd = now.Add(lt.window)
 		return
 	}
 
 	e.failures++
-
 	// If threshold reached, lock the account
 	if e.failures >= lt.maxAttempts {
 		e.lockedUntil = now.Add(lt.lockoutDuration)

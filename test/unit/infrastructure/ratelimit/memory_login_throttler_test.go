@@ -68,6 +68,36 @@ func TestThrottler_DifferentKeys_AreIndependent(t *testing.T) {
 }
 
 // =============================================================================
+// Window expiry — failures spread across windows should NOT accumulate
+// =============================================================================
+
+func TestThrottler_FailuresOutsideWindow_DoNotAccumulate(t *testing.T) {
+	// 3 max attempts, 50ms window — failures outside that window reset the counter
+	lt := ratelimit.NewMemoryLoginThrottler(3, 50*time.Millisecond, 15*time.Minute, 10*time.Minute)
+	defer lt.Stop()
+
+	lt.RecordFailure("juan@example.com")
+	lt.RecordFailure("juan@example.com")
+	// 2 failures → not blocked
+	assert.False(t, lt.IsBlocked("juan@example.com"))
+
+	// Wait for the window to expire
+	time.Sleep(60 * time.Millisecond)
+
+	// This failure starts a NEW window (counter resets to 1)
+	lt.RecordFailure("juan@example.com")
+	assert.False(t, lt.IsBlocked("juan@example.com"))
+
+	// Only 1 failure in the new window → still not blocked
+	lt.RecordFailure("juan@example.com")
+	assert.False(t, lt.IsBlocked("juan@example.com"))
+
+	// 3rd failure in the new window → NOW blocked
+	lt.RecordFailure("juan@example.com")
+	assert.True(t, lt.IsBlocked("juan@example.com"))
+}
+
+// =============================================================================
 // Reset
 // =============================================================================
 
