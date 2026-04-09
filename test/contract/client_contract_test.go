@@ -15,7 +15,7 @@ func TestContract_CreateClient_ValidBody_Returns201_WithClientResponse(t *testin
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Client Owner", "contract-client-create@example.com", "securepass123")
+	token := registerAndLogin(t, "Client Owner", "contract-client-create@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
 		"name": "Acme Corp",
@@ -28,7 +28,7 @@ func TestContract_CreateClient_MissingName_Returns400_WithErrorResponse(t *testi
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Client Owner", "contract-client-noname@example.com", "securepass123")
+	token := registerAndLogin(t, "Client Owner", "contract-client-noname@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{})
 
@@ -53,7 +53,7 @@ func TestContract_ListClients_Empty_Returns200_WithEmptyArray(t *testing.T) {
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "List Owner", "contract-client-list@example.com", "securepass123")
+	token := registerAndLogin(t, "List Owner", "contract-client-list@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 
@@ -64,7 +64,7 @@ func TestContract_ListClients_WithItems_Returns200_WithClientResponseArray(t *te
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "List Owner", "contract-client-listitems@example.com", "securepass123")
+	token := registerAndLogin(t, "List Owner", "contract-client-listitems@example.com", "securepass123").AccessToken
 
 	// Create two clients
 	r1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client A"})
@@ -94,7 +94,7 @@ func TestContract_GetClient_Existing_Returns200_WithClientResponse(t *testing.T)
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Get Owner", "contract-client-get@example.com", "securepass123")
+	token := registerAndLogin(t, "Get Owner", "contract-client-get@example.com", "securepass123").AccessToken
 
 	// Create a client to GET
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Get Client"})
@@ -111,13 +111,13 @@ func TestContract_GetClient_WrongUser_Returns403_WithErrorResponse(t *testing.T)
 	cv := newValidator(t)
 
 	// User A creates a client
-	tokenA := registerAndLogin(t, "Owner A", "contract-get-owner-a@example.com", "securepass123")
+	tokenA := registerAndLogin(t, "Owner A", "contract-get-owner-a@example.com", "securepass123").AccessToken
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), tokenA, map[string]string{"name": "A's Client"})
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 
 	// User B tries to read it
-	tokenB := registerAndLogin(t, "Other B", "contract-get-other-b@example.com", "securepass123")
+	tokenB := registerAndLogin(t, "Other B", "contract-get-other-b@example.com", "securepass123").AccessToken
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients/"+clientID), tokenB)
 
 	cv.ValidateResponse(resp, http.StatusForbidden)
@@ -127,7 +127,7 @@ func TestContract_GetClient_InvalidUUID_Returns400_WithErrorResponse(t *testing.
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Get Owner", "contract-client-baduuid@example.com", "securepass123")
+	token := registerAndLogin(t, "Get Owner", "contract-client-baduuid@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients/not-a-uuid"), token)
 
@@ -138,7 +138,7 @@ func TestContract_GetClient_NotFound_Returns404_WithErrorResponse(t *testing.T) 
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Get Owner", "contract-client-notfound@example.com", "securepass123")
+	token := registerAndLogin(t, "Get Owner", "contract-client-notfound@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients/550e8400-e29b-41d4-a716-446655440000"), token)
 
@@ -161,7 +161,7 @@ func TestContract_UpdateClient_ValidBody_Returns200_WithClientResponse(t *testin
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Update Owner", "contract-client-update@example.com", "securepass123")
+	token := registerAndLogin(t, "Update Owner", "contract-client-update@example.com", "securepass123").AccessToken
 
 	// Create a client to update
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Original"})
@@ -180,13 +180,13 @@ func TestContract_UpdateClient_WrongUser_Returns403_WithErrorResponse(t *testing
 	cv := newValidator(t)
 
 	// User A creates a client
-	tokenA := registerAndLogin(t, "Owner A", "contract-up-owner-a@example.com", "securepass123")
+	tokenA := registerAndLogin(t, "Owner A", "contract-up-owner-a@example.com", "securepass123").AccessToken
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), tokenA, map[string]string{"name": "A's Client"})
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 
 	// User B tries to update it
-	tokenB := registerAndLogin(t, "Other B", "contract-up-other-b@example.com", "securepass123")
+	tokenB := registerAndLogin(t, "Other B", "contract-up-other-b@example.com", "securepass123").AccessToken
 	resp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), tokenB, map[string]string{
 		"name": "Hijacked",
 	})
@@ -198,7 +198,7 @@ func TestContract_UpdateClient_NotFound_Returns404_WithErrorResponse(t *testing.
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Update Owner", "contract-client-upnotfound@example.com", "securepass123")
+	token := registerAndLogin(t, "Update Owner", "contract-client-upnotfound@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPutJSON(t, url("/users/me/clients/550e8400-e29b-41d4-a716-446655440000"), token, map[string]string{
 		"name": "Ghost",
@@ -211,7 +211,7 @@ func TestContract_UpdateClient_InvalidUUID_Returns400_WithErrorResponse(t *testi
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Update Owner", "contract-client-upbaduuid@example.com", "securepass123")
+	token := registerAndLogin(t, "Update Owner", "contract-client-upbaduuid@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPutJSON(t, url("/users/me/clients/not-a-uuid"), token, map[string]string{
 		"name": "Bad UUID",
@@ -238,7 +238,7 @@ func TestContract_DeleteClient_Existing_Returns204_NoBody(t *testing.T) {
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Delete Owner", "contract-client-delete@example.com", "securepass123")
+	token := registerAndLogin(t, "Delete Owner", "contract-client-delete@example.com", "securepass123").AccessToken
 
 	// Create a client to delete
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "To Delete"})
@@ -255,13 +255,13 @@ func TestContract_DeleteClient_WrongUser_Returns403_WithErrorResponse(t *testing
 	cv := newValidator(t)
 
 	// User A creates a client
-	tokenA := registerAndLogin(t, "Owner A", "contract-del-owner-a@example.com", "securepass123")
+	tokenA := registerAndLogin(t, "Owner A", "contract-del-owner-a@example.com", "securepass123").AccessToken
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), tokenA, map[string]string{"name": "A's Client"})
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 
 	// User B tries to delete it
-	tokenB := registerAndLogin(t, "Other B", "contract-del-other-b@example.com", "securepass123")
+	tokenB := registerAndLogin(t, "Other B", "contract-del-other-b@example.com", "securepass123").AccessToken
 	resp := helpers.AuthDeleteJSON(t, url("/users/me/clients/"+clientID), tokenB)
 
 	cv.ValidateResponse(resp, http.StatusForbidden)
@@ -271,7 +271,7 @@ func TestContract_DeleteClient_NotFound_Returns404_WithErrorResponse(t *testing.
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Delete Owner", "contract-client-delnotfound@example.com", "securepass123")
+	token := registerAndLogin(t, "Delete Owner", "contract-client-delnotfound@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthDeleteJSON(t, url("/users/me/clients/550e8400-e29b-41d4-a716-446655440000"), token)
 
@@ -282,7 +282,7 @@ func TestContract_DeleteClient_InvalidUUID_Returns400_WithErrorResponse(t *testi
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Delete Owner", "contract-client-delbaduuid@example.com", "securepass123")
+	token := registerAndLogin(t, "Delete Owner", "contract-client-delbaduuid@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthDeleteJSON(t, url("/users/me/clients/not-a-uuid"), token)
 

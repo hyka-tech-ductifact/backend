@@ -7,6 +7,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -110,30 +111,35 @@ func TestListClientsByUserID_ReturnsClients(t *testing.T) {
 		{ID: uuid.New(), Name: "Client 2", UserID: userID},
 	}
 	clientRepo := &mocks.MockClientRepository{
-		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID) ([]*entities.Client, error) {
-			return expected, nil
+		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+			return expected, 2, nil
 		},
 	}
 	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
 
-	clients, err := svc.ListClientsByUserID(context.Background(), userID)
+	pg, _ := pagination.NewPagination(1, 20)
+	result, err := svc.ListClientsByUserID(context.Background(), userID, pg)
 
 	require.NoError(t, err)
-	assert.Len(t, clients, 2)
+	assert.Len(t, result.Data, 2)
+	assert.Equal(t, int64(2), result.TotalItems)
+	assert.Equal(t, 1, result.TotalPages)
 }
 
 func TestListClientsByUserID_EmptyList(t *testing.T) {
 	clientRepo := &mocks.MockClientRepository{
-		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID) ([]*entities.Client, error) {
-			return []*entities.Client{}, nil
+		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+			return []*entities.Client{}, 0, nil
 		},
 	}
 	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
 
-	clients, err := svc.ListClientsByUserID(context.Background(), uuid.New())
+	pg, _ := pagination.NewPagination(1, 20)
+	result, err := svc.ListClientsByUserID(context.Background(), uuid.New(), pg)
 
 	require.NoError(t, err)
-	assert.Empty(t, clients)
+	assert.Empty(t, result.Data)
+	assert.Equal(t, int64(0), result.TotalItems)
 }
 
 // =============================================================================

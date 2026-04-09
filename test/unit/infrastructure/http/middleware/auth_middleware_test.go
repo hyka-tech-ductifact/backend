@@ -27,9 +27,15 @@ func init() {
 // The handler behind the middleware writes the userID from context into the response body,
 // so we can verify that the middleware set it correctly.
 func setupRouter(tokenProvider ports.TokenProvider) *gin.Engine {
+	blacklist := &mocks.MockTokenBlacklist{}
+	return setupRouterWithBlacklist(tokenProvider, blacklist)
+}
+
+// setupRouterWithBlacklist creates a test router with AuthMiddleware and a custom blacklist.
+func setupRouterWithBlacklist(tokenProvider ports.TokenProvider, blacklist ports.TokenBlacklist) *gin.Engine {
 	r := gin.New()
 
-	r.GET("/protected", middleware.AuthMiddleware(tokenProvider), func(c *gin.Context) {
+	r.GET("/protected", middleware.AuthMiddleware(tokenProvider, blacklist), func(c *gin.Context) {
 		userID := helpers.MustGetUserID(c)
 		if c.IsAborted() {
 			return
@@ -211,4 +217,35 @@ func TestMustGetUserID_WithWrongType_Returns401(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuthMiddleware_BlacklistedToken_Returns401(t *testing.T) {
+	// ARRANGE
+	userID := uuid.New()
+	mockProvider := &mocks.MockTokenProvider{
+		ValidateTokenFn: func(tokenString string) (*ports.TokenClaims, error) {
+			return &ports.TokenClaims{UserID: userID, Email: "juan@example.com"}, nil
+		},
+	}
+	blacklist := &mocks.MockTokenBlacklist{
+		IsBlacklistedFn: func(token string) bool {
+			return token == "revoked-access-token"
+		},
+	}
+
+	router := setupRouterWithBlacklist(mockProvider, blacklist)
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer revoked-access-token")
+	w := httptest.NewRecorder()
+
+	// ACT
+	router.ServeHTTP(w, req)
+
+	// ASSERT
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+	var body map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &body)
+	assert.Equal(t, "token has been revoked", body["error"])
 }

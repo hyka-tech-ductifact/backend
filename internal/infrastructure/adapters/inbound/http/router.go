@@ -26,12 +26,17 @@ func SetupRoutes(
 	clientService usecases.ClientService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
+	blacklist ports.TokenBlacklist,
+	ipLimiter ports.RateLimiter,
+	userLimiter ports.RateLimiter,
 	corsCfg config.CORS,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyInUse, http.StatusConflict, "email already in use")
 	helpers.RegisterDomainError(services.ErrInvalidCredentials, http.StatusUnauthorized, "invalid email or password")
+	helpers.RegisterDomainError(services.ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid or expired refresh token")
+	helpers.RegisterDomainError(services.ErrAccountLocked, http.StatusTooManyRequests, "account temporarily locked, please try again later")
 	helpers.RegisterDomainError(services.ErrClientNotFound, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(services.ErrClientNotOwned, http.StatusForbidden, "client does not belong to this user")
 	helpers.RegisterDomainError(entities.ErrEmptyUserName, http.StatusBadRequest, "user name cannot be empty")
@@ -53,10 +58,13 @@ func SetupRoutes(
 	// 3. Recovery: third, to catch panics from anything below
 	r.Use(middleware.RecoveryMiddleware())
 
-	// 4. Metrics: fourth, to record request count and latency
+	// 4. Security headers: fourth, so ALL responses include them (even errors)
+	r.Use(middleware.SecurityHeadersMiddleware())
+
+	// 5. Metrics: fifth, to record request count and latency
 	r.Use(middleware.MetricsMiddleware())
 
-	// 5. CORS: fifth, before any business logic
+	// 6. CORS: sixth, before any business logic
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     corsCfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -65,6 +73,9 @@ func SetupRoutes(
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	// 7. Rate limit by IP: seventh, applied globally to all routes
+	r.Use(middleware.IPRateLimitMiddleware(ipLimiter))
 
 	// --- Infrastructure routes (unversioned) ---
 
@@ -86,12 +97,20 @@ func SetupRoutes(
 	{
 		authRoutes.POST("/register", authHandler.Register)
 		authRoutes.POST("/login", authHandler.Login)
+		authRoutes.POST("/refresh", authHandler.Refresh)
 	}
 
 	// --- Protected routes (auth required) ---
 
 	protected := v1.Group("")
-	protected.Use(middleware.AuthMiddleware(tokenProvider))
+	protected.Use(middleware.AuthMiddleware(tokenProvider, blacklist))
+	protected.Use(middleware.UserRateLimitMiddleware(userLimiter))
+
+	// Auth routes that require authentication
+	protectedAuth := protected.Group("/auth")
+	{
+		protectedAuth.POST("/logout", authHandler.Logout)
+	}
 
 	// User routes — userID comes from the JWT token, not the URL
 	userHandler := NewUserHandler(userService)

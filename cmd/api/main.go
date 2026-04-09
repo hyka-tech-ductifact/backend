@@ -15,6 +15,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/internal/infrastructure/auth"
 	"ductifact/internal/infrastructure/logging"
+	"ductifact/internal/infrastructure/ratelimit"
 
 	"github.com/joho/godotenv"
 )
@@ -47,13 +48,40 @@ func main() {
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
-	authService := services.NewAuthService(userRepo, tokenProvider)
+	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
+	defer blacklist.Stop()
+
+	// --- Login throttler ---
+	loginThrottler := ratelimit.NewMemoryLoginThrottler(
+		cfg.LoginThrottle.MaxAttempts,
+		cfg.LoginThrottle.Window,
+		cfg.LoginThrottle.LockoutDuration,
+		1*time.Minute,
+	)
+	defer loginThrottler.Stop()
+
+	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
+	// --- Rate limiters ---
+	ipLimiter := ratelimit.NewMemoryRateLimiter(
+		cfg.RateLimit.IPMaxRequests,
+		cfg.RateLimit.IPWindow,
+		1*time.Minute,
+	)
+	defer ipLimiter.Stop()
+
+	userLimiter := ratelimit.NewMemoryRateLimiter(
+		cfg.RateLimit.UserMaxRequests,
+		cfg.RateLimit.UserWindow,
+		1*time.Minute,
+	)
+	defer userLimiter.Stop()
+
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, cfg.CORS)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

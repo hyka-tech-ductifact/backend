@@ -12,17 +12,20 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Config holds all application configuration, grouped by concern.
 type Config struct {
-	App      App
-	Database Database
-	JWT      JWT
-	Log      Log
-	CORS     CORS
+	App           App
+	Database      Database
+	JWT           JWT
+	Log           Log
+	CORS          CORS
+	RateLimit     RateLimit
+	LoginThrottle LoginThrottle
 }
 
 // App holds general application settings.
@@ -50,8 +53,9 @@ func (d Database) DSN() string {
 
 // JWT holds authentication token settings.
 type JWT struct {
-	Secret        string        // HMAC signing key
-	TokenDuration time.Duration // How long tokens remain valid
+	Secret               string        // HMAC signing key
+	TokenDuration        time.Duration // How long access tokens remain valid
+	RefreshTokenDuration time.Duration // How long refresh tokens remain valid
 }
 
 // Log holds logging configuration.
@@ -65,13 +69,28 @@ type CORS struct {
 	AllowedOrigins []string
 }
 
+// RateLimit holds rate limiting configuration.
+type RateLimit struct {
+	IPMaxRequests   int           // Max requests per IP per window
+	IPWindow        time.Duration // Time window for IP rate limiting
+	UserMaxRequests int           // Max requests per authenticated user per window
+	UserWindow      time.Duration // Time window for user rate limiting
+}
+
+// LoginThrottle holds brute-force protection configuration.
+type LoginThrottle struct {
+	MaxAttempts     int           // Max failed login attempts before lockout
+	Window          time.Duration // Time window for counting failures
+	LockoutDuration time.Duration // How long to lock the account after max failures
+}
+
 // Load reads all configuration from environment variables.
 // Required variables panic if missing — call this at startup
 // before any other initialization.
 func Load() Config {
 	return Config{
 		App: App{
-			Host: optional("APP_HOST", "localhost"),
+			Host: required("APP_HOST"),
 			Port: required("APP_PORT"),
 		},
 		Database: Database{
@@ -82,15 +101,27 @@ func Load() Config {
 			Name:     required("DB_NAME"),
 		},
 		JWT: JWT{
-			Secret:        required("JWT_SECRET"),
-			TokenDuration: parseDuration(optional("JWT_TOKEN_DURATION", "24h")),
+			Secret:               required("JWT_SECRET"),
+			TokenDuration:        parseDuration(required("JWT_TOKEN_DURATION")),
+			RefreshTokenDuration: parseDuration(required("JWT_REFRESH_TOKEN_DURATION")),
 		},
 		Log: Log{
-			Level:  optional("LOG_LEVEL", "info"),
-			Format: optional("LOG_FORMAT", "text"),
+			Level:  required("LOG_LEVEL"),
+			Format: required("LOG_FORMAT"),
 		},
 		CORS: CORS{
 			AllowedOrigins: parseList(required("CORS_ORIGINS")),
+		},
+		RateLimit: RateLimit{
+			IPMaxRequests:   parseInt(required("RATE_LIMIT_IP_MAX")),
+			IPWindow:        parseDuration(required("RATE_LIMIT_IP_WINDOW")),
+			UserMaxRequests: parseInt(required("RATE_LIMIT_USER_MAX")),
+			UserWindow:      parseDuration(required("RATE_LIMIT_USER_WINDOW")),
+		},
+		LoginThrottle: LoginThrottle{
+			MaxAttempts:     parseInt(required("LOGIN_THROTTLE_MAX_ATTEMPTS")),
+			Window:          parseDuration(required("LOGIN_THROTTLE_WINDOW")),
+			LockoutDuration: parseDuration(required("LOGIN_THROTTLE_LOCKOUT")),
 		},
 	}
 }
@@ -104,14 +135,6 @@ func required(key string) string {
 		panic(fmt.Sprintf("required environment variable %s is not set", key))
 	}
 	return v
-}
-
-// optional reads an environment variable, returning defaultValue if empty or unset.
-func optional(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultValue
 }
 
 // parseList splits a comma-separated string into a trimmed slice.
@@ -134,4 +157,14 @@ func parseDuration(s string) time.Duration {
 		panic(fmt.Sprintf("invalid duration %q: %v", s, err))
 	}
 	return d
+}
+
+// parseInt parses a string as an integer.
+// Panics if the format is invalid — this is a configuration error.
+func parseInt(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		panic(fmt.Sprintf("invalid integer %q: %v", s, err))
+	}
+	return n
 }

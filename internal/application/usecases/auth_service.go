@@ -3,11 +3,14 @@ package usecases
 import (
 	"context"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/domain/entities"
 )
 
 // AuthService is the inbound port for authentication operations.
 type AuthService interface {
-	Register(ctx context.Context, name, email, password string) (*entities.User, string, error)
-	Login(ctx context.Context, email, password string) (*entities.User, string, error)
+	Register(ctx context.Context, name, email, password string) (*entities.User, *ports.TokenPair, error)
+	Login(ctx context.Context, email, password string) (*entities.User, *ports.TokenPair, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*ports.TokenPair, error)
+	Logout(ctx context.Context, accessToken, refreshToken string) error
 }

@@ -13,8 +13,9 @@ import (
 )
 
 var testJWTConfig = config.JWT{
-	Secret:        "test-secret-key-at-least-32-chars!!",
-	TokenDuration: 24 * time.Hour,
+	Secret:               "test-secret-key-at-least-32-chars!!",
+	TokenDuration:        15 * time.Minute,
+	RefreshTokenDuration: 7 * 24 * time.Hour,
 }
 
 // helper creates a JWTProvider with a test secret.
@@ -40,57 +41,81 @@ func TestNewJWTProvider_WithSecret_DoesNotPanic(t *testing.T) {
 }
 
 // =============================================================================
-// GenerateToken
+// GenerateTokenPair
 // =============================================================================
 
-func TestGenerateToken_ReturnsNonEmptyString(t *testing.T) {
+func TestGenerateTokenPair_ReturnsBothTokens(t *testing.T) {
 	provider := newTestProvider(t)
 
-	token, err := provider.GenerateToken(uuid.New(), "juan@example.com")
+	pair, err := provider.GenerateTokenPair(uuid.New(), "juan@example.com")
 
 	require.NoError(t, err)
-	assert.NotEmpty(t, token)
+	assert.NotEmpty(t, pair.AccessToken)
+	assert.NotEmpty(t, pair.RefreshToken)
+	assert.NotEqual(t, pair.AccessToken, pair.RefreshToken)
 }
 
-func TestGenerateToken_DifferentUsersGetDifferentTokens(t *testing.T) {
+func TestGenerateTokenPair_DifferentUsersGetDifferentTokens(t *testing.T) {
 	provider := newTestProvider(t)
 
-	token1, _ := provider.GenerateToken(uuid.New(), "juan@example.com")
-	token2, _ := provider.GenerateToken(uuid.New(), "pedro@example.com")
+	pair1, _ := provider.GenerateTokenPair(uuid.New(), "juan@example.com")
+	pair2, _ := provider.GenerateTokenPair(uuid.New(), "pedro@example.com")
 
-	assert.NotEqual(t, token1, token2)
+	assert.NotEqual(t, pair1.AccessToken, pair2.AccessToken)
+	assert.NotEqual(t, pair1.RefreshToken, pair2.RefreshToken)
 }
 
 // =============================================================================
-// ValidateToken
+// ValidateToken (access tokens only)
 // =============================================================================
 
-func TestValidateToken_WithValidToken_ReturnsClaims(t *testing.T) {
+func TestValidateToken_WithValidAccessToken_ReturnsClaims(t *testing.T) {
 	provider := newTestProvider(t)
 	userID := uuid.New()
 	email := "juan@example.com"
 
-	token, err := provider.GenerateToken(userID, email)
+	pair, err := provider.GenerateTokenPair(userID, email)
 	require.NoError(t, err)
 
-	claims, err := provider.ValidateToken(token)
+	claims, err := provider.ValidateToken(pair.AccessToken)
 
 	require.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, email, claims.Email)
 }
 
+func TestValidateToken_WithRefreshToken_ReturnsError(t *testing.T) {
+	provider := newTestProvider(t)
+
+	pair, err := provider.GenerateTokenPair(uuid.New(), "juan@example.com")
+	require.NoError(t, err)
+
+	// A refresh token must NOT be accepted as an access token
+	claims, err := provider.ValidateToken(pair.RefreshToken)
+
+	assert.Nil(t, claims)
+	assert.ErrorIs(t, err, auth.ErrInvalidToken)
+}
+
 func TestValidateToken_WithInvalidSignature_ReturnsError(t *testing.T) {
 	// Generate with one secret
-	provider1 := auth.NewJWTProvider(config.JWT{Secret: "secret-key-one-at-least-32-chars!"})
+	provider1 := auth.NewJWTProvider(config.JWT{
+		Secret:               "secret-key-one-at-least-32-chars!",
+		TokenDuration:        15 * time.Minute,
+		RefreshTokenDuration: 168 * time.Hour,
+	})
 
-	token, err := provider1.GenerateToken(uuid.New(), "juan@example.com")
+	pair, err := provider1.GenerateTokenPair(uuid.New(), "juan@example.com")
 	require.NoError(t, err)
 
 	// Validate with a different secret
-	provider2 := auth.NewJWTProvider(config.JWT{Secret: "secret-key-two-at-least-32-chars!"})
+	provider2 := auth.NewJWTProvider(config.JWT{
+		Secret:               "secret-key-two-at-least-32-chars!",
+		TokenDuration:        15 * time.Minute,
+		RefreshTokenDuration: 168 * time.Hour,
+	})
 
-	claims, err := provider2.ValidateToken(token)
+	claims, err := provider2.ValidateToken(pair.AccessToken)
 
 	assert.Nil(t, claims)
 	assert.ErrorIs(t, err, auth.ErrInvalidToken)
@@ -117,10 +142,10 @@ func TestValidateToken_WithEmptyString_ReturnsError(t *testing.T) {
 func TestValidateToken_WithTamperedPayload_ReturnsError(t *testing.T) {
 	provider := newTestProvider(t)
 
-	token, err := provider.GenerateToken(uuid.New(), "juan@example.com")
+	pair, err := provider.GenerateTokenPair(uuid.New(), "juan@example.com")
 	require.NoError(t, err)
 
-	tampered := token[:len(token)-5] + "XXXXX"
+	tampered := pair.AccessToken[:len(pair.AccessToken)-5] + "XXXXX"
 
 	claims, err := provider.ValidateToken(tampered)
 
@@ -129,7 +154,48 @@ func TestValidateToken_WithTamperedPayload_ReturnsError(t *testing.T) {
 }
 
 // =============================================================================
-// Round-trip: Generate → Validate
+// ValidateRefreshToken
+// =============================================================================
+
+func TestValidateRefreshToken_WithValidRefreshToken_ReturnsClaims(t *testing.T) {
+	provider := newTestProvider(t)
+	userID := uuid.New()
+	email := "juan@example.com"
+
+	pair, err := provider.GenerateTokenPair(userID, email)
+	require.NoError(t, err)
+
+	claims, err := provider.ValidateRefreshToken(pair.RefreshToken)
+
+	require.NoError(t, err)
+	assert.Equal(t, userID, claims.UserID)
+	assert.Equal(t, email, claims.Email)
+}
+
+func TestValidateRefreshToken_WithAccessToken_ReturnsError(t *testing.T) {
+	provider := newTestProvider(t)
+
+	pair, err := provider.GenerateTokenPair(uuid.New(), "juan@example.com")
+	require.NoError(t, err)
+
+	// An access token must NOT be accepted as a refresh token
+	claims, err := provider.ValidateRefreshToken(pair.AccessToken)
+
+	assert.Nil(t, claims)
+	assert.ErrorIs(t, err, auth.ErrInvalidRefreshToken)
+}
+
+func TestValidateRefreshToken_WithGarbageString_ReturnsError(t *testing.T) {
+	provider := newTestProvider(t)
+
+	claims, err := provider.ValidateRefreshToken("this-is-not-a-jwt")
+
+	assert.Nil(t, claims)
+	assert.ErrorIs(t, err, auth.ErrInvalidRefreshToken)
+}
+
+// =============================================================================
+// Round-trip: GenerateTokenPair → Validate
 // =============================================================================
 
 func TestRoundTrip_GenerateAndValidate_PreservesUserData(t *testing.T) {
@@ -138,12 +204,18 @@ func TestRoundTrip_GenerateAndValidate_PreservesUserData(t *testing.T) {
 	userID := uuid.New()
 	email := "maria@example.com"
 
-	token, err := provider.GenerateToken(userID, email)
+	pair, err := provider.GenerateTokenPair(userID, email)
 	require.NoError(t, err)
 
-	claims, err := provider.ValidateToken(token)
+	// Access token round-trip
+	accessClaims, err := provider.ValidateToken(pair.AccessToken)
 	require.NoError(t, err)
+	assert.Equal(t, userID, accessClaims.UserID)
+	assert.Equal(t, email, accessClaims.Email)
 
-	assert.Equal(t, userID, claims.UserID)
-	assert.Equal(t, email, claims.Email)
+	// Refresh token round-trip
+	refreshClaims, err := provider.ValidateRefreshToken(pair.RefreshToken)
+	require.NoError(t, err)
+	assert.Equal(t, userID, refreshClaims.UserID)
+	assert.Equal(t, email, refreshClaims.Email)
 }

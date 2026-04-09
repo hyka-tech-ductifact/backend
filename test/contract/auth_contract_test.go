@@ -205,3 +205,79 @@ func TestContract_Login_EmptyBody_Returns400_WithErrorResponse(t *testing.T) {
 
 	cv.ValidateResponse(resp, http.StatusBadRequest)
 }
+
+// ═══════════════════════════════════════════════════════════════
+// POST /auth/refresh
+// ═══════════════════════════════════════════════════════════════
+
+func TestContract_Refresh_ValidToken_Returns200_WithTokenResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	tokens := registerAndLogin(t, "Refresh User", "contract-refresh@example.com", "securepass123")
+
+	resp := helpers.PostJSON(t, url("/auth/refresh"), map[string]string{
+		"refresh_token": tokens.RefreshToken,
+	})
+
+	cv.ValidateResponse(resp, http.StatusOK)
+}
+
+func TestContract_Refresh_MissingToken_Returns400_WithErrorResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	resp := helpers.PostJSON(t, url("/auth/refresh"), map[string]string{})
+
+	cv.ValidateResponse(resp, http.StatusBadRequest)
+}
+
+func TestContract_Refresh_InvalidToken_Returns401_WithErrorResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	resp := helpers.PostJSON(t, url("/auth/refresh"), map[string]string{
+		"refresh_token": "invalid-token",
+	})
+
+	cv.ValidateResponse(resp, http.StatusUnauthorized)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POST /auth/logout
+// ═══════════════════════════════════════════════════════════════
+
+func TestContract_Logout_ValidTokens_Returns200_WithMessageResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	tokens := registerAndLogin(t, "Logout User", "contract-logout@example.com", "securepass123")
+
+	resp := helpers.AuthPostJSON(t, url("/auth/logout"), tokens.AccessToken, map[string]string{
+		"refresh_token": tokens.RefreshToken,
+	})
+
+	cv.ValidateResponse(resp, http.StatusOK)
+}
+
+func TestContract_Logout_MissingRefreshToken_Returns400_WithErrorResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	tokens := registerAndLogin(t, "Logout User", "contract-logout400@example.com", "securepass123")
+
+	resp := helpers.AuthPostJSON(t, url("/auth/logout"), tokens.AccessToken, map[string]string{})
+
+	cv.ValidateResponse(resp, http.StatusBadRequest)
+}
+
+func TestContract_Logout_NoToken_Returns401_WithErrorResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	resp := helpers.PostJSON(t, url("/auth/logout"), map[string]string{
+		"refresh_token": "some-token",
+	})
+
+	cv.ValidateResponse(resp, http.StatusUnauthorized)
+}

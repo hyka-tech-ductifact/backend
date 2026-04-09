@@ -33,7 +33,7 @@ func registerUser(t *testing.T, name, email, password string) (string, string) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	user := body["user"].(map[string]any)
-	return user["id"].(string), body["token"].(string)
+	return user["id"].(string), body["access_token"].(string)
 }
 
 // ─── Get User (via /users/me) ────────────────────────────────────────────────
