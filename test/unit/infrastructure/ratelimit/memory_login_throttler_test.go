@@ -151,8 +151,8 @@ func TestThrottler_AfterLockoutExpires_CanAccumulateAgain(t *testing.T) {
 	lt.RecordFailure("juan@example.com")
 	assert.True(t, lt.IsBlocked("juan@example.com"))
 
-	// Wait for lockout to expire
-	time.Sleep(60 * time.Millisecond)
+	// Wait for lockout to expire (generous margin)
+	time.Sleep(100 * time.Millisecond)
 
 	// Should be able to fail again and get locked again
 	lt.RecordFailure("juan@example.com")

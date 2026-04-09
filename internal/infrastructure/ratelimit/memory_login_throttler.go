@@ -85,11 +85,12 @@ func (lt *MemoryLoginThrottler) RecordFailure(key string) {
 	}
 
 	now := lt.now()
-
-	if e.windowEnd.Before(now) {
-		// Window expired, reset counter and start new window
+	isUnlocked := !e.lockedUntil.IsZero() && now.After(e.lockedUntil)
+	if isUnlocked || now.After(e.windowEnd) {
+		// if lockout or Window expired, reset counter and start fresh
 		e.failures = 1
 		e.windowEnd = now.Add(lt.window)
+		e.lockedUntil = time.Time{}
 		return
 	}
 
