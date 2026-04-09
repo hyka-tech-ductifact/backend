@@ -656,7 +656,8 @@ func TestLogin_WhenBlocked_DoesNotQueryDatabase(t *testing.T) {
 
 	svc := newTestAuthServiceWithThrottler(mockRepo, mockToken, throttler)
 
-	svc.Login(context.Background(), "juan@example.com", "any-password")
+	_, _, err := svc.Login(context.Background(), "juan@example.com", "any-password")
+	require.Error(t, err)
 
 	assert.False(t, dbQueried, "should not query DB when account is blocked")
 }
