@@ -102,9 +102,15 @@ func newValidator(t *testing.T) *contract.ContractValidator {
 	return contract.NewContractValidator(t, specPath, env.baseURL, env.tracker)
 }
 
-// registerAndLogin creates a user via /auth/register and returns the JWT token.
-// This is a test helper — it does NOT validate the contract, just obtains a token.
-func registerAndLogin(t *testing.T, name, email, password string) string {
+// authTokens holds both access and refresh tokens returned by register/login.
+type authTokens struct {
+	AccessToken  string
+	RefreshToken string
+}
+
+// registerAndLogin creates a user via /auth/register and returns both tokens.
+// This is a test helper — it does NOT validate the contract, just obtains tokens.
+func registerAndLogin(t *testing.T, name, email, password string) authTokens {
 	t.Helper()
 
 	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
@@ -114,9 +120,13 @@ func registerAndLogin(t *testing.T, name, email, password string) string {
 	})
 
 	body := helpers.ParseBody(t, resp)
-	token, ok := body["access_token"].(string)
-	if !ok || token == "" {
+	access, ok := body["access_token"].(string)
+	if !ok || access == "" {
 		t.Fatalf("registerAndLogin: expected access_token in response, got: %v", body)
 	}
-	return token
+	refresh, ok := body["refresh_token"].(string)
+	if !ok || refresh == "" {
+		t.Fatalf("registerAndLogin: expected refresh_token in response, got: %v", body)
+	}
+	return authTokens{AccessToken: access, RefreshToken: refresh}
 }

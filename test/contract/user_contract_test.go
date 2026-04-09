@@ -15,7 +15,7 @@ func TestContract_GetMe_Authenticated_Returns200_WithUserResponse(t *testing.T) 
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Me User", "contract-getme@example.com", "securepass123")
+	token := registerAndLogin(t, "Me User", "contract-getme@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthGetJSON(t, url("/users/me"), token)
 
@@ -46,7 +46,7 @@ func TestContract_UpdateMe_ValidBody_Returns200_WithUserResponse(t *testing.T) {
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Update User", "contract-update@example.com", "securepass123")
+	token := registerAndLogin(t, "Update User", "contract-update@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{
 		"name": "Updated Name",
@@ -69,7 +69,7 @@ func TestContract_UpdateMe_InvalidEmail_Returns400_WithErrorResponse(t *testing.
 	clean(t)
 	cv := newValidator(t)
 
-	token := registerAndLogin(t, "Update User", "contract-update400@example.com", "securepass123")
+	token := registerAndLogin(t, "Update User", "contract-update400@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{
 		"email": "not-an-email",
@@ -84,7 +84,7 @@ func TestContract_UpdateMe_DuplicateEmail_Returns409_WithErrorResponse(t *testin
 
 	// Create two users
 	registerAndLogin(t, "First User", "contract-first@example.com", "securepass123")
-	token := registerAndLogin(t, "Second User", "contract-second@example.com", "securepass123")
+	token := registerAndLogin(t, "Second User", "contract-second@example.com", "securepass123").AccessToken
 
 	// Try to update second user's email to first user's email
 	resp := helpers.AuthPutJSON(t, url("/users/me"), token, map[string]string{

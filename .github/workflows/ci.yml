@@ -34,6 +34,13 @@ env:
   CORS_ORIGINS: "*"
   LOG_LEVEL: error
   LOG_FORMAT: text
+  RATE_LIMIT_IP_MAX: "10000"
+  RATE_LIMIT_IP_WINDOW: "1m"
+  RATE_LIMIT_USER_MAX: "10000"
+  RATE_LIMIT_USER_WINDOW: "1m"
+  LOGIN_THROTTLE_MAX_ATTEMPTS: "100"
+  LOGIN_THROTTLE_WINDOW: "1m"
+  LOGIN_THROTTLE_LOCKOUT: "1m"
 
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:

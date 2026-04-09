@@ -81,8 +81,8 @@ func TestE2E_ListClients_Success(t *testing.T) {
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var clients []map[string]any
-	helpers.ParseBodyArray(t, resp, &clients)
+	body := helpers.ParseBody(t, resp)
+	clients := body["data"].([]any)
 	assert.Len(t, clients, 2)
 }
 
@@ -93,8 +93,8 @@ func TestE2E_ListClients_Empty(t *testing.T) {
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var clients []map[string]any
-	helpers.ParseBodyArray(t, resp, &clients)
+	body := helpers.ParseBody(t, resp)
+	clients := body["data"].([]any)
 	assert.Empty(t, clients)
 }
 
@@ -116,10 +116,10 @@ func TestE2E_ListClients_DoesNotReturnOtherUsersClients(t *testing.T) {
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token1)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var clients []map[string]any
-	helpers.ParseBodyArray(t, resp, &clients)
+	body := helpers.ParseBody(t, resp)
+	clients := body["data"].([]any)
 	assert.Len(t, clients, 1)
-	assert.Equal(t, user1ID, clients[0]["user_id"])
+	assert.Equal(t, user1ID, clients[0].(map[string]any)["user_id"])
 }
 
 // ─── Get Client ──────────────────────────────────────────────────────────────
@@ -296,10 +296,10 @@ func TestE2E_Client_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	// 4. List — should have 1 client
 	listResp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 	assert.Equal(t, http.StatusOK, listResp.StatusCode)
-	var clients []map[string]any
-	helpers.ParseBodyArray(t, listResp, &clients)
+	listBody := helpers.ParseBody(t, listResp)
+	clients := listBody["data"].([]any)
 	assert.Len(t, clients, 1)
-	assert.Equal(t, "Acme Inc", clients[0]["name"])
+	assert.Equal(t, "Acme Inc", clients[0].(map[string]any)["name"])
 
 	// 5. Delete
 	deleteResp := helpers.AuthDeleteJSON(t, url("/users/me/clients/"+clientID), token)
@@ -308,7 +308,7 @@ func TestE2E_Client_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	// 6. List — should be empty now
 	listResp2 := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
 	assert.Equal(t, http.StatusOK, listResp2.StatusCode)
-	var clientsAfter []map[string]any
-	helpers.ParseBodyArray(t, listResp2, &clientsAfter)
+	listBody2 := helpers.ParseBody(t, listResp2)
+	clientsAfter := listBody2["data"].([]any)
 	assert.Empty(t, clientsAfter)
 }
