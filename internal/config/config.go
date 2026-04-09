@@ -90,7 +90,7 @@ type LoginThrottle struct {
 func Load() Config {
 	return Config{
 		App: App{
-			Host: optional("APP_HOST", "localhost"),
+			Host: required("APP_HOST"),
 			Port: required("APP_PORT"),
 		},
 		Database: Database{
@@ -102,26 +102,26 @@ func Load() Config {
 		},
 		JWT: JWT{
 			Secret:               required("JWT_SECRET"),
-			TokenDuration:        parseDuration(optional("JWT_TOKEN_DURATION", "15m")),
-			RefreshTokenDuration: parseDuration(optional("JWT_REFRESH_TOKEN_DURATION", "168h")),
+			TokenDuration:        parseDuration(required("JWT_TOKEN_DURATION")),
+			RefreshTokenDuration: parseDuration(required("JWT_REFRESH_TOKEN_DURATION")),
 		},
 		Log: Log{
-			Level:  optional("LOG_LEVEL", "info"),
-			Format: optional("LOG_FORMAT", "text"),
+			Level:  required("LOG_LEVEL"),
+			Format: required("LOG_FORMAT"),
 		},
 		CORS: CORS{
 			AllowedOrigins: parseList(required("CORS_ORIGINS")),
 		},
 		RateLimit: RateLimit{
-			IPMaxRequests:   parseInt(optional("RATE_LIMIT_IP_MAX", "100")),
-			IPWindow:        parseDuration(optional("RATE_LIMIT_IP_WINDOW", "1m")),
-			UserMaxRequests: parseInt(optional("RATE_LIMIT_USER_MAX", "60")),
-			UserWindow:      parseDuration(optional("RATE_LIMIT_USER_WINDOW", "1m")),
+			IPMaxRequests:   parseInt(required("RATE_LIMIT_IP_MAX")),
+			IPWindow:        parseDuration(required("RATE_LIMIT_IP_WINDOW")),
+			UserMaxRequests: parseInt(required("RATE_LIMIT_USER_MAX")),
+			UserWindow:      parseDuration(required("RATE_LIMIT_USER_WINDOW")),
 		},
 		LoginThrottle: LoginThrottle{
-			MaxAttempts:     parseInt(optional("LOGIN_THROTTLE_MAX_ATTEMPTS", "10")),
-			Window:          parseDuration(optional("LOGIN_THROTTLE_WINDOW", "15m")),
-			LockoutDuration: parseDuration(optional("LOGIN_THROTTLE_LOCKOUT", "15m")),
+			MaxAttempts:     parseInt(required("LOGIN_THROTTLE_MAX_ATTEMPTS")),
+			Window:          parseDuration(required("LOGIN_THROTTLE_WINDOW")),
+			LockoutDuration: parseDuration(required("LOGIN_THROTTLE_LOCKOUT")),
 		},
 	}
 }
@@ -135,14 +135,6 @@ func required(key string) string {
 		panic(fmt.Sprintf("required environment variable %s is not set", key))
 	}
 	return v
-}
-
-// optional reads an environment variable, returning defaultValue if empty or unset.
-func optional(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultValue
 }
 
 // parseList splits a comma-separated string into a trimmed slice.
