@@ -2,9 +2,11 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +27,14 @@ type ClientResponse struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	UserID string `json:"user_id"`
+}
+
+type ListClientResponse struct {
+	Data       []*ClientResponse `json:"data"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+	TotalItems int64             `json:"total_items"`
+	TotalPages int               `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -59,25 +69,45 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 	c.JSON(http.StatusCreated, toClientResponse(client))
 }
 
-// ListClients handles GET /users/me/clients
+// ListClients handles GET /users/me/clients?page=1&page_size=20
 func (h *ClientHandler) ListClients(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
 		return
 	}
 
-	clients, err := h.clientService.ListClientsByUserID(c.Request.Context(), userID)
+	pg, err := parsePagination(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.clientService.ListClientsByUserID(c.Request.Context(), userID, pg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	response := make([]*ClientResponse, len(clients))
-	for i, client := range clients {
+	response := make([]*ClientResponse, len(result.Data))
+	for i, client := range result.Data {
 		response[i] = toClientResponse(client)
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, &ListClientResponse{
+		Data:       response,
+		Page:       result.Page,
+		PageSize:   result.PageSize,
+		TotalItems: result.TotalItems,
+		TotalPages: result.TotalPages,
+	})
+}
+
+// parsePagination extracts page and page_size from query params
+// and returns a validation error if values are out of range.
+func parsePagination(c *gin.Context) (pagination.Pagination, error) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	return pagination.NewPagination(page, pageSize)
 }
 
 // GetClient handles GET /users/me/clients/:client_id

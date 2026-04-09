@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 
 	"github.com/google/uuid"
 )
@@ -13,7 +14,7 @@ import (
 type ClientService interface {
 	CreateClient(ctx context.Context, name string, userID uuid.UUID) (*entities.Client, error)
 	GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error)
-	ListClientsByUserID(ctx context.Context, userID uuid.UUID) ([]*entities.Client, error)
+	ListClientsByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Client], error)
 	UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, name *string) (*entities.Client, error)
 	DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 }

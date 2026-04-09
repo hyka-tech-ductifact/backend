@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -58,17 +59,31 @@ func (r *PostgresClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 	return toClientEntity(&model), nil
 }
 
-func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]*entities.Client, error) {
+func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+	var totalItems int64
+
+	// Count total matching rows (before pagination)
+	if err := r.db.WithContext(ctx).Model(&ClientModel{}).Where("user_id = ?", userID).Count(&totalItems).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch the requested page
 	var models []ClientModel
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Find(&models).Error; err != nil {
-		return nil, err
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Offset((pg.Page - 1) * pg.PageSize).
+		Limit(pg.PageSize).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
 	}
 
 	clients := make([]*entities.Client, len(models))
 	for i := range models {
 		clients[i] = toClientEntity(&models[i])
 	}
-	return clients, nil
+	return clients, totalItems, nil
 }
 
 func (r *PostgresClientRepository) Update(ctx context.Context, client *entities.Client) error {

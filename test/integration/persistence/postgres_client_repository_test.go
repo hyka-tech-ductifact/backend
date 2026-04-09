@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -69,9 +70,11 @@ func TestPostgresClientRepository_ListByUserID(t *testing.T) {
 	require.NoError(t, clientRepo.Create(ctx, client1))
 	require.NoError(t, clientRepo.Create(ctx, client2))
 
-	clients, err := clientRepo.ListByUserID(ctx, user.ID)
+	pg, _ := pagination.NewPagination(1, 20)
+	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, pg)
 	require.NoError(t, err)
 	assert.Len(t, clients, 2)
+	assert.Equal(t, int64(2), total)
 }
 
 func TestPostgresClientRepository_ListByUserID_Empty(t *testing.T) {
@@ -80,9 +83,11 @@ func TestPostgresClientRepository_ListByUserID_Empty(t *testing.T) {
 
 	user := createTestUser(t, userRepo)
 
-	clients, err := clientRepo.ListByUserID(ctx, user.ID)
+	pg, _ := pagination.NewPagination(1, 20)
+	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, pg)
 	require.NoError(t, err)
 	assert.Empty(t, clients)
+	assert.Equal(t, int64(0), total)
 }
 
 func TestPostgresClientRepository_ListByUserID_DoesNotReturnOtherUsersClients(t *testing.T) {
@@ -98,13 +103,14 @@ func TestPostgresClientRepository_ListByUserID_DoesNotReturnOtherUsersClients(t 
 	require.NoError(t, clientRepo.Create(ctx, clientB))
 
 	// User 1 should only see their own client
-	clients1, err := clientRepo.ListByUserID(ctx, user1.ID)
+	pg, _ := pagination.NewPagination(1, 20)
+	clients1, _, err := clientRepo.ListByUserID(ctx, user1.ID, pg)
 	require.NoError(t, err)
 	assert.Len(t, clients1, 1)
 	assert.Equal(t, user1.ID, clients1[0].UserID)
 
 	// User 2 should only see their own client
-	clients2, err := clientRepo.ListByUserID(ctx, user2.ID)
+	clients2, _, err := clientRepo.ListByUserID(ctx, user2.ID, pg)
 	require.NoError(t, err)
 	assert.Len(t, clients2, 1)
 	assert.Equal(t, user2.ID, clients2[0].UserID)

@@ -143,7 +143,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 13.1 | Pagination on list endpoints | ⬜ | 🔴 Now |
+| 13.1 | Pagination on list endpoints | ✅ | — |
 | 13.2 | Filtering and sorting (query params) | ⬜ | 🟡 Soon |
 | 13.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🔵 Later |
 | 13.4 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
@@ -215,7 +215,7 @@ Business Features          ░░░░░░░░░░░░░░░░░�
 Resilience                 ░░░░░░░░░░░░░░░░░░░░  0/5
 ```
 
-> **Total progress**: 56/86 tasks completed (~65%)
+> **Total progress**: 57/86 tasks completed (~66%)
 > **Recommendation**: Sections 10 (Security) and 11 (Database) have the highest immediate impact.
 
 ### Priority Legend

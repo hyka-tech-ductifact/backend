@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -85,9 +86,14 @@ func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID 
 	return s.getOwnedClient(ctx, id, userID)
 }
 
-// ListClientsByUserID retrieves all clients belonging to a user.
-func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUID) ([]*entities.Client, error) {
-	return s.clientRepo.ListByUserID(ctx, userID)
+// ListClientsByUserID retrieves a paginated list of clients belonging to a user.
+func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Client], error) {
+	clients, totalItems, err := s.clientRepo.ListByUserID(ctx, userID, pg)
+	if err != nil {
+		return pagination.Result[*entities.Client]{}, err
+	}
+
+	return pagination.NewResult(clients, pg, totalItems), nil
 }
 
 // UpdateClient applies a partial update to an existing client.
