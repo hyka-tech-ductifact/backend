@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ductifact/internal/config"
+	"ductifact/internal/infrastructure/migrations"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -21,9 +22,17 @@ func NewPostgresConnection(cfg config.Database, logLevel string) (*gorm.DB, erro
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.AutoMigrate(&UserModel{}, &ClientModel{}); err != nil {
-		slog.Warn("auto-migration failed", "error", err)
+	// Run versioned SQL migrations (replaces GORM AutoMigrate).
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying *sql.DB: %w", err)
 	}
+
+	if err := migrations.Run(sqlDB); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	slog.Info("database migrations applied successfully")
 
 	return db, nil
 }

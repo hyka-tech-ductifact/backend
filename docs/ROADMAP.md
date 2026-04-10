@@ -122,7 +122,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 11.1 | Versioned migrations (`golang-migrate`) | ⬜ | 🔴 Now |
+| 11.1 | Versioned migrations (`golang-migrate`) | ✅ | — |
 | 11.2 | Development data seeders | ⬜ | 🟡 Soon |
 | 11.3 | Soft delete (`deleted_at` logical deletion) | ⬜ | 🟡 Soon |
 | 11.4 | Optimized indexes for frequent queries | ⬜ | 🔵 Later |
@@ -134,7 +134,7 @@
 |---|------|--------|----------|
 | 12.1 | Pre-commit hooks (auto lint + format) | ✅ | — |
 | 12.2 | Dependabot / Renovate (dependency updates) | ⬜ | 🟡 Soon |
-| 12.3 | Automated changelog (conventional commits) | ⬜ | 🔵 Later |
+| 12.3 | Automated changelog (conventional commits) | ⬜ | 🟡 Soon |
 | 12.4 | Makefile targets for all operations | ✅ | — |
 | 12.5 | Hot reload in development (`air`) | ✅ | — |
 | 12.6 | Coverage report (HTML) | ✅ | — |
@@ -144,7 +144,7 @@
 | # | Task | Status | Priority |
 |---|------|--------|----------|
 | 13.1 | Pagination on list endpoints | ✅ | — |
-| 13.2 | Filtering and sorting (query params) | ⬜ | 🟡 Soon |
+| 13.2 | Filtering and sorting (query params) | ⬜ | 🔵 Later |
 | 13.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🔵 Later |
 | 13.4 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
 | 13.5 | Partial responses (field selection) | ⬜ | ⚪ Maybe never |
@@ -163,8 +163,8 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 15.1 | Grafana dashboards (latency, errors, throughput) | ⬜ | 🟡 Soon |
-| 15.2 | Alerts (Alertmanager / Grafana alerts) | ⬜ | 🟡 Soon |
+| 15.1 | Grafana dashboards (latency, errors, throughput) | ⬜ 🔵 Later |
+| 15.2 | Alerts (Alertmanager / Grafana alerts) | ⬜ 🔵 Later |
 | 15.3 | Log aggregation (Loki + Grafana) | ⬜ | 🔵 Later |
 | 15.4 | Distributed tracing with OpenTelemetry | ⬜ | 🔵 Later |
 | 15.5 | Audit log (user action tracking) | ⬜ | 🔵 Later |
