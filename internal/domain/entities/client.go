@@ -18,6 +18,7 @@ type Client struct {
 	UserID    uuid.UUID
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt *time.Time // nil = active, non-nil = soft-deleted
 }
 
 // NewClient is the only way to create a valid Client.

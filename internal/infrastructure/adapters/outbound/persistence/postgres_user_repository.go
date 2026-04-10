@@ -23,6 +23,7 @@ type UserModel struct {
 	PasswordHash string    `gorm:"column:password_hash;not null;default:''"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	DeletedAt    gorm.DeletedAt `gorm:"index"`
 }
 
 func (UserModel) TableName() string {
@@ -75,7 +76,7 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User
 // --- Mappers (package-level functions, not methods) ---
 
 func toUserModel(user *entities.User) *UserModel {
-	return &UserModel{
+	model := &UserModel{
 		ID:           user.ID,
 		Name:         user.Name,
 		Email:        user.Email,
@@ -83,10 +84,14 @@ func toUserModel(user *entities.User) *UserModel {
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	}
+	if user.DeletedAt != nil {
+		model.DeletedAt = gorm.DeletedAt{Time: *user.DeletedAt, Valid: true}
+	}
+	return model
 }
 
 func toUserEntity(model *UserModel) *entities.User {
-	return &entities.User{
+	entity := &entities.User{
 		ID:           model.ID,
 		Name:         model.Name,
 		Email:        model.Email,
@@ -94,4 +99,8 @@ func toUserEntity(model *UserModel) *entities.User {
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}
+	if model.DeletedAt.Valid {
+		entity.DeletedAt = &model.DeletedAt.Time
+	}
+	return entity
 }

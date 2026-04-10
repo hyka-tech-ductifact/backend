@@ -23,6 +23,7 @@ type ClientModel struct {
 	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 
 	// GORM association to UserModel for FK constraint and cascade delete.
 	User UserModel `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
@@ -98,21 +99,29 @@ func (r *PostgresClientRepository) Delete(ctx context.Context, id uuid.UUID) err
 // --- Mappers (package-level functions, not methods) ---
 
 func toClientModel(client *entities.Client) *ClientModel {
-	return &ClientModel{
+	model := &ClientModel{
 		ID:        client.ID,
 		Name:      client.Name,
 		UserID:    client.UserID,
 		CreatedAt: client.CreatedAt,
 		UpdatedAt: client.UpdatedAt,
 	}
+	if client.DeletedAt != nil {
+		model.DeletedAt = gorm.DeletedAt{Time: *client.DeletedAt, Valid: true}
+	}
+	return model
 }
 
 func toClientEntity(model *ClientModel) *entities.Client {
-	return &entities.Client{
+	entity := &entities.Client{
 		ID:        model.ID,
 		Name:      model.Name,
 		UserID:    model.UserID,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
 	}
+	if model.DeletedAt.Valid {
+		entity.DeletedAt = &model.DeletedAt.Time
+	}
+	return entity
 }
