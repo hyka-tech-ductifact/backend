@@ -8,5 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at    TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email);
+-- Partial unique index: only active (non-deleted) users must have unique emails.
+-- This allows re-registration after soft delete.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users (deleted_at);

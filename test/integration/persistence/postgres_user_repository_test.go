@@ -183,3 +183,34 @@ func TestPostgresUserRepository_Mapper_PreservesAllFields(t *testing.T) {
 	assert.WithinDuration(t, original.CreatedAt, found.CreatedAt, 1_000_000_000)
 	assert.WithinDuration(t, original.UpdatedAt, found.UpdatedAt, 1_000_000_000)
 }
+
+// =============================================================================
+// Soft Delete — Re-register with same email after soft delete
+// =============================================================================
+
+func TestPostgresUserRepository_Create_SameEmail_AfterSoftDelete_Succeeds(t *testing.T) {
+	db := helpers.SetupTestDB(t)
+	helpers.CleanDB(t, db)
+	repo := persistence.NewPostgresUserRepository(db)
+	ctx := context.Background()
+
+	// 1. Create a user
+	user1, _ := entities.NewUser("Juan", "reuse@example.com", "securepass123")
+	err := repo.Create(ctx, user1)
+	require.NoError(t, err)
+
+	// 2. Soft-delete it via GORM (sets deleted_at = NOW())
+	err = db.Delete(&persistence.UserModel{}, "id = ?", user1.ID).Error
+	require.NoError(t, err)
+
+	// 3. Create a new user with the SAME email — must succeed thanks to partial unique index
+	user2, _ := entities.NewUser("Juan Nuevo", "reuse@example.com", "securepass123")
+	err = repo.Create(ctx, user2)
+	require.NoError(t, err, "should allow re-registration after soft delete")
+
+	// 4. Verify the new user is retrievable
+	found, err := repo.GetByEmail(ctx, "reuse@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, user2.ID, found.ID)
+	assert.Equal(t, "Juan Nuevo", found.Name)
+}
