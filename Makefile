@@ -106,11 +106,13 @@ app-start: ensure-contract app-build services-start
 # Seed the database with development data if the users table is empty.
 # Runs automatically as part of `make dev` — no manual invocation needed.
 # If you need to reset: make clean && make dev
+# Uses psql inside the Postgres container — no local psql install needed.
 ensure-seed:
-	@count=$$(PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -tAc "SELECT COUNT(*) FROM users" 2>/dev/null); \
+	@count=$$(docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -tAc "SELECT COUNT(*) FROM users" 2>/dev/null); \
 	if [ "$$count" = "0" ]; then \
 		echo "Seeding database..."; \
-		PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f test/seed.sql -q; \
+		docker cp test/seed.sql ductifact_dev_postgres:/tmp/seed.sql; \
+		docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -f /tmp/seed.sql -q; \
 		echo "✅ Seed data loaded (alice@ductifact.dev / bob@ductifact.dev — password: password123)"; \
 	fi
 
