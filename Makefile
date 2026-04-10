@@ -31,8 +31,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
-	validate-branch fetch-contract \
-	migrate-create migrate-version
+	validate-branch fetch-contract
 
 # ═══════════════════════════════════════════════════════════════
 # Help
@@ -68,10 +67,6 @@ help:
 	@echo "  Contracts:"
 	@echo "    fetch-contract   - Download bundled.yaml from contracts release"
 	@echo ""
-	@echo "  Migrations:"
-	@echo "    migrate-create   - Create a new migration: make migrate-create name=add_xyz"
-	@echo "    migrate-version  - Show current migration version"
-	@echo ""
 	@echo "  Docker (smoke test):"
 	@echo "    docker-build     - Build Docker image"
 	@echo "    docker-start     - Build + start app & DB in Docker"
@@ -101,34 +96,6 @@ dev: ensure-contract services-start
 app-build:
 	@echo "Building ductifact..."
 	go build -o bin/api ./cmd/api
-
-# ═══════════════════════════════════════════════════════════════
-# Migrations
-# ═══════════════════════════════════════════════════════════════
-
-# Path to migration SQL files (embedded in binary, but CLI uses the filesystem)
-MIGRATIONS_DIR := internal/infrastructure/migrations
-
-# Database URL for the migrate CLI (built from existing env vars)
-DB_URL := postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
-
-# Create a new forward-only migration.
-# We follow a forward-only strategy: mistakes are fixed with a new
-# corrective migration, never by reverting. This keeps the workflow
-# simple and safe across staging and production.
-# Usage: make migrate-create name=add_role_to_users
-migrate-create:
-	@if [ -z "$(name)" ]; then \
-		echo "❌ Usage: make migrate-create name=description_of_change"; \
-		exit 1; \
-	fi
-	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
-	@rm -f $(MIGRATIONS_DIR)/*_$(name).down.sql
-	@echo "✅ Migration created — edit the .up.sql file"
-
-# Show current migration version
-migrate-version:
-	@migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" version
 
 # Build and start API in background (used in CI and local testing)
 app-start: ensure-contract app-build services-start
@@ -299,7 +266,6 @@ deps:
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install gotest.tools/gotestsum@latest
-	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # ═══════════════════════════════════════════════════════════════
 # CI
