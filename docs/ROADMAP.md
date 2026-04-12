@@ -127,13 +127,14 @@
 | 11.3 | Soft delete (`deleted_at` logical deletion) | ✅ | — |
 | 11.4 | Optimized indexes for frequent queries | ⬜ | 🔵 Later |
 | 11.5 | Connection pooling tuning | ⬜ | 🔵 Later |
+| 11.6 | Automated database backups (`pg_dump` + offsite) | ✅ | — |
 
 ### 12. Developer Experience
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
 | 12.1 | Pre-commit hooks (auto lint + format) | ✅ | — |
-| 12.2 | Dependabot / Renovate (dependency updates) | ⬜ | 🟡 Soon |
+| 12.2 | Dependabot / Renovate (dependency updates) | ✅ | — |
 | 12.3 | Automated changelog (conventional commits) | ⬜ | 🟡 Soon |
 | 12.4 | Makefile targets for all operations | ✅ | — |
 | 12.5 | Hot reload in development (`air`) | ✅ | — |
@@ -206,8 +207,8 @@ Observability              █████████████████�
 Testing                    ████████████████████  6/6   ✅
 CI/CD & DevOps             ████████████████████  6/6   ✅
 Security                   ████████████████████  6/6   ✅
-Database                   ████████████░░░░░░░░  3/5
-Developer Experience       ████████░░░░░░░░░░░░  3/6
+Database                   ████████████████░░░░  4/6
+Developer Experience       ██████████░░░░░░░░░░  4/6
 Advanced API               ░░░░░░░░░░░░░░░░░░░░  0/6
 Caching & Performance      ░░░░░░░░░░░░░░░░░░░░  0/4
 Advanced Observability     ░░░░░░░░░░░░░░░░░░░░  0/5
@@ -215,7 +216,7 @@ Business Features          ░░░░░░░░░░░░░░░░░�
 Resilience                 ░░░░░░░░░░░░░░░░░░░░  0/5
 ```
 
-> **Total progress**: 57/86 tasks completed (~66%)
+> **Total progress**: 59/87 tasks completed (~68%)
 > **Recommendation**: Sections 10 (Security) and 11 (Database) have the highest immediate impact.
 
 ### Priority Legend
