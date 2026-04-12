@@ -80,7 +80,9 @@ func Run(db *sql.DB) error {
 			// Drop closes the source/driver, so we need a fresh instance.
 			return Run(db)
 		}
-		m.Force(int(version - 1))
+		if err := m.Force(int(version - 1)); err != nil {
+			return fmt.Errorf("migrations: failed to force version %d: %w", version-1, err)
+		}
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
