@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"ductifact/internal/config"
-	"ductifact/internal/infrastructure/adapters/outbound/persistence"
+	"ductifact/internal/infrastructure/migrations"
 
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
@@ -46,8 +46,14 @@ func ConnectTestDB() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 
-	if err := db.AutoMigrate(&persistence.UserModel{}, &persistence.ClientModel{}); err != nil {
-		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+	// Run versioned SQL migrations (same as production).
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying *sql.DB: %w", err)
+	}
+
+	if err := migrations.Run(sqlDB); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return db, nil

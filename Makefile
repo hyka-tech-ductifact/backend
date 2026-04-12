@@ -26,7 +26,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 # ─── .PHONY ─────────────────────────────────────────────────
 
 .PHONY: help \
-	dev app-build app-start \
+	dev app-build app-start ensure-seed \
 	services-start services-stop \
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
@@ -88,7 +88,7 @@ help:
 # ═══════════════════════════════════════════════════════════════
 
 # Start DB and run with hot reload (main dev workflow)
-dev: ensure-contract services-start
+dev: ensure-contract services-start ensure-seed
 	@echo "Running ductifact with hot reloading..."
 	air
 
@@ -102,6 +102,19 @@ app-start: ensure-contract app-build services-start
 	./bin/api &
 	@sleep 3
 	@echo "✅ API running in background"
+
+# Seed the database with development data if the users table is empty.
+# Runs automatically as part of `make dev` — no manual invocation needed.
+# If you need to reset: make clean && make dev
+# Uses psql inside the Postgres container — no local psql install needed.
+ensure-seed:
+	@count=$$(docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -tAc "SELECT COUNT(*) FROM users" 2>/dev/null); \
+	if [ "$$count" = "0" ]; then \
+		echo "Seeding database..."; \
+		docker cp test/seed.sql ductifact_dev_postgres:/tmp/seed.sql; \
+		docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -f /tmp/seed.sql -q; \
+		echo "✅ Seed data loaded (alice@ductifact.dev / bob@ductifact.dev — password: password123)"; \
+	fi
 
 # ═══════════════════════════════════════════════════════════════
 # Services (dev dependencies)
@@ -301,8 +314,10 @@ validate-branch:
 
 # Clean all untracked and ignored files, except .env (contains local secrets).
 # Uses git as the source of truth — anything not in git is an artifact.
+# Also removes Docker volumes (database data) for a full reset.
 clean:
 	@echo "Cleaning all generated files..."
 	git clean -fdx --exclude=.env
 	go clean -testcache
+	docker compose down -v 2>/dev/null || true
 	@echo "✅ Cleanup completed!"

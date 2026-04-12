@@ -19,6 +19,7 @@ type User struct {
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	DeletedAt    *time.Time // nil = active, non-nil = soft-deleted
 }
 
 // NewUser is the only way to create a valid User.
