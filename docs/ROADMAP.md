@@ -133,7 +133,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 12.1 | Pre-commit hooks (auto lint + format) | ⬜ |  🟡 Soon |
+| 12.1 | Pre-commit hooks (auto lint + format) | ✅ | — |
 | 12.2 | Dependabot / Renovate (dependency updates) | ✅ | — |
 | 12.3 | Automated changelog (conventional commits) | ✅ | — |
 | 12.4 | Makefile targets for all operations | ✅ | — |
