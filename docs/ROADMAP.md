@@ -133,9 +133,9 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 12.1 | Pre-commit hooks (auto lint + format) | ✅ | — |
+| 12.1 | Pre-commit hooks (auto lint + format) | ⬜ |  🟡 Soon |
 | 12.2 | Dependabot / Renovate (dependency updates) | ✅ | — |
-| 12.3 | Automated changelog (conventional commits) | ⬜ | 🟡 Soon |
+| 12.3 | Automated changelog (conventional commits) | ✅ | — |
 | 12.4 | Makefile targets for all operations | ✅ | — |
 | 12.5 | Hot reload in development (`air`) | ✅ | — |
 | 12.6 | Coverage report (HTML) | ✅ | — |

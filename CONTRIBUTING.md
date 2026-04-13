@@ -46,15 +46,28 @@ git fetch origin && git rebase origin/main
 Use **SemVer**: `vMAJOR.MINOR.PATCH`
 
 ```bash
+# 1. Create release branch
 git checkout main && git pull
+git checkout -b chore/release-v0.4.0
 
+# 2. Generate changelog
+make changelog VERSION=v0.4.0
+git add CHANGELOG.md && git commit -m "chore(release): v0.4.0"
+git push -u origin chore/release-v0.4.0
+
+# 3. Open PR "chore(release): v0.4.0" → squash merge into main
+
+# 4. Tag the merged commit
+git checkout main && git pull
 git tag -a v0.4.0 -m "Release v0.4.0"
 git push origin v0.4.0
 
+# 5. Reset release branch
 git checkout -B release v0.4.0
 git push origin release --force-with-lease
 ```
 
+The `make tag` command creates the annotated tag and pushes it.
 Production deploys from the **tag**, not from `main`.
 
 ---
@@ -97,16 +110,49 @@ release:   v0.4.0 ── H1 ── H2
 
 ---
 
-## 5) Commit messages
+## 5) Commit messages & PR titles
 
-[Conventional Commits](https://www.conventionalcommits.org/):
+We use [Conventional Commits](https://www.conventionalcommits.org/). Since we do
+**squash merge**, the PR title becomes the commit message on `main`. CI validates
+the PR title format automatically.
 
-`feat:`, `fix:`, `chore:`
+### Format
+
+```
+<type>(<scope>): <description>
+```
+
+### Types
+
+| Type | When to use | In changelog? |
+|------|------------|---------------|
+| `feat` | New feature | ✅ |
+| `fix` | Bug fix | ✅ |
+| `chore` | Everything else (docs, deps, refactor, CI, tests...) | ❌ |
+
+### Examples
+
+```
+feat(auth): add refresh token rotation
+fix(client): prevent duplicate client names
+chore: update Go to 1.24
+feat(api)!: change error response format   ← breaking change
+```
+
+### Breaking changes
+
+Add `!` after the scope to indicate a breaking change:
+
+```
+feat(api)!: change pagination response format
+```
 
 ---
 
 ## 6) PR rules
 
 - No direct pushes to `main`
-- CI must pass (tests, lint, build)
+- CI must pass (tests, lint, build, **PR title validation**)
+- PR title must follow Conventional Commits format (see §5)
 - Keep PRs small and focused
+- Use **squash merge** (1 PR = 1 commit)
