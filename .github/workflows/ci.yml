@@ -49,9 +49,9 @@ env:
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
 
-  # ── 0. Branch name & target validation ─────────────────────
-  branch-rules:
-    name: Branch Rules
+  # ── 0. PR validation (branch name + title format) ───────────
+  pr-rules:
+    name: PR Rules
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -62,6 +62,19 @@ jobs:
           BRANCH: ${{ github.head_ref }}
           BASE: ${{ github.base_ref }}
         run: make validate-branch
+
+      - name: Validate PR title (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            chore
+          requireScope: false
+          subjectPattern: ^.+$
+          subjectPatternError: "PR title must have a description after the type, e.g. 'feat: add login endpoint'"
 
   # ── 1. Lint + static analysis ──────────────────────────────
   lint:

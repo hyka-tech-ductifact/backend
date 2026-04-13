@@ -31,7 +31,8 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	test test-unit test-integration test-contract test-e2e test-clean \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
-	validate-branch fetch-contract
+	validate-branch fetch-contract \
+	changelog
 
 # ═══════════════════════════════════════════════════════════════
 # Help
@@ -79,6 +80,10 @@ help:
 	@echo ""
 	@echo "  CI:"
 	@echo "    validate-branch  - Validate branch name and target"
+	@echo ""
+	@echo "  Release:"
+	@echo "    changelog        - Generate CHANGELOG.md (auto-bumps version via SemVer)"
+	@echo "                       Override: make changelog VERSION=v1.0.0"
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "    clean            - Remove build artifacts and temp files"
@@ -307,6 +312,21 @@ validate-branch:
 		fi; \
 	fi; \
 	echo "✅ Branch '$$BRANCH' → '$${BASE:-*}' is valid"
+
+# ═══════════════════════════════════════════════════════════════
+# Release
+# ═══════════════════════════════════════════════════════════════
+
+# Generate CHANGELOG.md from conventional commits using git-cliff.
+# By default, calculates the next version automatically via SemVer:
+#   fix  → patch (0.2.0 → 0.2.1)
+#   feat → minor (0.2.0 → 0.3.0)
+#   feat! / BREAKING CHANGE → major (0.2.0 → 1.0.0)
+# Override: make changelog VERSION=v1.0.0
+changelog:
+	@echo "Generating CHANGELOG.md..."
+	$(if $(VERSION),git-cliff --tag $(VERSION) --output CHANGELOG.md,git-cliff --bump --output CHANGELOG.md)
+	@echo "✅ CHANGELOG.md updated"
 
 # ═══════════════════════════════════════════════════════════════
 # Maintenance
