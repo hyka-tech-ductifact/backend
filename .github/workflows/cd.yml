@@ -50,7 +50,7 @@ jobs:
         run: make fetch-contract
 
       - name: Build and push (staging tag)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -112,7 +112,7 @@ jobs:
         run: make fetch-contract
 
       - name: Build and push (production tags)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
