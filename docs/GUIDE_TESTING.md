@@ -8,7 +8,7 @@ The backend has 4 test levels, each with a different scope and purpose:
 |-------|---------------|--------------|----------|
 | **Unit** | Domain logic, services, value objects | None (uses mocks) | `test/unit/` |
 | **Integration** | Repositories against real PostgreSQL | DB | `test/integration/` |
-| **Contract** | API responses match the OpenAPI spec | DB + running server | `test/contract/` |
+| **Schema** | API responses match the OpenAPI spec | DB + running server | Schemathesis (CLI) |
 | **E2E** | Full HTTP flows end-to-end | DB + running server | `test/e2e/` |
 
 ## Test pyramid
@@ -16,7 +16,7 @@ The backend has 4 test levels, each with a different scope and purpose:
 ```
           /  E2E   \          Few — critical user flows
          /----------\
-        / Contract   \        Moderate — every endpoint × status code
+        /  Schema    \        Automated — Schemathesis fuzzes every endpoint
        /--------------\
       /  Integration    \     Moderate — repos, constraints, mappers
      /--------------------\
@@ -42,11 +42,11 @@ Test repositories against a real PostgreSQL instance. Verify that SQL/GORM queri
 
 Each test cleans the database before running (TRUNCATE) to ensure isolation.
 
-### Contract tests
+### Schema tests
 
-Validate that every API response conforms to the OpenAPI spec (`contracts/openapi/bundled.yaml`). Uses `kin-openapi` to load the spec and validate response bodies, status codes, and schemas automatically.
+Automated property-based testing powered by [Schemathesis](https://schemathesis.io/). Instead of writing manual tests per endpoint, Schemathesis reads the OpenAPI spec (`contracts/openapi/bundled.yaml`) and automatically generates thousands of test cases — valid inputs, edge cases, boundary values, type mismatches — to verify that every API response conforms to the documented schema.
 
-A coverage tracker ensures all spec-defined operations are tested. Untested operations fail the suite.
+This replaces the previous hand-written contract tests with zero-maintenance, higher-coverage validation.
 
 ### E2E tests
 
@@ -66,7 +66,7 @@ Black-box HTTP tests against the running server. They don't import any internal 
 ```bash
 make test-unit              # unit tests (no dependencies)
 make test-integration       # requires services (make services-start)
-make test-contract          # requires services + server (make services-start && make app-start)
+make test-schema            # requires services + server (make services-start && make app-start)
 make test-e2e               # requires services + server (make services-start && make app-start)
 make test                   # all tests
 ```

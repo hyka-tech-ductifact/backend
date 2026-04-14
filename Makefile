@@ -28,7 +28,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 .PHONY: help \
 	dev app-build app-start ensure-seed \
 	services-start services-stop \
-	test test-unit test-integration test-contract test-e2e test-clean \
+	test test-unit test-integration test-schema test-e2e test-clean \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
 	validate-branch fetch-contract \
@@ -54,7 +54,7 @@ help:
 	@echo "    test             - Run all tests"
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
-	@echo "    test-contract    - Run contract tests (requires running server)"
+	@echo "    test-schema      - Run schema tests with Schemathesis (requires running server)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
@@ -162,7 +162,7 @@ define run-tests
 endef
 
 # Run all tests
-test: test-unit test-integration test-contract test-e2e
+test: test-unit test-integration test-schema test-e2e
 
 # Run unit tests — no dependencies needed
 test-unit:
@@ -174,10 +174,39 @@ test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,integration,./test/integration/...)
 
-# Run contract tests — requires server running (make app-start)
-test-contract:
-	@echo "Running contract tests..."
-	$(call run-tests,contract,./test/contract/...)
+# Run schema conformance tests with Schemathesis (via Docker) — requires server running (make app-start).
+# Validates every endpoint against the OpenAPI spec using property-based fuzzing.
+# Uses --network host so the container can reach the local API server.
+# Registers a test user and obtains a JWT token for authenticated endpoints.
+# Note: --url points to /v1 because the spec paths don't include the version prefix
+#       (it's defined in the server URL). The /health endpoint (root server, no /v1)
+#       is skipped here — it's already verified by e2e and docker-smoke tests.
+SCHEMATHESIS_IMAGE ?= schemathesis/schemathesis:stable
+test-schema: ensure-contract
+	@echo "Running schema tests (Schemathesis)..."
+	@TOKEN=$$(curl -sf http://localhost:$(APP_PORT)/v1/auth/register \
+		-H 'Content-Type: application/json' \
+		-d '{"name":"Schemathesis Bot","email":"schemathesis@test.local","password":"securepass123"}' \
+		| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
+	if [ -z "$$TOKEN" ]; then \
+		TOKEN=$$(curl -sf http://localhost:$(APP_PORT)/v1/auth/login \
+			-H 'Content-Type: application/json' \
+			-d '{"email":"schemathesis@test.local","password":"securepass123"}' \
+			| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
+	fi; \
+	if [ -z "$$TOKEN" ]; then \
+		echo "❌ Could not obtain auth token for schema tests"; exit 1; \
+	fi; \
+	echo "✅ Auth token obtained"; \
+	docker run --rm --network host \
+		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
+		$(SCHEMATHESIS_IMAGE) \
+		run /spec/bundled.yaml \
+		--url http://localhost:$(APP_PORT)/v1 \
+		--checks all \
+		-H "Authorization: Bearer $$TOKEN" \
+		-n 50 \
+		$(if $(filter 1,$(CI)),--report,)
 
 # Run E2E tests — requires server running (make app-start)
 test-e2e:

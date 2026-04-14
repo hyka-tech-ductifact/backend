@@ -130,9 +130,9 @@ jobs:
       - name: Run integration tests
         run: make test-integration
 
-  # ── 4. Contract tests (need Postgres + running API) ────────
-  contract-tests:
-    name: Contract Tests
+  # ── 4. Schema tests with Schemathesis (need Postgres + running API) ─
+  schema-tests:
+    name: Schema Tests (Schemathesis)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,14 +141,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@latest
-
       - name: Build and start API server
         run: make app-start
 
-      - name: Run contract tests
-        run: make test-contract
+      - name: Run schema tests
+        run: make test-schema
 
   # ── 5. E2E tests (need Postgres + running API) ────────────
   e2e-tests:

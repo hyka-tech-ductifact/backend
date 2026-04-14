@@ -67,7 +67,7 @@
 | # | Task | Status |
 |---|------|--------|
 | 6.1 | OpenAPI spec (`contracts/openapi/`) | ✅ |
-| 6.2 | Contract tests (auth, user, client, health) | ✅ |
+| 6.2 | Schema tests — Schemathesis (replaces manual contract tests) | ✅ |
 | 6.3 | Spec validation in CI (`redocly lint`) | ✅ |
 | 6.4 | Swagger UI embedded in API (`/docs`) | ✅ |
 | 6.5 | TypeScript type generation for frontend | ✅ |
@@ -89,7 +89,7 @@
 | 8.1 | Unit tests (entities, VOs, services, JWT) | ✅ |
 | 8.2 | Hand-written mocks (repositories, ports) | ✅ |
 | 8.3 | Integration tests (repositories against DB) | ✅ |
-| 8.4 | Contract tests (OpenAPI compliance) | ✅ |
+| 8.4 | Schema tests — Schemathesis (OpenAPI compliance) | ✅ |
 | 8.5 | E2E tests (full HTTP flow) | ✅ |
 | 8.6 | CI with race detector + JUnit XML | ✅ |
 

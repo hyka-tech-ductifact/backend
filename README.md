@@ -33,12 +33,12 @@ make dev   # build + DB + the app with hot reload (air)
 ```bash
 make test-unit                  # unit tests (no dependencies)
 make test-integration           # integration tests (requires DB)
-make test-contract              # contract tests (requires DB + running server)
+make test-schema                # schema tests with Schemathesis (requires DB + running server)
 make test-e2e                   # E2E tests (requires DB + running server)
 make test                       # run all tests
 ```
 
-For contract/E2E tests, start the server first:
+For schema/E2E tests, start the server first:
 
 ```bash
 make app-start      # starts DB + fetches contract + builds + runs API
