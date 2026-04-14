@@ -3,32 +3,30 @@
 # Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 
 version: 2
+
+# Group all ecosystems into a single weekly PR
+multi-ecosystem-groups:
+  all-deps:
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
 updates:
   # Go modules (gin, gorm, jwt, etc.)
   - package-ecosystem: "gomod"
     directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "go"
+    patterns: ["*"]
+    multi-ecosystem-group: "all-deps"
 
   # GitHub Actions (actions/checkout, actions/setup-go, etc.)
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "ci"
+    patterns: ["*"]
+    multi-ecosystem-group: "all-deps"
 
   # Dockerfile base images (golang:1.24-alpine, etc.)
   - package-ecosystem: "docker"
     directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "docker"
+    patterns: ["*"]
+    multi-ecosystem-group: "all-deps"
