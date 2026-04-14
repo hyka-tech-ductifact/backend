@@ -23,19 +23,9 @@ type User struct {
 }
 
 // NewUser is the only way to create a valid User.
-// It validates name, email, and password, then hashes the password via the Value Object.
+// It validates name and email via setters (single source of truth),
+// then hashes the password via the Value Object.
 func NewUser(name, email, password string) (*User, error) {
-	if name == "" {
-		return nil, ErrEmptyUserName
-	}
-
-	// Validate email through the value object.
-	// The VO is used for validation, but we store the raw string.
-	validEmail, err := valueobjects.NewEmail(email)
-	if err != nil {
-		return nil, err
-	}
-
 	// Validate and hash the password via the Value Object
 	pwd, err := valueobjects.NewPassword(password)
 	if err != nil {
@@ -43,14 +33,22 @@ func NewUser(name, email, password string) (*User, error) {
 	}
 
 	now := time.Now()
-	return &User{
+	u := &User{
 		ID:           uuid.New(),
-		Name:         name,
-		Email:        validEmail.String(),
 		PasswordHash: pwd.Hash(),
 		CreatedAt:    now,
 		UpdatedAt:    now,
-	}, nil
+	}
+
+	// Validate through setters — each setter is the single source of truth.
+	if err := u.SetName(name); err != nil {
+		return nil, err
+	}
+	if err := u.SetEmail(email); err != nil {
+		return nil, err
+	}
+
+	return u, nil
 }
 
 // SetName validates and updates the user's name.
