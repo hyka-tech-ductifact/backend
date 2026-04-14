@@ -153,13 +153,25 @@ GET {{baseUrl}}/users/me
 # CLIENTS (protected — requires Bearer token)
 # =============================================================================
 
-### Create a client
+### Create a client (all fields)
 POST {{baseUrl}}/users/me/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Acme Corp"
+  "name": "Acme Corp",
+  "phone": "+34 600 111 222",
+  "email": "acme@example.com",
+  "description": "Main client for project management"
+}
+
+### Create a client (minimal — name only)
+POST {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Minimal Client"
 }
 
 ### List my clients
@@ -170,13 +182,25 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/users/me/clients/{{client_id}}
 Authorization: Bearer {{token}}
 
-### Update a client
+### Update a client (all fields)
 PUT {{baseUrl}}/users/me/clients/{{client_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Acme Corp Updated"
+  "name": "Acme Corp Updated",
+  "phone": "+34 600 999 888",
+  "email": "acme.updated@example.com",
+  "description": "Updated description"
+}
+
+### Update a client (partial — phone only)
+PUT {{baseUrl}}/users/me/clients/{{client_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "phone": "+34 600 555 666"
 }
 
 ### Delete a client
@@ -193,6 +217,26 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {}
+
+### Create client — invalid phone → 400
+POST {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Bad Phone Client",
+  "phone": "abc"
+}
+
+### Create client — invalid email → 400
+POST {{baseUrl}}/users/me/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Bad Email Client",
+  "email": "not-an-email"
+}
 
 ### Get client — invalid UUID → 400
 GET {{baseUrl}}/users/me/clients/not-a-uuid
