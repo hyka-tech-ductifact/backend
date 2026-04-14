@@ -27,11 +27,14 @@ func newTestUser() *entities.User {
 // newTestClient creates a Client with sensible defaults and timestamps in the past.
 func newTestClient(userID uuid.UUID) *entities.Client {
 	return &entities.Client{
-		ID:        uuid.New(),
-		Name:      "Acme Corp",
-		UserID:    userID,
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
+		ID:          uuid.New(),
+		Name:        "Acme Corp",
+		Phone:       "+34 612 345 678",
+		Email:       "contact@acme.com",
+		Description: "Main partner",
+		UserID:      userID,
+		CreatedAt:   time.Now().Add(-time.Hour),
+		UpdatedAt:   time.Now().Add(-time.Hour),
 	}
 }
 

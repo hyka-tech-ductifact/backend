@@ -23,10 +23,19 @@ func TestCreateClient_WithValidData_ReturnsClient(t *testing.T) {
 	user := newTestUser()
 	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
 
-	client, err := svc.CreateClient(context.Background(), "Acme Corp", user.ID)
+	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
+		Name:        "Acme Corp",
+		Phone:       "+34 612 345 678",
+		Email:       "contact@acme.com",
+		Description: "Main partner",
+		UserID:      user.ID,
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "Acme Corp", client.Name)
+	assert.Equal(t, "+34 612 345 678", client.Phone)
+	assert.Equal(t, "contact@acme.com", client.Email)
+	assert.Equal(t, "Main partner", client.Description)
 	assert.Equal(t, user.ID, client.UserID)
 }
 
@@ -34,7 +43,9 @@ func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
 	user := newTestUser()
 	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
 
-	client, err := svc.CreateClient(context.Background(), "", user.ID)
+	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
+		UserID: user.ID,
+	})
 
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, entities.ErrEmptyClientName)
@@ -43,7 +54,10 @@ func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
 func TestCreateClient_WithNonExistingUser_ReturnsError(t *testing.T) {
 	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(nil))
 
-	client, err := svc.CreateClient(context.Background(), "Acme Corp", uuid.New())
+	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
+		Name:   "Acme Corp",
+		UserID: uuid.New(),
+	})
 
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
@@ -58,7 +72,10 @@ func TestCreateClient_WhenRepoFails_ReturnsError(t *testing.T) {
 	}
 	svc := services.NewClientService(clientRepo, userRepoReturning(user))
 
-	client, err := svc.CreateClient(context.Background(), "Acme Corp", user.ID)
+	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
+		Name:   "Acme Corp",
+		UserID: user.ID,
+	})
 
 	assert.Nil(t, client)
 	assert.EqualError(t, err, "db connection lost")
@@ -151,7 +168,9 @@ func TestUpdateClient_WithNewName_UpdatesName(t *testing.T) {
 	client := newTestClient(userID)
 	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr("New Name"))
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
+		Name: strPtr("New Name"),
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", result.Name)
@@ -162,7 +181,9 @@ func TestUpdateClient_WithEmptyName_ReturnsError(t *testing.T) {
 	client := newTestClient(userID)
 	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr(""))
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
+		Name: strPtr(""),
+	})
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, entities.ErrEmptyClientName)
@@ -173,7 +194,9 @@ func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 	client := newTestClient(ownerID)
 	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	result, err := svc.UpdateClient(context.Background(), client.ID, uuid.New(), strPtr("New Name"))
+	result, err := svc.UpdateClient(context.Background(), client.ID, uuid.New(), entities.UpdateClientParams{
+		Name: strPtr("New Name"),
+	})
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotOwned)
@@ -182,7 +205,9 @@ func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
 
-	result, err := svc.UpdateClient(context.Background(), uuid.New(), uuid.New(), strPtr("New Name"))
+	result, err := svc.UpdateClient(context.Background(), uuid.New(), uuid.New(), entities.UpdateClientParams{
+		Name: strPtr("New Name"),
+	})
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrClientNotFound)
@@ -194,7 +219,9 @@ func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
 	oldTime := client.UpdatedAt
 	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
 
-	result, err := svc.UpdateClient(context.Background(), client.ID, userID, strPtr("New Name"))
+	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
+		Name: strPtr("New Name"),
+	})
 
 	require.NoError(t, err)
 	assert.True(t, result.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
@@ -211,7 +238,7 @@ func TestUpdateClient_WithNoChanges_SkipsPersistence(t *testing.T) {
 	}
 	svc := services.NewClientService(repo, &mocks.MockUserRepository{})
 
-	_, err := svc.UpdateClient(context.Background(), client.ID, userID, nil)
+	_, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{})
 
 	require.NoError(t, err)
 	assert.False(t, updateCalled, "Update should not be called when no fields change")
