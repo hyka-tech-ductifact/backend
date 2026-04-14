@@ -64,7 +64,7 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 	}
 
 	var req CreateClientRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := helpers.StrictBindJSON(c, &req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -161,7 +161,7 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 	}
 
 	var req UpdateClientRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := helpers.StrictBindJSON(c, &req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

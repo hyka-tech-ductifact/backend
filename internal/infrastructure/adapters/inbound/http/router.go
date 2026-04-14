@@ -47,6 +47,10 @@ func SetupRoutes(
 	// --- Create router WITHOUT default middlewares ---
 	r := gin.New()
 
+	// Return 405 Method Not Allowed (instead of 404) for unsupported HTTP methods.
+	// Without this, Gin returns 404 for methods like TRACE on existing routes.
+	r.HandleMethodNotAllowed = true
+
 	// --- Register middlewares in correct order ---
 	// 1. Request ID: first, so all logs include the ID
 	r.Use(middleware.RequestIDMiddleware())

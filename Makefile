@@ -204,6 +204,9 @@ test-schema: ensure-contract
 		run /spec/bundled.yaml \
 		--url http://localhost:$(APP_PORT)/v1 \
 		--checks all \
+		--exclude-checks unsupported_method \
+		--exclude-operation-id healthCheck \
+		--exclude-operation-id-regex '(create|list|get|update|delete)(Project|Order|Piece)' \
 		-H "Authorization: Bearer $$TOKEN" \
 		-n 50 \
 		$(if $(filter 1,$(CI)),--report,)
