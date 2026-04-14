@@ -16,17 +16,26 @@ import (
 // --- DTOs (HTTP-specific, not domain objects) ---
 
 type CreateClientRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Phone       string `json:"phone"`
+	Email       string `json:"email"`
+	Description string `json:"description"`
 }
 
 type UpdateClientRequest struct {
-	Name *string `json:"name" binding:"omitempty"`
+	Name        *string `json:"name" binding:"omitempty"`
+	Phone       *string `json:"phone"`
+	Email       *string `json:"email"`
+	Description *string `json:"description"`
 }
 
 type ClientResponse struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	UserID string `json:"user_id"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Phone       string `json:"phone"`
+	Email       string `json:"email"`
+	Description string `json:"description"`
+	UserID      string `json:"user_id"`
 }
 
 type ListClientResponse struct {
@@ -60,7 +69,13 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 		return
 	}
 
-	client, err := h.clientService.CreateClient(c.Request.Context(), req.Name, userID)
+	client, err := h.clientService.CreateClient(c.Request.Context(), entities.CreateClientParams{
+		Name:        req.Name,
+		Phone:       req.Phone,
+		Email:       req.Email,
+		Description: req.Description,
+		UserID:      userID,
+	})
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -151,7 +166,12 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 		return
 	}
 
-	client, err := h.clientService.UpdateClient(c.Request.Context(), id, userID, req.Name)
+	client, err := h.clientService.UpdateClient(c.Request.Context(), id, userID, entities.UpdateClientParams{
+		Name:        req.Name,
+		Phone:       req.Phone,
+		Email:       req.Email,
+		Description: req.Description,
+	})
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -185,8 +205,11 @@ func (h *ClientHandler) DeleteClient(c *gin.Context) {
 
 func toClientResponse(client *entities.Client) *ClientResponse {
 	return &ClientResponse{
-		ID:     client.ID.String(),
-		Name:   client.Name,
-		UserID: client.UserID.String(),
+		ID:          client.ID.String(),
+		Name:        client.Name,
+		Phone:       client.Phone,
+		Email:       client.Email,
+		Description: client.Description,
+		UserID:      client.UserID.String(),
 	}
 }

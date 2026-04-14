@@ -18,15 +18,18 @@ import (
 // ClientModel is the GORM-specific database representation.
 // It is NOT a domain entity. It lives here because only this adapter cares about it.
 type ClientModel struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Name      string    `gorm:"not null"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ID          uuid.UUID `gorm:"primaryKey"`
+	Name        string
+	Phone       string
+	Email       string
+	Description string
+	UserID      uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt
 
 	// GORM association to UserModel for FK constraint and cascade delete.
-	User UserModel `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	User UserModel `gorm:"foreignKey:UserID"`
 }
 
 func (ClientModel) TableName() string {
@@ -100,11 +103,14 @@ func (r *PostgresClientRepository) Delete(ctx context.Context, id uuid.UUID) err
 
 func toClientModel(client *entities.Client) *ClientModel {
 	model := &ClientModel{
-		ID:        client.ID,
-		Name:      client.Name,
-		UserID:    client.UserID,
-		CreatedAt: client.CreatedAt,
-		UpdatedAt: client.UpdatedAt,
+		ID:          client.ID,
+		Name:        client.Name,
+		Phone:       client.Phone,
+		Email:       client.Email,
+		Description: client.Description,
+		UserID:      client.UserID,
+		CreatedAt:   client.CreatedAt,
+		UpdatedAt:   client.UpdatedAt,
 	}
 	if client.DeletedAt != nil {
 		model.DeletedAt = gorm.DeletedAt{Time: *client.DeletedAt, Valid: true}
@@ -114,11 +120,14 @@ func toClientModel(client *entities.Client) *ClientModel {
 
 func toClientEntity(model *ClientModel) *entities.Client {
 	entity := &entities.Client{
-		ID:        model.ID,
-		Name:      model.Name,
-		UserID:    model.UserID,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:          model.ID,
+		Name:        model.Name,
+		Phone:       model.Phone,
+		Email:       model.Email,
+		Description: model.Description,
+		UserID:      model.UserID,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
 	}
 	if model.DeletedAt.Valid {
 		entity.DeletedAt = &model.DeletedAt.Time

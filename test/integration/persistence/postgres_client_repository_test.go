@@ -29,6 +29,17 @@ func createTestUser(t *testing.T, userRepo *persistence.PostgresUserRepository) 
 	return user
 }
 
+// newClientParams is a helper that returns CreateClientParams with all fields populated.
+func newClientParams(name string, userID uuid.UUID) entities.CreateClientParams {
+	return entities.CreateClientParams{
+		Name:        name,
+		Phone:       "+34 600 111 222",
+		Email:       "client@example.com",
+		Description: "Test client description",
+		UserID:      userID,
+	}
+}
+
 // =============================================================================
 // Create + GetByID
 // =============================================================================
@@ -39,7 +50,7 @@ func TestPostgresClientRepository_Create_And_GetByID(t *testing.T) {
 
 	user := createTestUser(t, userRepo)
 
-	client, err := entities.NewClient("Acme Corp", user.ID)
+	client, err := entities.NewClient(newClientParams("Acme Corp", user.ID))
 	require.NoError(t, err)
 
 	err = clientRepo.Create(ctx, client)
@@ -50,6 +61,9 @@ func TestPostgresClientRepository_Create_And_GetByID(t *testing.T) {
 
 	assert.Equal(t, client.ID, found.ID)
 	assert.Equal(t, "Acme Corp", found.Name)
+	assert.Equal(t, "+34 600 111 222", found.Phone)
+	assert.Equal(t, "client@example.com", found.Email)
+	assert.Equal(t, "Test client description", found.Description)
 	assert.Equal(t, user.ID, found.UserID)
 	assert.False(t, found.CreatedAt.IsZero())
 	assert.False(t, found.UpdatedAt.IsZero())
@@ -65,8 +79,8 @@ func TestPostgresClientRepository_ListByUserID(t *testing.T) {
 
 	user := createTestUser(t, userRepo)
 
-	client1, _ := entities.NewClient("Client A", user.ID)
-	client2, _ := entities.NewClient("Client B", user.ID)
+	client1, _ := entities.NewClient(entities.CreateClientParams{Name: "Client A", UserID: user.ID})
+	client2, _ := entities.NewClient(entities.CreateClientParams{Name: "Client B", UserID: user.ID})
 	require.NoError(t, clientRepo.Create(ctx, client1))
 	require.NoError(t, clientRepo.Create(ctx, client2))
 
@@ -97,8 +111,8 @@ func TestPostgresClientRepository_ListByUserID_DoesNotReturnOtherUsersClients(t 
 	user1 := createTestUser(t, userRepo)
 	user2 := createTestUser(t, userRepo)
 
-	clientA, _ := entities.NewClient("Shared Name", user1.ID)
-	clientB, _ := entities.NewClient("Shared Name", user2.ID)
+	clientA, _ := entities.NewClient(entities.CreateClientParams{Name: "Shared Name", UserID: user1.ID})
+	clientB, _ := entities.NewClient(entities.CreateClientParams{Name: "Shared Name", UserID: user2.ID})
 	require.NoError(t, clientRepo.Create(ctx, clientA))
 	require.NoError(t, clientRepo.Create(ctx, clientB))
 
@@ -125,16 +139,22 @@ func TestPostgresClientRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
 	user := createTestUser(t, userRepo)
-	client, _ := entities.NewClient("Old Name", user.ID)
+	client, _ := entities.NewClient(entities.CreateClientParams{Name: "Old Name", UserID: user.ID})
 	require.NoError(t, clientRepo.Create(ctx, client))
 
-	client.Name = "New Name"
+	require.NoError(t, client.SetName("New Name"))
+	require.NoError(t, client.SetPhone("+34 999 888 777"))
+	require.NoError(t, client.SetEmail("updated@example.com"))
+	require.NoError(t, client.SetDescription("Updated description"))
 	err := clientRepo.Update(ctx, client)
 	require.NoError(t, err)
 
 	found, err := clientRepo.GetByID(ctx, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", found.Name)
+	assert.Equal(t, "+34 999 888 777", found.Phone)
+	assert.Equal(t, "updated@example.com", found.Email)
+	assert.Equal(t, "Updated description", found.Description)
 }
 
 // =============================================================================
@@ -146,7 +166,7 @@ func TestPostgresClientRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	user := createTestUser(t, userRepo)
-	client, _ := entities.NewClient("To Delete", user.ID)
+	client, _ := entities.NewClient(entities.CreateClientParams{Name: "To Delete", UserID: user.ID})
 	require.NoError(t, clientRepo.Create(ctx, client))
 
 	err := clientRepo.Delete(ctx, client.ID)
@@ -179,7 +199,7 @@ func TestPostgresClientRepository_Create_WithInvalidUserID_Fails(t *testing.T) {
 	clientRepo, _ := setupClientRepo(t)
 	ctx := context.Background()
 
-	client, _ := entities.NewClient("Orphan Client", uuid.New())
+	client, _ := entities.NewClient(entities.CreateClientParams{Name: "Orphan Client", UserID: uuid.New()})
 	err := clientRepo.Create(ctx, client)
 
 	assert.Error(t, err, "creating a client with a non-existing user_id should fail due to FK constraint")
@@ -196,8 +216,8 @@ func TestPostgresClientRepository_TwoUsers_SameClientName_BothSucceed(t *testing
 	user1 := createTestUser(t, userRepo)
 	user2 := createTestUser(t, userRepo)
 
-	clientA, _ := entities.NewClient("Same Name", user1.ID)
-	clientB, _ := entities.NewClient("Same Name", user2.ID)
+	clientA, _ := entities.NewClient(entities.CreateClientParams{Name: "Same Name", UserID: user1.ID})
+	clientB, _ := entities.NewClient(entities.CreateClientParams{Name: "Same Name", UserID: user2.ID})
 
 	require.NoError(t, clientRepo.Create(ctx, clientA))
 	require.NoError(t, clientRepo.Create(ctx, clientB))
@@ -224,7 +244,7 @@ func TestPostgresClientRepository_Mapper_PreservesAllFields(t *testing.T) {
 	ctx := context.Background()
 
 	user := createTestUser(t, userRepo)
-	original, _ := entities.NewClient("Full Data Client", user.ID)
+	original, _ := entities.NewClient(newClientParams("Full Data Client", user.ID))
 	require.NoError(t, clientRepo.Create(ctx, original))
 
 	found, err := clientRepo.GetByID(ctx, original.ID)
@@ -232,6 +252,9 @@ func TestPostgresClientRepository_Mapper_PreservesAllFields(t *testing.T) {
 
 	assert.Equal(t, original.ID, found.ID)
 	assert.Equal(t, original.Name, found.Name)
+	assert.Equal(t, original.Phone, found.Phone)
+	assert.Equal(t, original.Email, found.Email)
+	assert.Equal(t, original.Description, found.Description)
 	assert.Equal(t, original.UserID, found.UserID)
 	assert.WithinDuration(t, original.CreatedAt, found.CreatedAt, 1_000_000_000)
 	assert.WithinDuration(t, original.UpdatedAt, found.UpdatedAt, 1_000_000_000)
@@ -246,7 +269,7 @@ func TestPostgresClientRepository_CascadeDelete_UserDeletion(t *testing.T) {
 	ctx := context.Background()
 
 	user := createTestUser(t, userRepo)
-	client, _ := entities.NewClient("Will Be Orphaned", user.ID)
+	client, _ := entities.NewClient(entities.CreateClientParams{Name: "Will Be Orphaned", UserID: user.ID})
 	require.NoError(t, clientRepo.Create(ctx, client))
 
 	// Delete the user directly via DB (simulating cascade)

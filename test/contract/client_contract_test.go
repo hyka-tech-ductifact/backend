@@ -18,7 +18,24 @@ func TestContract_CreateClient_ValidBody_Returns201_WithClientResponse(t *testin
 	token := registerAndLogin(t, "Client Owner", "contract-client-create@example.com", "securepass123").AccessToken
 
 	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
-		"name": "Acme Corp",
+		"name":        "Acme Corp",
+		"phone":       "+34 600 111 222",
+		"email":       "acme@example.com",
+		"description": "A test client",
+	})
+
+	cv.ValidateResponse(resp, http.StatusCreated)
+}
+
+func TestContract_CreateClient_MinimalBody_Returns201_WithClientResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	token := registerAndLogin(t, "Client Owner", "contract-client-create-min@example.com", "securepass123").AccessToken
+
+	// Only required field: name. Optional fields default to "".
+	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name": "Minimal Client",
 	})
 
 	cv.ValidateResponse(resp, http.StatusCreated)
@@ -66,10 +83,20 @@ func TestContract_ListClients_WithItems_Returns200_WithClientResponseArray(t *te
 
 	token := registerAndLogin(t, "List Owner", "contract-client-listitems@example.com", "securepass123").AccessToken
 
-	// Create two clients
-	r1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client A"})
+	// Create two clients with all fields
+	r1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":        "Client A",
+		"phone":       "+34 600 111 222",
+		"email":       "a@example.com",
+		"description": "Client A desc",
+	})
 	defer r1.Body.Close()
-	r2 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client B"})
+	r2 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":        "Client B",
+		"phone":       "+34 600 333 444",
+		"email":       "b@example.com",
+		"description": "Client B desc",
+	})
 	defer r2.Body.Close()
 
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
@@ -96,8 +123,13 @@ func TestContract_GetClient_Existing_Returns200_WithClientResponse(t *testing.T)
 
 	token := registerAndLogin(t, "Get Owner", "contract-client-get@example.com", "securepass123").AccessToken
 
-	// Create a client to GET
-	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Get Client"})
+	// Create a client to GET (with all fields)
+	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":        "Get Client",
+		"phone":       "+34 600 555 666",
+		"email":       "getclient@example.com",
+		"description": "Client to get",
+	})
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 
@@ -169,7 +201,31 @@ func TestContract_UpdateClient_ValidBody_Returns200_WithClientResponse(t *testin
 	clientID := created["id"].(string)
 
 	resp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), token, map[string]string{
-		"name": "Updated Name",
+		"name":        "Updated Name",
+		"phone":       "+34 600 777 888",
+		"email":       "updated@example.com",
+		"description": "Updated description",
+	})
+
+	cv.ValidateResponse(resp, http.StatusOK)
+}
+
+func TestContract_UpdateClient_PartialUpdate_Returns200_WithClientResponse(t *testing.T) {
+	clean(t)
+	cv := newValidator(t)
+
+	token := registerAndLogin(t, "Partial Owner", "contract-client-partial@example.com", "securepass123").AccessToken
+
+	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":  "Original",
+		"phone": "+34 600 111 222",
+	})
+	created := helpers.ParseBody(t, createResp)
+	clientID := created["id"].(string)
+
+	// Only update phone — other fields should remain unchanged
+	resp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), token, map[string]string{
+		"phone": "+34 600 999 000",
 	})
 
 	cv.ValidateResponse(resp, http.StatusOK)
