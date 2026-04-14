@@ -46,6 +46,10 @@ func main() {
 	clientRepo := persistence.NewPostgresClientRepository(db)
 	clientService := services.NewClientService(clientRepo, userRepo)
 
+	// --- Project wiring ---
+	projectRepo := persistence.NewPostgresProjectRepository(db)
+	projectService := services.NewProjectService(projectRepo, clientRepo)
+
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
 	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
@@ -81,7 +85,7 @@ func main() {
 	defer userLimiter.Stop()
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
+	router := httpAdapter.SetupRoutes(healthChecker, userService, clientService, projectService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

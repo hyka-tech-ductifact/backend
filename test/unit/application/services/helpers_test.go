@@ -74,6 +74,40 @@ func clientRepoReturning(client *entities.Client) *mocks.MockClientRepository {
 	}
 }
 
+// newTestProject creates a Project with sensible defaults and timestamps in the past.
+func newTestProject(clientID uuid.UUID) *entities.Project {
+	return &entities.Project{
+		ID:          uuid.New(),
+		Name:        "Residential Tower B",
+		Address:     "Calle Mayor 12, Madrid",
+		ManagerName: "Carlos Pérez",
+		Phone:       "+34 699 111 222",
+		Description: "14-storey residential building",
+		ClientID:    clientID,
+		CreatedAt:   time.Now().Add(-time.Hour),
+		UpdatedAt:   time.Now().Add(-time.Hour),
+	}
+}
+
+// --- Mock helpers ---
+
+// projectRepoReturning builds a MockProjectRepository whose GetByIDFn always returns
+// a copy of the given project (or ErrNotFound if project is nil).
+func projectRepoReturning(project *entities.Project) *mocks.MockProjectRepository {
+	return &mocks.MockProjectRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Project, error) {
+			if project == nil {
+				return nil, repositories.ErrNotFound
+			}
+			cp := *project
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, p *entities.Project) error {
+			return nil
+		},
+	}
+}
+
 // strPtr returns a pointer to the given string. Useful for optional update fields.
 func strPtr(s string) *string {
 	return &s

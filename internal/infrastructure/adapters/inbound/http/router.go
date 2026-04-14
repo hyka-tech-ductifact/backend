@@ -23,6 +23,7 @@ func SetupRoutes(
 	healthChecker ports.HealthChecker,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
+	projectService usecases.ProjectService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
@@ -38,8 +39,11 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrAccountLocked, http.StatusTooManyRequests, "account temporarily locked, please try again later")
 	helpers.RegisterDomainError(services.ErrClientNotFound, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(services.ErrClientNotOwned, http.StatusForbidden, "client does not belong to this user")
+	helpers.RegisterDomainError(services.ErrProjectNotFound, http.StatusNotFound, "project not found")
+	helpers.RegisterDomainError(services.ErrProjectNotOwned, http.StatusForbidden, "project does not belong to this client")
 	helpers.RegisterDomainError(entities.ErrEmptyUserName, http.StatusBadRequest, "user name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrEmptyClientName, http.StatusBadRequest, "client name cannot be empty")
+	helpers.RegisterDomainError(entities.ErrEmptyProjectName, http.StatusBadRequest, "project name cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
@@ -121,6 +125,17 @@ func SetupRoutes(
 		clientRoutes.GET("/:client_id", clientHandler.GetClient)
 		clientRoutes.PUT("/:client_id", clientHandler.UpdateClient)
 		clientRoutes.DELETE("/:client_id", clientHandler.DeleteClient)
+	}
+
+	// Project routes — nested under a client
+	projectHandler := NewProjectHandler(projectService)
+	projectRoutes := protected.Group("/users/me/clients/:client_id/projects")
+	{
+		projectRoutes.POST("", projectHandler.CreateProject)
+		projectRoutes.GET("", projectHandler.ListProjects)
+		projectRoutes.GET("/:project_id", projectHandler.GetProject)
+		projectRoutes.PUT("/:project_id", projectHandler.UpdateProject)
+		projectRoutes.DELETE("/:project_id", projectHandler.DeleteProject)
 	}
 
 	return r

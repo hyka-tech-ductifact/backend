@@ -35,3 +35,31 @@ INSERT INTO clients (id, name, phone, email, description, user_id, created_at, u
   ('c0000000-0000-0000-0000-000000000009', 'Oscorp Labs',     '+34 600 200 001', 'oscorp@example.com',  'Genetics and biotech',    'b0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
   ('c0000000-0000-0000-0000-000000000010', 'LexCorp',         '+34 600 200 002', 'lex@example.com',     'Real estate and tech',    'b0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
   ('c0000000-0000-0000-0000-000000000011', 'Pied Piper Inc',  '+34 600 200 003', 'pp@example.com',      'Middle-out compression',  'b0000000-0000-0000-0000-000000000002', NOW(),                      NOW());
+
+-- ─── Projects (Alice → Acme Corp) ──────────────────────────
+-- 3 projects for Acme Corp — enough to test listing and pagination.
+
+INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
+  ('p0000000-0000-0000-0000-000000000001', 'Residential Tower B',       'Calle Mayor 12, Madrid',              'Carlos Pérez',    '+34 699 111 001', '14-storey residential building, phase 1',     'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'),
+  ('p0000000-0000-0000-0000-000000000002', 'Office Park Norte',         'Av. de la Constitución 45, Sevilla',  'Laura Gómez',     '+34 699 111 002', 'Mixed-use office complex with parking',        'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'),
+  ('p0000000-0000-0000-0000-000000000003', 'Warehouse Logistics Hub',   'Polígono Industrial Sur, Valencia',   'Miguel Torres',   '+34 699 111 003', 'Cold-storage warehouse for distribution',      'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days');
+
+-- ─── Projects (Alice → Globex Industries) ───────────────────
+-- 2 projects for Globex — verifies isolation between clients.
+
+INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
+  ('p0000000-0000-0000-0000-000000000004', 'Port Expansion Phase 2',    'Puerto de Barcelona, Muelle 9',       'Ana Ruiz',        '+34 699 222 001', 'Container terminal expansion',                'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+  ('p0000000-0000-0000-0000-000000000005', 'Solar Farm Andalucía',      'Carretera A-92 km 34, Antequera',     '',                '+34 699 222 002', '',                                            'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+
+-- ─── Projects (Alice → Stark Industries) ────────────────────
+-- 1 project with minimal fields — tests optional fields as empty strings.
+
+INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
+  ('p0000000-0000-0000-0000-000000000006', 'Arc Reactor Facility',      '',                                    '',                '',                '',                                            'c0000000-0000-0000-0000-000000000006', NOW(),                      NOW());
+
+-- ─── Projects (Bob → Oscorp Labs) ───────────────────────────
+-- 2 projects for Bob — verifies that Alice cannot see Bob's projects.
+
+INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
+  ('p0000000-0000-0000-0000-000000000007', 'Genetics Lab Expansion',    'Calle Genómica 8, Barcelona',         'Peter Parker',    '+34 699 333 001', 'New wing for genome sequencing',               'c0000000-0000-0000-0000-000000000009', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
+  ('p0000000-0000-0000-0000-000000000008', 'Biotech Campus',            'Parque Científico, Bilbao',           'Gwen Stacy',      '+34 699 333 002', 'R&D campus with 3 buildings',                 'c0000000-0000-0000-0000-000000000009', NOW(),                      NOW());
