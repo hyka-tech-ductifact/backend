@@ -32,7 +32,10 @@ func TestE2E_CreateClient_Success(t *testing.T) {
 	userID, token := createUserForClients(t, "Juan", "juan@example.com")
 
 	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
-		"name": "Acme Corp",
+		"name":        "Acme Corp",
+		"phone":       "+34 600 111 222",
+		"email":       "acme@example.com",
+		"description": "Main client",
 	})
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -40,6 +43,29 @@ func TestE2E_CreateClient_Success(t *testing.T) {
 
 	assert.NotEmpty(t, body["id"])
 	assert.Equal(t, "Acme Corp", body["name"])
+	assert.Equal(t, "+34 600 111 222", body["phone"])
+	assert.Equal(t, "acme@example.com", body["email"])
+	assert.Equal(t, "Main client", body["description"])
+	assert.Equal(t, userID, body["user_id"])
+}
+
+func TestE2E_CreateClient_MinimalFields_Success(t *testing.T) {
+	clean(t)
+	userID, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	// Only required field: name. Optional fields default to "".
+	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name": "Minimal Client",
+	})
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+
+	assert.NotEmpty(t, body["id"])
+	assert.Equal(t, "Minimal Client", body["name"])
+	assert.Equal(t, "", body["phone"])
+	assert.Equal(t, "", body["email"])
+	assert.Equal(t, "", body["description"])
 	assert.Equal(t, userID, body["user_id"])
 }
 
@@ -69,11 +95,17 @@ func TestE2E_ListClients_Success(t *testing.T) {
 	_, token := createUserForClients(t, "Juan", "juan@example.com")
 
 	// Create two clients
-	resp1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client A"})
+	resp1 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":  "Client A",
+		"phone": "+34 600 111 222",
+	})
 	require.Equal(t, http.StatusCreated, resp1.StatusCode)
 	resp1.Body.Close()
 
-	resp2 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Client B"})
+	resp2 := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":  "Client B",
+		"email": "b@example.com",
+	})
 	require.Equal(t, http.StatusCreated, resp2.StatusCode)
 	resp2.Body.Close()
 
@@ -128,7 +160,12 @@ func TestE2E_GetClient_Success(t *testing.T) {
 	clean(t)
 	userID, token := createUserForClients(t, "Juan", "juan@example.com")
 
-	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Acme Corp"})
+	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":        "Acme Corp",
+		"phone":       "+34 600 111 222",
+		"email":       "acme@example.com",
+		"description": "Main client",
+	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
@@ -139,6 +176,9 @@ func TestE2E_GetClient_Success(t *testing.T) {
 
 	assert.Equal(t, clientID, body["id"])
 	assert.Equal(t, "Acme Corp", body["name"])
+	assert.Equal(t, "+34 600 111 222", body["phone"])
+	assert.Equal(t, "acme@example.com", body["email"])
+	assert.Equal(t, "Main client", body["description"])
 	assert.Equal(t, userID, body["user_id"])
 }
 
@@ -180,19 +220,53 @@ func TestE2E_UpdateClient_Success(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Juan", "juan@example.com")
 
-	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Old Name"})
+	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":  "Old Name",
+		"phone": "+34 600 111 222",
+	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 
 	resp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), token, map[string]string{
-		"name": "New Name",
+		"name":        "New Name",
+		"phone":       "+34 600 999 888",
+		"email":       "updated@example.com",
+		"description": "Updated description",
 	})
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, "New Name", body["name"])
+	assert.Equal(t, "+34 600 999 888", body["phone"])
+	assert.Equal(t, "updated@example.com", body["email"])
+	assert.Equal(t, "Updated description", body["description"])
 	assert.Equal(t, clientID, body["id"])
+}
+
+func TestE2E_UpdateClient_PartialUpdate_Success(t *testing.T) {
+	clean(t)
+	_, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+		"name":  "Original Name",
+		"phone": "+34 600 111 222",
+		"email": "original@example.com",
+	})
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+	created := helpers.ParseBody(t, createResp)
+	clientID := created["id"].(string)
+
+	// Only update phone — other fields should remain unchanged
+	resp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), token, map[string]string{
+		"phone": "+34 600 999 000",
+	})
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Equal(t, "Original Name", body["name"])
+	assert.Equal(t, "+34 600 999 000", body["phone"])
+	assert.Equal(t, "original@example.com", body["email"])
 }
 
 func TestE2E_UpdateClient_NotFound_Returns404(t *testing.T) {
@@ -270,28 +344,42 @@ func TestE2E_Client_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Ana", "ana@example.com")
 
-	// 1. Create
+	// 1. Create with all fields
 	createResp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
-		"name": "Acme Corp",
+		"name":        "Acme Corp",
+		"phone":       "+34 600 111 222",
+		"email":       "acme@example.com",
+		"description": "Main client for project management",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	clientID := created["id"].(string)
 	assert.Equal(t, "Acme Corp", created["name"])
+	assert.Equal(t, "+34 600 111 222", created["phone"])
+	assert.Equal(t, "acme@example.com", created["email"])
+	assert.Equal(t, "Main client for project management", created["description"])
 
 	// 2. Get — verify persisted
 	getResp := helpers.AuthGetJSON(t, url("/users/me/clients/"+clientID), token)
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	fetched := helpers.ParseBody(t, getResp)
 	assert.Equal(t, "Acme Corp", fetched["name"])
+	assert.Equal(t, "+34 600 111 222", fetched["phone"])
+	assert.Equal(t, "acme@example.com", fetched["email"])
 
-	// 3. Update
+	// 3. Update all fields
 	updateResp := helpers.AuthPutJSON(t, url("/users/me/clients/"+clientID), token, map[string]string{
-		"name": "Acme Inc",
+		"name":        "Acme Inc",
+		"phone":       "+34 600 999 888",
+		"email":       "acme.inc@example.com",
+		"description": "Updated description",
 	})
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 	updated := helpers.ParseBody(t, updateResp)
 	assert.Equal(t, "Acme Inc", updated["name"])
+	assert.Equal(t, "+34 600 999 888", updated["phone"])
+	assert.Equal(t, "acme.inc@example.com", updated["email"])
+	assert.Equal(t, "Updated description", updated["description"])
 
 	// 4. List — should have 1 client
 	listResp := helpers.AuthGetJSON(t, url("/users/me/clients"), token)
