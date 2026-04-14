@@ -241,3 +241,104 @@ Content-Type: application/json
 ### Get client — invalid UUID → 400
 GET {{baseUrl}}/users/me/clients/not-a-uuid
 Authorization: Bearer {{token}}
+
+# =============================================================================
+# PROJECTS (protected — requires Bearer token)
+# =============================================================================
+
+@client_id = <paste-client-uuid-here>
+@project_id = <paste-project-uuid-here>
+
+### Create a project (all fields)
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Residential Tower B",
+  "address": "Calle Mayor 12, Madrid",
+  "manager_name": "Carlos Pérez",
+  "phone": "+34 699 111 222",
+  "description": "14-storey residential building, phase 1"
+}
+
+### Create a project (minimal — name only)
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Minimal Project"
+}
+
+### List projects for a client
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects
+Authorization: Bearer {{token}}
+
+### List projects — page 2
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects?page=2&page_size=5
+Authorization: Bearer {{token}}
+
+### Get a project by ID
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+Authorization: Bearer {{token}}
+
+### Update a project (all fields)
+PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Tower B - Phase 2",
+  "address": "Avenida de la Constitución 1, Sevilla",
+  "manager_name": "Ana García",
+  "phone": "+34 600 999 888",
+  "description": "Updated to phase 2"
+}
+
+### Update a project (partial — address only)
+PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "address": "New Address 5, Barcelona"
+}
+
+### Delete a project
+DELETE {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# PROJECT VALIDATION (protected)
+# =============================================================================
+
+### Create project — missing name → 400
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Create project — invalid phone → 400
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Bad Phone Project",
+  "phone": "abc"
+}
+
+### Create project — non-existing client → 404
+POST {{baseUrl}}/users/me/clients/00000000-0000-0000-0000-000000000000/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Orphan Project"
+}
+
+### Get project — invalid UUID → 400
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/not-a-uuid
+Authorization: Bearer {{token}}
