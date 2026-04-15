@@ -18,13 +18,14 @@ import (
 // OrderModel is the GORM-specific database representation.
 // It is NOT a domain entity. It lives here because only this adapter cares about it.
 type OrderModel struct {
-	ID        uuid.UUID `gorm:"primaryKey"`
-	Title     string
-	Status    string
-	ProjectID uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt
+	ID          uuid.UUID `gorm:"primaryKey"`
+	Title       string
+	Status      string
+	Description string
+	ProjectID   uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt
 
 	// GORM association to ProjectModel for FK constraint and cascade delete.
 	Project ProjectModel `gorm:"foreignKey:ProjectID"`
@@ -101,12 +102,13 @@ func (r *PostgresOrderRepository) Delete(ctx context.Context, id uuid.UUID) erro
 
 func toOrderModel(order *entities.Order) *OrderModel {
 	model := &OrderModel{
-		ID:        order.ID,
-		Title:     order.Title,
-		Status:    string(order.Status),
-		ProjectID: order.ProjectID,
-		CreatedAt: order.CreatedAt,
-		UpdatedAt: order.UpdatedAt,
+		ID:          order.ID,
+		Title:       order.Title,
+		Status:      string(order.Status),
+		Description: order.Description,
+		ProjectID:   order.ProjectID,
+		CreatedAt:   order.CreatedAt,
+		UpdatedAt:   order.UpdatedAt,
 	}
 	if order.DeletedAt != nil {
 		model.DeletedAt = gorm.DeletedAt{Time: *order.DeletedAt, Valid: true}
@@ -116,12 +118,13 @@ func toOrderModel(order *entities.Order) *OrderModel {
 
 func toOrderEntity(model *OrderModel) *entities.Order {
 	entity := &entities.Order{
-		ID:        model.ID,
-		Title:     model.Title,
-		Status:    entities.OrderStatus(model.Status),
-		ProjectID: model.ProjectID,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:          model.ID,
+		Title:       model.Title,
+		Status:      entities.OrderStatus(model.Status),
+		Description: model.Description,
+		ProjectID:   model.ProjectID,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
 	}
 	if model.DeletedAt.Valid {
 		entity.DeletedAt = &model.DeletedAt.Time

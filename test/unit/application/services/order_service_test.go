@@ -26,13 +26,15 @@ func TestCreateOrder_WithValidData_ReturnsOrder(t *testing.T) {
 	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
 
 	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
-		Title:     "Steel beams – lot 3",
-		ProjectID: project.ID,
+		Title:       "Steel beams – lot 3",
+		Description: "First batch of structural steel",
+		ProjectID:   project.ID,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "Steel beams – lot 3", order.Title)
 	assert.Equal(t, entities.OrderStatusPending, order.Status)
+	assert.Equal(t, "First batch of structural steel", order.Description)
 	assert.Equal(t, project.ID, order.ProjectID)
 }
 
@@ -262,6 +264,21 @@ func TestUpdateOrder_WithStatus_UpdatesStatus(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, entities.OrderStatusCompleted, result.Status)
+}
+
+func TestUpdateOrder_WithDescription_UpdatesDescription(t *testing.T) {
+	userID := uuid.New()
+	client := newTestClient(userID)
+	project := newTestProject(client.ID)
+	order := newTestOrder(project.ID)
+	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+
+	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+		Description: strPtr("Updated description"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "Updated description", result.Description)
 }
 
 func TestUpdateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {

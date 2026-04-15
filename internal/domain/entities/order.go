@@ -27,33 +27,36 @@ func (s OrderStatus) IsValid() bool {
 }
 
 type Order struct {
-	ID        uuid.UUID
-	Title     string
-	Status    OrderStatus
-	ProjectID uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time // nil = active, non-nil = soft-deleted
+	ID          uuid.UUID
+	Title       string
+	Status      OrderStatus
+	Description string
+	ProjectID   uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time // nil = active, non-nil = soft-deleted
 }
 
 // CreateOrderParams groups all parameters needed to create an Order.
-// Required: Title, ProjectID. Optional: Status (defaults to "pending").
+// Required: Title, ProjectID. Optional: Status (defaults to "pending"), Description.
 type CreateOrderParams struct {
-	Title     string
-	Status    string
-	ProjectID uuid.UUID
+	Title       string
+	Status      string
+	Description string
+	ProjectID   uuid.UUID
 }
 
 // UpdateOrderParams groups all fields that can be updated on an Order.
 // nil = field not provided (no change), non-nil = new value.
 type UpdateOrderParams struct {
-	Title  *string
-	Status *string
+	Title       *string
+	Status      *string
+	Description *string
 }
 
 // HasChanges returns true if at least one field is set.
 func (p UpdateOrderParams) HasChanges() bool {
-	return p.Title != nil || p.Status != nil
+	return p.Title != nil || p.Status != nil || p.Description != nil
 }
 
 // NewOrder is the only way to create a valid Order.
@@ -86,6 +89,8 @@ func NewOrder(params CreateOrderParams) (*Order, error) {
 		return nil, err
 	}
 
+	o.Description = params.Description
+
 	return o, nil
 }
 
@@ -106,4 +111,9 @@ func (o *Order) SetStatus(status string) error {
 	}
 	o.Status = s
 	return nil
+}
+
+// SetDescription updates the order's description. Empty string is valid (clears it).
+func (o *Order) SetDescription(description string) {
+	o.Description = description
 }

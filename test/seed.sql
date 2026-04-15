@@ -67,27 +67,27 @@ INSERT INTO projects (id, name, address, manager_name, phone, description, clien
 -- ─── Orders (Alice → Acme Corp → Residential Tower B) ──────
 -- 3 orders for the first project — enough to test listing and pagination.
 
-INSERT INTO orders (id, title, status, project_id, created_at, updated_at) VALUES
-  ('e0000000-0000-0000-0000-000000000001', 'Steel beams – lot 3',         'pending',   'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
-  ('e0000000-0000-0000-0000-000000000002', 'Concrete mix – delivery 1',   'completed', 'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
-  ('e0000000-0000-0000-0000-000000000003', 'Electrical wiring – phase A', 'pending',   'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000001', 'Steel beams – lot 3',         'pending',   'First batch of structural steel for floors 1-5',  'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+  ('e0000000-0000-0000-0000-000000000002', 'Concrete mix – delivery 1',   'completed', 'High-strength concrete for foundation',            'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('e0000000-0000-0000-0000-000000000003', 'Electrical wiring – phase A', 'pending',   '',                                                 'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
 
 -- ─── Orders (Alice → Acme Corp → Office Park Norte) ────────
 -- 2 orders for the second project — verifies isolation between projects.
 
-INSERT INTO orders (id, title, status, project_id, created_at, updated_at) VALUES
-  ('e0000000-0000-0000-0000-000000000004', 'HVAC units – building A',     'pending',   'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
-  ('e0000000-0000-0000-0000-000000000005', 'Elevator installation',       'completed', 'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000004', 'HVAC units – building A',     'pending',   'Central air conditioning for office floors',       'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('e0000000-0000-0000-0000-000000000005', 'Elevator installation',       'completed', 'Two passenger elevators, capacity 1000kg',         'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
 
 -- ─── Orders (Alice → Globex → Port Expansion Phase 2) ──────
 -- 1 order with minimal data — tests defaults.
 
-INSERT INTO orders (id, title, status, project_id, created_at, updated_at) VALUES
-  ('e0000000-0000-0000-0000-000000000006', 'Container crane rental',      'pending',   'f0000000-0000-0000-0000-000000000004', NOW(),                      NOW());
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000006', 'Container crane rental',      'pending',   '',                                                 'f0000000-0000-0000-0000-000000000004', NOW(),                      NOW());
 
 -- ─── Orders (Bob → Oscorp Labs → Genetics Lab Expansion) ───
 -- 2 orders for Bob — verifies that Alice cannot see Bob's orders.
 
-INSERT INTO orders (id, title, status, project_id, created_at, updated_at) VALUES
-  ('e0000000-0000-0000-0000-000000000007', 'Gene sequencer – model X',    'pending',   'f0000000-0000-0000-0000-000000000007', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
-  ('e0000000-0000-0000-0000-000000000008', 'Lab bench furniture',         'completed', 'f0000000-0000-0000-0000-000000000007', NOW(),                      NOW());
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000007', 'Gene sequencer – model X',    'pending',   'Latest generation genome sequencer',               'f0000000-0000-0000-0000-000000000007', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
+  ('e0000000-0000-0000-0000-000000000008', 'Lab bench furniture',         'completed', '',                                                 'f0000000-0000-0000-0000-000000000007', NOW(),                      NOW());

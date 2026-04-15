@@ -355,7 +355,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "title": "Steel beams – lot 3"
+  "title": "Steel beams – lot 3",
+  "description": "First batch of structural steel for floors 1-5"
 }
 
 ### Create an order (with status)
@@ -365,7 +366,8 @@ Content-Type: application/json
 
 {
   "title": "Concrete mix – delivery 1",
-  "status": "completed"
+  "status": "completed",
+  "description": "High-strength concrete for foundation"
 }
 
 ### List orders for a project
@@ -387,7 +389,8 @@ Content-Type: application/json
 
 {
   "title": "Steel beams – lot 3 (updated)",
-  "status": "completed"
+  "status": "completed",
+  "description": "Updated description for the order"
 }
 
 ### Update an order (partial — status only)

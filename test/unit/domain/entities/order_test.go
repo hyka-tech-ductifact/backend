@@ -13,14 +13,16 @@ import (
 func TestNewOrder_WithValidData_ReturnsOrder(t *testing.T) {
 	projectID := uuid.New()
 	order, err := entities.NewOrder(entities.CreateOrderParams{
-		Title:     "Steel beams – lot 3",
-		Status:    "pending",
-		ProjectID: projectID,
+		Title:       "Steel beams – lot 3",
+		Status:      "pending",
+		Description: "First batch of structural steel",
+		ProjectID:   projectID,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "Steel beams – lot 3", order.Title)
 	assert.Equal(t, entities.OrderStatusPending, order.Status)
+	assert.Equal(t, "First batch of structural steel", order.Description)
 	assert.Equal(t, projectID, order.ProjectID)
 	assert.NotEmpty(t, order.ID)
 	assert.False(t, order.CreatedAt.IsZero())
@@ -36,6 +38,7 @@ func TestNewOrder_WithDefaultStatus_ReturnsPending(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, entities.OrderStatusPending, order.Status)
+	assert.Equal(t, "", order.Description, "description defaults to empty string")
 }
 
 func TestNewOrder_WithCompletedStatus_ReturnsCompleted(t *testing.T) {
@@ -120,6 +123,7 @@ func TestUpdateOrderParams_HasChanges_WithNoFields_ReturnsFalse(t *testing.T) {
 func TestUpdateOrderParams_HasChanges_WithAnyField_ReturnsTrue(t *testing.T) {
 	title := "New Title"
 	status := "completed"
+	desc := "Updated description"
 
 	tests := []struct {
 		label  string
@@ -127,6 +131,7 @@ func TestUpdateOrderParams_HasChanges_WithAnyField_ReturnsTrue(t *testing.T) {
 	}{
 		{"Title", entities.UpdateOrderParams{Title: &title}},
 		{"Status", entities.UpdateOrderParams{Status: &status}},
+		{"Description", entities.UpdateOrderParams{Description: &desc}},
 	}
 
 	for _, tc := range tests {
@@ -174,6 +179,21 @@ func TestOrderSetStatus_WithInvalidStatus_ReturnsError(t *testing.T) {
 	err := order.SetStatus("invalid")
 
 	assert.ErrorIs(t, err, entities.ErrInvalidOrderStatus)
+}
+
+func TestOrderSetDescription_Updates(t *testing.T) {
+	order := newTestOrderForSetters()
+	order.SetDescription("New description")
+
+	assert.Equal(t, "New description", order.Description)
+}
+
+func TestOrderSetDescription_WithEmpty_ClearsField(t *testing.T) {
+	order := newTestOrderForSetters()
+	order.SetDescription("some text")
+	order.SetDescription("")
+
+	assert.Equal(t, "", order.Description)
 }
 
 // --- OrderStatus.IsValid ---

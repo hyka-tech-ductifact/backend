@@ -53,8 +53,9 @@ func TestPostgresOrderRepository_Create_And_GetByID(t *testing.T) {
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
 
 	order, err := entities.NewOrder(entities.CreateOrderParams{
-		Title:     "Steel beams – lot 3",
-		ProjectID: project.ID,
+		Title:       "Steel beams – lot 3",
+		Description: "First batch of structural steel",
+		ProjectID:   project.ID,
 	})
 	require.NoError(t, err)
 
@@ -67,6 +68,7 @@ func TestPostgresOrderRepository_Create_And_GetByID(t *testing.T) {
 	assert.Equal(t, order.ID, found.ID)
 	assert.Equal(t, "Steel beams – lot 3", found.Title)
 	assert.Equal(t, entities.OrderStatusPending, found.Status)
+	assert.Equal(t, "First batch of structural steel", found.Description)
 	assert.Equal(t, project.ID, found.ProjectID)
 	assert.False(t, found.CreatedAt.IsZero())
 	assert.False(t, found.UpdatedAt.IsZero())
@@ -171,11 +173,12 @@ func TestPostgresOrderRepository_Update(t *testing.T) {
 	user := createTestUser(t, userRepo)
 	client := createTestClient(t, clientRepo, user.ID)
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
-	order, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Old Title", ProjectID: project.ID})
+	order, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Old Title", Description: "Old desc", ProjectID: project.ID})
 	require.NoError(t, orderRepo.Create(ctx, order))
 
 	require.NoError(t, order.SetTitle("New Title"))
 	require.NoError(t, order.SetStatus("completed"))
+	order.SetDescription("New desc")
 	err := orderRepo.Update(ctx, order)
 	require.NoError(t, err)
 
@@ -183,6 +186,7 @@ func TestPostgresOrderRepository_Update(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "New Title", found.Title)
 	assert.Equal(t, entities.OrderStatusCompleted, found.Status)
+	assert.Equal(t, "New desc", found.Description)
 }
 
 // =============================================================================
@@ -278,7 +282,7 @@ func TestPostgresOrderRepository_Mapper_PreservesAllFields(t *testing.T) {
 	user := createTestUser(t, userRepo)
 	client := createTestClient(t, clientRepo, user.ID)
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
-	original, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Full Data Order", ProjectID: project.ID})
+	original, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Full Data Order", Description: "Full description", ProjectID: project.ID})
 	require.NoError(t, orderRepo.Create(ctx, original))
 
 	found, err := orderRepo.GetByID(ctx, original.ID)
@@ -287,6 +291,7 @@ func TestPostgresOrderRepository_Mapper_PreservesAllFields(t *testing.T) {
 	assert.Equal(t, original.ID, found.ID)
 	assert.Equal(t, original.Title, found.Title)
 	assert.Equal(t, original.Status, found.Status)
+	assert.Equal(t, original.Description, found.Description)
 	assert.Equal(t, original.ProjectID, found.ProjectID)
 	assert.WithinDuration(t, original.CreatedAt, found.CreatedAt, 1_000_000_000)
 	assert.WithinDuration(t, original.UpdatedAt, found.UpdatedAt, 1_000_000_000)

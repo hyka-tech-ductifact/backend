@@ -165,6 +165,9 @@ func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, projectID 
 			return nil, err
 		}
 	}
+	if params.Description != nil {
+		order.SetDescription(*params.Description)
+	}
 
 	order.UpdatedAt = time.Now()
 	if err := s.orderRepo.Update(ctx, order); err != nil {

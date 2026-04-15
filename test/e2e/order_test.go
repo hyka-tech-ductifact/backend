@@ -42,7 +42,8 @@ func TestE2E_CreateOrder_Success(t *testing.T) {
 	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
 	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
-		"title": "Steel beams – lot 3",
+		"title":       "Steel beams – lot 3",
+		"description": "First batch of structural steel",
 	})
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -51,6 +52,7 @@ func TestE2E_CreateOrder_Success(t *testing.T) {
 	assert.NotEmpty(t, body["id"])
 	assert.Equal(t, "Steel beams – lot 3", body["title"])
 	assert.Equal(t, "pending", body["status"])
+	assert.Equal(t, "First batch of structural steel", body["description"])
 	assert.Equal(t, projectID, body["project_id"])
 }
 
@@ -192,7 +194,8 @@ func TestE2E_GetOrder_Success(t *testing.T) {
 	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
 	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
-		"title": "Steel beams – lot 3",
+		"title":       "Steel beams – lot 3",
+		"description": "First batch",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
@@ -205,6 +208,7 @@ func TestE2E_GetOrder_Success(t *testing.T) {
 	assert.Equal(t, orderID, body["id"])
 	assert.Equal(t, "Steel beams – lot 3", body["title"])
 	assert.Equal(t, "pending", body["status"])
+	assert.Equal(t, "First batch", body["description"])
 	assert.Equal(t, projectID, body["project_id"])
 }
 
@@ -252,14 +256,16 @@ func TestE2E_UpdateOrder_Success(t *testing.T) {
 	orderID := created["id"].(string)
 
 	resp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
-		"title":  "New Title",
-		"status": "completed",
+		"title":       "New Title",
+		"status":      "completed",
+		"description": "Updated description",
 	})
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, "New Title", body["title"])
 	assert.Equal(t, "completed", body["status"])
+	assert.Equal(t, "Updated description", body["description"])
 	assert.Equal(t, orderID, body["id"])
 }
 
@@ -378,13 +384,15 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 
 	// 1. Create with default status
 	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
-		"title": "Steel beams – lot 3",
+		"title":       "Steel beams – lot 3",
+		"description": "First batch of structural steel",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 	assert.Equal(t, "Steel beams – lot 3", created["title"])
 	assert.Equal(t, "pending", created["status"])
+	assert.Equal(t, "First batch of structural steel", created["description"])
 	assert.Equal(t, projectID, created["project_id"])
 
 	// 2. Get — verify persisted
@@ -393,16 +401,19 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	fetched := helpers.ParseBody(t, getResp)
 	assert.Equal(t, "Steel beams – lot 3", fetched["title"])
 	assert.Equal(t, "pending", fetched["status"])
+	assert.Equal(t, "First batch of structural steel", fetched["description"])
 
-	// 3. Update title + status
+	// 3. Update title + status + description
 	updateResp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
-		"title":  "Steel beams – lot 3 (updated)",
-		"status": "completed",
+		"title":       "Steel beams – lot 3 (updated)",
+		"status":      "completed",
+		"description": "Updated description",
 	})
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 	updated := helpers.ParseBody(t, updateResp)
 	assert.Equal(t, "Steel beams – lot 3 (updated)", updated["title"])
 	assert.Equal(t, "completed", updated["status"])
+	assert.Equal(t, "Updated description", updated["description"])
 
 	// 4. List — should have 1 order
 	listResp := helpers.AuthGetJSON(t, orderURL(clientID, projectID), token)

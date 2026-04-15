@@ -111,12 +111,13 @@ func projectRepoReturning(project *entities.Project) *mocks.MockProjectRepositor
 // newTestOrder creates an Order with sensible defaults and timestamps in the past.
 func newTestOrder(projectID uuid.UUID) *entities.Order {
 	return &entities.Order{
-		ID:        uuid.New(),
-		Title:     "Steel beams – lot 3",
-		Status:    entities.OrderStatusPending,
-		ProjectID: projectID,
-		CreatedAt: time.Now().Add(-time.Hour),
-		UpdatedAt: time.Now().Add(-time.Hour),
+		ID:          uuid.New(),
+		Title:       "Steel beams – lot 3",
+		Status:      entities.OrderStatusPending,
+		Description: "First batch of structural steel",
+		ProjectID:   projectID,
+		CreatedAt:   time.Now().Add(-time.Hour),
+		UpdatedAt:   time.Now().Add(-time.Hour),
 	}
 }
 

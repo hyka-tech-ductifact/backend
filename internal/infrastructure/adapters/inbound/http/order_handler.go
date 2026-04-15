@@ -14,20 +14,23 @@ import (
 // --- DTOs (HTTP-specific, not domain objects) ---
 
 type CreateOrderRequest struct {
-	Title  string `json:"title" binding:"required"`
-	Status string `json:"status"`
+	Title       string `json:"title" binding:"required"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
 }
 
 type UpdateOrderRequest struct {
-	Title  *string `json:"title" binding:"omitempty"`
-	Status *string `json:"status"`
+	Title       *string `json:"title" binding:"omitempty"`
+	Status      *string `json:"status"`
+	Description *string `json:"description"`
 }
 
 type OrderResponse struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	ProjectID string `json:"project_id"`
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+	ProjectID   string `json:"project_id"`
 }
 
 type ListOrderResponse struct {
@@ -74,9 +77,10 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 
 	order, err := h.orderService.CreateOrder(c.Request.Context(), userID, clientID, entities.CreateOrderParams{
-		Title:     req.Title,
-		Status:    req.Status,
-		ProjectID: projectID,
+		Title:       req.Title,
+		Status:      req.Status,
+		Description: req.Description,
+		ProjectID:   projectID,
 	})
 	if err != nil {
 		helpers.HandleError(c, err)
@@ -197,8 +201,9 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	}
 
 	order, err := h.orderService.UpdateOrder(c.Request.Context(), orderID, projectID, clientID, userID, entities.UpdateOrderParams{
-		Title:  req.Title,
-		Status: req.Status,
+		Title:       req.Title,
+		Status:      req.Status,
+		Description: req.Description,
 	})
 	if err != nil {
 		helpers.HandleError(c, err)
@@ -245,9 +250,10 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 
 func toOrderResponse(order *entities.Order) *OrderResponse {
 	return &OrderResponse{
-		ID:        order.ID.String(),
-		Title:     order.Title,
-		Status:    string(order.Status),
-		ProjectID: order.ProjectID.String(),
+		ID:          order.ID.String(),
+		Title:       order.Title,
+		Status:      string(order.Status),
+		Description: order.Description,
+		ProjectID:   order.ProjectID.String(),
 	}
 }
