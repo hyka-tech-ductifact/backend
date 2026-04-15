@@ -108,6 +108,35 @@ func projectRepoReturning(project *entities.Project) *mocks.MockProjectRepositor
 	}
 }
 
+// newTestOrder creates an Order with sensible defaults and timestamps in the past.
+func newTestOrder(projectID uuid.UUID) *entities.Order {
+	return &entities.Order{
+		ID:        uuid.New(),
+		Title:     "Steel beams – lot 3",
+		Status:    entities.OrderStatusPending,
+		ProjectID: projectID,
+		CreatedAt: time.Now().Add(-time.Hour),
+		UpdatedAt: time.Now().Add(-time.Hour),
+	}
+}
+
+// orderRepoReturning builds a MockOrderRepository whose GetByIDFn always returns
+// a copy of the given order (or ErrNotFound if order is nil).
+func orderRepoReturning(order *entities.Order) *mocks.MockOrderRepository {
+	return &mocks.MockOrderRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Order, error) {
+			if order == nil {
+				return nil, repositories.ErrNotFound
+			}
+			cp := *order
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, o *entities.Order) error {
+			return nil
+		},
+	}
+}
+
 // strPtr returns a pointer to the given string. Useful for optional update fields.
 func strPtr(s string) *string {
 	return &s

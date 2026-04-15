@@ -1,0 +1,130 @@
+package persistence
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/repositories"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// --- Database Model (infrastructure concern) ---
+
+// OrderModel is the GORM-specific database representation.
+// It is NOT a domain entity. It lives here because only this adapter cares about it.
+type OrderModel struct {
+	ID        uuid.UUID `gorm:"primaryKey"`
+	Title     string
+	Status    string
+	ProjectID uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
+
+	// GORM association to ProjectModel for FK constraint and cascade delete.
+	Project ProjectModel `gorm:"foreignKey:ProjectID"`
+}
+
+func (OrderModel) TableName() string {
+	return "orders"
+}
+
+// --- Repository implementation ---
+
+// PostgresOrderRepository implements domain's OrderRepository interface.
+type PostgresOrderRepository struct {
+	db *gorm.DB
+}
+
+func NewPostgresOrderRepository(db *gorm.DB) *PostgresOrderRepository {
+	return &PostgresOrderRepository{db: db}
+}
+
+func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Order) error {
+	model := toOrderModel(order)
+	return r.db.WithContext(ctx).Create(model).Error
+}
+
+func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.Order, error) {
+	var model OrderModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, repositories.ErrNotFound
+		}
+		return nil, err
+	}
+	return toOrderEntity(&model), nil
+}
+
+func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+	var totalItems int64
+
+	// Count total matching rows (before pagination)
+	if err := r.db.WithContext(ctx).Model(&OrderModel{}).Where("project_id = ?", projectID).Count(&totalItems).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch the requested page
+	var models []OrderModel
+	err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("created_at DESC").
+		Offset((pg.Page - 1) * pg.PageSize).
+		Limit(pg.PageSize).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orders := make([]*entities.Order, len(models))
+	for i := range models {
+		orders[i] = toOrderEntity(&models[i])
+	}
+	return orders, totalItems, nil
+}
+
+func (r *PostgresOrderRepository) Update(ctx context.Context, order *entities.Order) error {
+	model := toOrderModel(order)
+	return r.db.WithContext(ctx).Save(model).Error
+}
+
+func (r *PostgresOrderRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&OrderModel{}, "id = ?", id).Error
+}
+
+// --- Mappers (package-level functions, not methods) ---
+
+func toOrderModel(order *entities.Order) *OrderModel {
+	model := &OrderModel{
+		ID:        order.ID,
+		Title:     order.Title,
+		Status:    string(order.Status),
+		ProjectID: order.ProjectID,
+		CreatedAt: order.CreatedAt,
+		UpdatedAt: order.UpdatedAt,
+	}
+	if order.DeletedAt != nil {
+		model.DeletedAt = gorm.DeletedAt{Time: *order.DeletedAt, Valid: true}
+	}
+	return model
+}
+
+func toOrderEntity(model *OrderModel) *entities.Order {
+	entity := &entities.Order{
+		ID:        model.ID,
+		Title:     model.Title,
+		Status:    entities.OrderStatus(model.Status),
+		ProjectID: model.ProjectID,
+		CreatedAt: model.CreatedAt,
+		UpdatedAt: model.UpdatedAt,
+	}
+	if model.DeletedAt.Valid {
+		entity.DeletedAt = &model.DeletedAt.Time
+	}
+	return entity
+}
