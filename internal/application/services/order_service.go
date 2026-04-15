@@ -43,58 +43,13 @@ func NewOrderService(
 	}
 }
 
-// verifyProjectOwnership verifies the full ownership chain: User → Client → Project.
-// Returns the project or an application-level error.
-func (s *orderService) verifyProjectOwnership(ctx context.Context, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Project, error) {
-	// Step 1: Verify client exists and belongs to user
-	client, err := s.clientRepo.GetByID(ctx, clientID)
-	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, ErrClientNotFound
-		}
-		return nil, err
-	}
-	if client.UserID != userID {
-		return nil, ErrClientNotOwned
-	}
-
-	// Step 2: Verify project exists and belongs to client
-	project, err := s.projectRepo.GetByID(ctx, projectID)
-	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, ErrProjectNotFound
-		}
-		return nil, err
-	}
-	if project.ClientID != clientID {
-		return nil, ErrProjectNotOwned
-	}
-
-	return project, nil
-}
-
-// getOwnedOrder fetches an order by ID and verifies it belongs to the given project.
-func (s *orderService) getOwnedOrder(ctx context.Context, id uuid.UUID, projectID uuid.UUID) (*entities.Order, error) {
-	order, err := s.orderRepo.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, ErrOrderNotFound
-		}
-		return nil, err
-	}
-	if order.ProjectID != projectID {
-		return nil, ErrOrderNotOwned
-	}
-	return order, nil
-}
-
 // CreateOrder orchestrates order creation:
 // 1. Verify the full ownership chain (User → Client → Project).
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
 func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, clientID uuid.UUID, params entities.CreateOrderParams) (*entities.Order, error) {
 	// Step 1: Verify full ownership chain
-	_, err := s.verifyProjectOwnership(ctx, params.ProjectID, clientID, userID)
+	_, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, params.ProjectID, clientID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,17 +70,13 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, client
 
 // GetOrderByID retrieves an order by ID, verifying the full ownership chain.
 func (s *orderService) GetOrderByID(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Order, error) {
-	_, err := s.verifyProjectOwnership(ctx, projectID, clientID, userID)
-	if err != nil {
-		return nil, err
-	}
-	return s.getOwnedOrder(ctx, id, projectID)
+	return verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
 }
 
 // ListOrdersByProjectID retrieves a paginated list of orders belonging to a project.
 // Verifies the full ownership chain.
 func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Order], error) {
-	_, err := s.verifyProjectOwnership(ctx, projectID, clientID, userID)
+	_, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, projectID, clientID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Order]{}, err
 	}
@@ -141,12 +92,7 @@ func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid
 // UpdateOrder applies a partial update to an existing order.
 // Verifies the full ownership chain.
 func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, params entities.UpdateOrderParams) (*entities.Order, error) {
-	_, err := s.verifyProjectOwnership(ctx, projectID, clientID, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	order, err := s.getOwnedOrder(ctx, id, projectID)
+	order, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,12 +125,7 @@ func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, projectID 
 
 // DeleteOrder removes an order, verifying the full ownership chain.
 func (s *orderService) DeleteOrder(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) error {
-	_, err := s.verifyProjectOwnership(ctx, projectID, clientID, userID)
-	if err != nil {
-		return err
-	}
-
-	order, err := s.getOwnedOrder(ctx, id, projectID)
+	order, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
 	if err != nil {
 		return err
 	}
