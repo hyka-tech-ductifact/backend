@@ -24,6 +24,7 @@ func SetupRoutes(
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	projectService usecases.ProjectService,
+	orderService usecases.OrderService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
@@ -44,6 +45,10 @@ func SetupRoutes(
 	helpers.RegisterDomainError(entities.ErrEmptyUserName, http.StatusBadRequest, "user name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrEmptyClientName, http.StatusBadRequest, "client name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrEmptyProjectName, http.StatusBadRequest, "project name cannot be empty")
+	helpers.RegisterDomainError(services.ErrOrderNotFound, http.StatusNotFound, "order not found")
+	helpers.RegisterDomainError(services.ErrOrderNotOwned, http.StatusForbidden, "order does not belong to this project")
+	helpers.RegisterDomainError(entities.ErrEmptyOrderTitle, http.StatusBadRequest, "order title cannot be empty")
+	helpers.RegisterDomainError(entities.ErrInvalidOrderStatus, http.StatusBadRequest, "order status must be 'pending' or 'completed'")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
@@ -136,6 +141,17 @@ func SetupRoutes(
 		projectRoutes.GET("/:project_id", projectHandler.GetProject)
 		projectRoutes.PUT("/:project_id", projectHandler.UpdateProject)
 		projectRoutes.DELETE("/:project_id", projectHandler.DeleteProject)
+	}
+
+	// Order routes — nested under a project
+	orderHandler := NewOrderHandler(orderService)
+	orderRoutes := protected.Group("/users/me/clients/:client_id/projects/:project_id/orders")
+	{
+		orderRoutes.POST("", orderHandler.CreateOrder)
+		orderRoutes.GET("", orderHandler.ListOrders)
+		orderRoutes.GET("/:order_id", orderHandler.GetOrder)
+		orderRoutes.PUT("/:order_id", orderHandler.UpdateOrder)
+		orderRoutes.DELETE("/:order_id", orderHandler.DeleteOrder)
 	}
 
 	return r

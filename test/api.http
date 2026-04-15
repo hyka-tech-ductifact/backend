@@ -342,3 +342,97 @@ Content-Type: application/json
 ### Get project — invalid UUID → 400
 GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/not-a-uuid
 Authorization: Bearer {{token}}
+
+# =============================================================================
+# ORDERS (protected — requires Bearer token)
+# =============================================================================
+
+@order_id = <paste-order-uuid-here>
+
+### Create an order (default status = pending)
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Steel beams – lot 3"
+}
+
+### Create an order (with status)
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Concrete mix – delivery 1",
+  "status": "completed"
+}
+
+### List orders for a project
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+Authorization: Bearer {{token}}
+
+### List orders — page 2
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders?page=2&page_size=5
+Authorization: Bearer {{token}}
+
+### Get an order by ID
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+
+### Update an order (all fields)
+PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Steel beams – lot 3 (updated)",
+  "status": "completed"
+}
+
+### Update an order (partial — status only)
+PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### Delete an order
+DELETE {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# ORDER VALIDATION (protected)
+# =============================================================================
+
+### Create order — missing title → 400
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Create order — invalid status → 400
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Some order",
+  "status": "invalid"
+}
+
+### Create order — non-existing project → 404
+POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/00000000-0000-0000-0000-000000000000/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Orphan Order"
+}
+
+### Get order — invalid UUID → 400
+GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/not-a-uuid
+Authorization: Bearer {{token}}
