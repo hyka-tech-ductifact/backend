@@ -40,26 +40,54 @@ INSERT INTO clients (id, name, phone, email, description, user_id, created_at, u
 -- 3 projects for Acme Corp — enough to test listing and pagination.
 
 INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
-  ('p0000000-0000-0000-0000-000000000001', 'Residential Tower B',       'Calle Mayor 12, Madrid',              'Carlos Pérez',    '+34 699 111 001', '14-storey residential building, phase 1',     'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'),
-  ('p0000000-0000-0000-0000-000000000002', 'Office Park Norte',         'Av. de la Constitución 45, Sevilla',  'Laura Gómez',     '+34 699 111 002', 'Mixed-use office complex with parking',        'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'),
-  ('p0000000-0000-0000-0000-000000000003', 'Warehouse Logistics Hub',   'Polígono Industrial Sur, Valencia',   'Miguel Torres',   '+34 699 111 003', 'Cold-storage warehouse for distribution',      'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days');
+  ('f0000000-0000-0000-0000-000000000001', 'Residential Tower B',       'Calle Mayor 12, Madrid',              'Carlos Pérez',    '+34 699 111 001', '14-storey residential building, phase 1',     'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'),
+  ('f0000000-0000-0000-0000-000000000002', 'Office Park Norte',         'Av. de la Constitución 45, Sevilla',  'Laura Gómez',     '+34 699 111 002', 'Mixed-use office complex with parking',        'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'),
+  ('f0000000-0000-0000-0000-000000000003', 'Warehouse Logistics Hub',   'Polígono Industrial Sur, Valencia',   'Miguel Torres',   '+34 699 111 003', 'Cold-storage warehouse for distribution',      'c0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days');
 
 -- ─── Projects (Alice → Globex Industries) ───────────────────
 -- 2 projects for Globex — verifies isolation between clients.
 
 INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
-  ('p0000000-0000-0000-0000-000000000004', 'Port Expansion Phase 2',    'Puerto de Barcelona, Muelle 9',       'Ana Ruiz',        '+34 699 222 001', 'Container terminal expansion',                'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
-  ('p0000000-0000-0000-0000-000000000005', 'Solar Farm Andalucía',      'Carretera A-92 km 34, Antequera',     '',                '+34 699 222 002', '',                                            'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+  ('f0000000-0000-0000-0000-000000000004', 'Port Expansion Phase 2',    'Puerto de Barcelona, Muelle 9',       'Ana Ruiz',        '+34 699 222 001', 'Container terminal expansion',                'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+  ('f0000000-0000-0000-0000-000000000005', 'Solar Farm Andalucía',      'Carretera A-92 km 34, Antequera',     '',                '+34 699 222 002', '',                                            'c0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
 
 -- ─── Projects (Alice → Stark Industries) ────────────────────
 -- 1 project with minimal fields — tests optional fields as empty strings.
 
 INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
-  ('p0000000-0000-0000-0000-000000000006', 'Arc Reactor Facility',      '',                                    '',                '',                '',                                            'c0000000-0000-0000-0000-000000000006', NOW(),                      NOW());
+  ('f0000000-0000-0000-0000-000000000006', 'Arc Reactor Facility',      '',                                    '',                '',                '',                                            'c0000000-0000-0000-0000-000000000006', NOW(),                      NOW());
 
 -- ─── Projects (Bob → Oscorp Labs) ───────────────────────────
 -- 2 projects for Bob — verifies that Alice cannot see Bob's projects.
 
 INSERT INTO projects (id, name, address, manager_name, phone, description, client_id, created_at, updated_at) VALUES
-  ('p0000000-0000-0000-0000-000000000007', 'Genetics Lab Expansion',    'Calle Genómica 8, Barcelona',         'Peter Parker',    '+34 699 333 001', 'New wing for genome sequencing',               'c0000000-0000-0000-0000-000000000009', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
-  ('p0000000-0000-0000-0000-000000000008', 'Biotech Campus',            'Parque Científico, Bilbao',           'Gwen Stacy',      '+34 699 333 002', 'R&D campus with 3 buildings',                 'c0000000-0000-0000-0000-000000000009', NOW(),                      NOW());
+  ('f0000000-0000-0000-0000-000000000007', 'Genetics Lab Expansion',    'Calle Genómica 8, Barcelona',         'Peter Parker',    '+34 699 333 001', 'New wing for genome sequencing',               'c0000000-0000-0000-0000-000000000009', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
+  ('f0000000-0000-0000-0000-000000000008', 'Biotech Campus',            'Parque Científico, Bilbao',           'Gwen Stacy',      '+34 699 333 002', 'R&D campus with 3 buildings',                 'c0000000-0000-0000-0000-000000000009', NOW(),                      NOW());
+
+-- ─── Orders (Alice → Acme Corp → Residential Tower B) ──────
+-- 3 orders for the first project — enough to test listing and pagination.
+
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000001', 'Steel beams – lot 3',         'pending',   'First batch of structural steel for floors 1-5',  'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+  ('e0000000-0000-0000-0000-000000000002', 'Concrete mix – delivery 1',   'completed', 'High-strength concrete for foundation',            'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('e0000000-0000-0000-0000-000000000003', 'Electrical wiring – phase A', 'pending',   '',                                                 'f0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+
+-- ─── Orders (Alice → Acme Corp → Office Park Norte) ────────
+-- 2 orders for the second project — verifies isolation between projects.
+
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000004', 'HVAC units – building A',     'pending',   'Central air conditioning for office floors',       'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('e0000000-0000-0000-0000-000000000005', 'Elevator installation',       'completed', 'Two passenger elevators, capacity 1000kg',         'f0000000-0000-0000-0000-000000000002', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+
+-- ─── Orders (Alice → Globex → Port Expansion Phase 2) ──────
+-- 1 order with minimal data — tests defaults.
+
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000006', 'Container crane rental',      'pending',   '',                                                 'f0000000-0000-0000-0000-000000000004', NOW(),                      NOW());
+
+-- ─── Orders (Bob → Oscorp Labs → Genetics Lab Expansion) ───
+-- 2 orders for Bob — verifies that Alice cannot see Bob's orders.
+
+INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
+  ('e0000000-0000-0000-0000-000000000007', 'Gene sequencer – model X',    'pending',   'Latest generation genome sequencer',               'f0000000-0000-0000-0000-000000000007', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
+  ('e0000000-0000-0000-0000-000000000008', 'Lab bench furniture',         'completed', '',                                                 'f0000000-0000-0000-0000-000000000007', NOW(),                      NOW());
