@@ -27,11 +27,19 @@ func LoadEnv() {
 
 // SetupTestDB creates a PostgreSQL database connection for testing.
 // Reads credentials from the .env file at the project root.
+// The underlying *sql.DB is automatically closed when the test finishes.
 func SetupTestDB(t *testing.T) *gorm.DB {
 	LoadEnv()
 
 	db, err := ConnectTestDB()
 	require.NoError(t, err, "failed to connect to test DB")
+
+	t.Cleanup(func() {
+		sqlDB, err := db.DB()
+		if err == nil {
+			sqlDB.Close()
+		}
+	})
 
 	return db
 }
@@ -63,7 +71,7 @@ func ConnectTestDB() (*gorm.DB, error) {
 // Call this at the beginning of each integration test.
 // Order matters: orders→projects→clients→users, so truncate in dependency order.
 func CleanDB(t *testing.T, db *gorm.DB) {
-	err := db.Exec("TRUNCATE TABLE orders, projects, clients, users RESTART IDENTITY CASCADE").Error
+	err := db.Exec("TRUNCATE TABLE pieces, piece_definitions, orders, projects, clients, users RESTART IDENTITY CASCADE").Error
 	require.NoError(t, err)
 }
 

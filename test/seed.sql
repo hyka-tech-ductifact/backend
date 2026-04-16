@@ -91,3 +91,44 @@ INSERT INTO orders (id, title, status, description, project_id, created_at, upda
 INSERT INTO orders (id, title, status, description, project_id, created_at, updated_at) VALUES
   ('e0000000-0000-0000-0000-000000000007', 'Gene sequencer – model X',    'pending',   'Latest generation genome sequencer',               'f0000000-0000-0000-0000-000000000007', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
   ('e0000000-0000-0000-0000-000000000008', 'Lab bench furniture',         'completed', '',                                                 'f0000000-0000-0000-0000-000000000007', NOW(),                      NOW());
+
+-- ─── Piece Definitions (predefined — visible to all users) ─────────────────
+-- 2 predefined definitions for common pieces.
+
+INSERT INTO piece_definitions (id, name, image_url, dimension_schema, predefined, user_id, created_at, updated_at) VALUES
+  ('d0000000-0000-0000-0000-000000000001', 'Standard Rectangle', '', '["Length","Width"]',              true,  NULL,                                    NOW() - INTERVAL '30 days', NOW() - INTERVAL '30 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'Standard Beam',      '', '["Length","Width","Height"]',     true,  NULL,                                    NOW() - INTERVAL '30 days', NOW() - INTERVAL '30 days');
+
+-- ─── Piece Definitions (Alice — custom) ─────────────────────────────────────
+-- 3 custom definitions for Alice.
+
+INSERT INTO piece_definitions (id, name, image_url, dimension_schema, predefined, user_id, created_at, updated_at) VALUES
+  ('d0000000-0000-0000-0000-000000000003', 'L-Bracket',       'https://example.com/l-bracket.png', '["ArmLength","ArmWidth","Thickness"]', false, 'a0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+  ('d0000000-0000-0000-0000-000000000004', 'Circular Plate',  '',                                   '["Diameter","Thickness"]',              false, 'a0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('d0000000-0000-0000-0000-000000000005', 'Angle Iron',      '',                                   '["Length","Width"]',                    false, 'a0000000-0000-0000-0000-000000000001', NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
+
+-- ─── Piece Definitions (Bob — custom) ───────────────────────────────────────
+-- 1 custom definition for Bob — verifies that Alice cannot see Bob's custom defs.
+
+INSERT INTO piece_definitions (id, name, image_url, dimension_schema, predefined, user_id, created_at, updated_at) VALUES
+  ('d0000000-0000-0000-0000-000000000006', 'Lab Panel',       '',                                   '["Length","Width","Thickness"]',        false, 'b0000000-0000-0000-0000-000000000002', NOW(),                      NOW());
+
+-- ─── Pieces (Alice → Acme Corp → Residential Tower B → Steel beams) ────────
+-- 3 pieces for the first order — enough to test listing and pagination.
+
+INSERT INTO pieces (id, title, order_id, definition_id, dimensions, quantity, created_at, updated_at) VALUES
+  ('a1000000-0000-0000-0000-000000000001', 'Main beam – floor 1',   'e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002', '{"Length":600,"Width":30,"Height":15}',   8,  NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'),
+  ('a1000000-0000-0000-0000-000000000002', 'Cross beam – floor 1',  'e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002', '{"Length":400,"Width":25,"Height":12}',   12, NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
+  ('a1000000-0000-0000-0000-000000000003', 'Support bracket',       'e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000003', '{"ArmLength":20,"ArmWidth":10,"Thickness":2}', 24, NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days');
+
+-- ─── Pieces (Alice → Acme Corp → Residential Tower B → Concrete mix) ───────
+-- 1 piece for the second order.
+
+INSERT INTO pieces (id, title, order_id, definition_id, dimensions, quantity, created_at, updated_at) VALUES
+  ('a1000000-0000-0000-0000-000000000004', 'Foundation plate',      'e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', '{"Length":300,"Width":200}',              4,  NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days');
+
+-- ─── Pieces (Bob → Oscorp → Gene sequencer) ────────────────────────────────
+-- 1 piece for Bob — verifies that Alice cannot see Bob's pieces.
+
+INSERT INTO pieces (id, title, order_id, definition_id, dimensions, quantity, created_at, updated_at) VALUES
+  ('a1000000-0000-0000-0000-000000000005', 'Sequencer housing',     'e0000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000006', '{"Length":120,"Width":60,"Thickness":3}', 2,  NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day');
