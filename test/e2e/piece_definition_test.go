@@ -154,7 +154,7 @@ func TestE2E_GetPieceDefinition_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_GetPieceDefinition_OtherUsersCustomDef_Returns403(t *testing.T) {
+func TestE2E_GetPieceDefinition_OtherUsersCustomDef_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -162,7 +162,7 @@ func TestE2E_GetPieceDefinition_OtherUsersCustomDef_Returns403(t *testing.T) {
 	defID := createPieceDef(t, token1, "Juan's Def", []string{"Length"})
 
 	resp := helpers.AuthGetJSON(t, pieceDefURL(defID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Update PieceDefinition ──────────────────────────────────────────────────
@@ -186,7 +186,7 @@ func TestE2E_UpdatePieceDefinition_Success(t *testing.T) {
 	assert.Len(t, schema, 2)
 }
 
-func TestE2E_UpdatePieceDefinition_NotOwned_Returns403(t *testing.T) {
+func TestE2E_UpdatePieceDefinition_NotOwned_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -197,7 +197,7 @@ func TestE2E_UpdatePieceDefinition_NotOwned_Returns403(t *testing.T) {
 		"name": "Stolen",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Delete PieceDefinition ──────────────────────────────────────────────────
@@ -215,7 +215,7 @@ func TestE2E_DeletePieceDefinition_Success(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }
 
-func TestE2E_DeletePieceDefinition_NotOwned_Returns403(t *testing.T) {
+func TestE2E_DeletePieceDefinition_NotOwned_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -223,7 +223,7 @@ func TestE2E_DeletePieceDefinition_NotOwned_Returns403(t *testing.T) {
 	defID := createPieceDef(t, token1, "Juan's Def", []string{"Length"})
 
 	resp := helpers.AuthDeleteJSON(t, pieceDefURL(defID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────

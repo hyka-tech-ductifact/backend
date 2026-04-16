@@ -64,6 +64,42 @@ func (r *PostgresProjectRepository) GetByID(ctx context.Context, id uuid.UUID) (
 	return toProjectEntity(&model), nil
 }
 
+func (r *PostgresProjectRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+	var model ProjectModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("projects.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnoseProjectFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toProjectEntity(&model), nil
+}
+
+func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrProjectNotFound
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrClientNotFound
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		return repositories.ErrProjectNotOwned
+	}
+	return repositories.ErrProjectNotFound
+}
+
 func (r *PostgresProjectRepository) ListByClientID(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
 	var totalItems int64
 

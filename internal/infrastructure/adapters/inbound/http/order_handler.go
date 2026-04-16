@@ -58,12 +58,6 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
 	projectID, err := uuid.Parse(c.Param("project_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
@@ -76,7 +70,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	order, err := h.orderService.CreateOrder(c.Request.Context(), userID, clientID, entities.CreateOrderParams{
+	order, err := h.orderService.CreateOrder(c.Request.Context(), userID, entities.CreateOrderParams{
 		Title:       req.Title,
 		Status:      req.Status,
 		Description: req.Description,
@@ -97,12 +91,6 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
 	projectID, err := uuid.Parse(c.Param("project_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
@@ -115,7 +103,7 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 		return
 	}
 
-	result, err := h.orderService.ListOrdersByProjectID(c.Request.Context(), projectID, clientID, userID, pg)
+	result, err := h.orderService.ListOrdersByProjectID(c.Request.Context(), projectID, userID, pg)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -142,25 +130,13 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
 	orderID, err := uuid.Parse(c.Param("order_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
 		return
 	}
 
-	order, err := h.orderService.GetOrderByID(c.Request.Context(), orderID, projectID, clientID, userID)
+	order, err := h.orderService.GetOrderByID(c.Request.Context(), orderID, userID)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -176,18 +152,6 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
 	orderID, err := uuid.Parse(c.Param("order_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
@@ -200,7 +164,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		return
 	}
 
-	order, err := h.orderService.UpdateOrder(c.Request.Context(), orderID, projectID, clientID, userID, entities.UpdateOrderParams{
+	order, err := h.orderService.UpdateOrder(c.Request.Context(), orderID, userID, entities.UpdateOrderParams{
 		Title:       req.Title,
 		Status:      req.Status,
 		Description: req.Description,
@@ -220,25 +184,13 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
 	orderID, err := uuid.Parse(c.Param("order_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
 		return
 	}
 
-	if err := h.orderService.DeleteOrder(c.Request.Context(), orderID, projectID, clientID, userID); err != nil {
+	if err := h.orderService.DeleteOrder(c.Request.Context(), orderID, userID); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

@@ -138,19 +138,13 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
 	projectID, err := uuid.Parse(c.Param("project_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
 		return
 	}
 
-	project, err := h.projectService.GetProjectByID(c.Request.Context(), projectID, clientID, userID)
+	project, err := h.projectService.GetProjectByID(c.Request.Context(), projectID, userID)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -166,12 +160,6 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
 	projectID, err := uuid.Parse(c.Param("project_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
@@ -184,7 +172,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	project, err := h.projectService.UpdateProject(c.Request.Context(), projectID, clientID, userID, entities.UpdateProjectParams{
+	project, err := h.projectService.UpdateProject(c.Request.Context(), projectID, userID, entities.UpdateProjectParams{
 		Name:        req.Name,
 		Address:     req.Address,
 		ManagerName: req.ManagerName,
@@ -206,19 +194,13 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
 	projectID, err := uuid.Parse(c.Param("project_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
 		return
 	}
 
-	if err := h.projectService.DeleteProject(c.Request.Context(), projectID, clientID, userID); err != nil {
+	if err := h.projectService.DeleteProject(c.Request.Context(), projectID, userID); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

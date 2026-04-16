@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -12,57 +11,44 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Application-level errors ---
-
-var (
-	ErrPieceNotFound = errors.New("piece not found")
-	ErrPieceNotOwned = errors.New("piece does not belong to this order")
-)
-
 // pieceService implements usecases.PieceService.
 // Unexported struct: can only be created via NewPieceService.
 type pieceService struct {
 	pieceRepo    repositories.PieceRepository
 	pieceDefRepo repositories.PieceDefinitionRepository
 	orderRepo    repositories.OrderRepository
-	projectRepo  repositories.ProjectRepository
-	clientRepo   repositories.ClientRepository
 }
 
 // NewPieceService creates a new PieceService.
-// It receives all repositories needed to verify the full ownership chain:
-// User → Client → Project → Order → Piece.
+// The order repository is needed to verify ownership during Create and List.
+// The piece definition repository is needed to validate dimensions.
 func NewPieceService(
 	pieceRepo repositories.PieceRepository,
 	pieceDefRepo repositories.PieceDefinitionRepository,
 	orderRepo repositories.OrderRepository,
-	projectRepo repositories.ProjectRepository,
-	clientRepo repositories.ClientRepository,
 ) *pieceService {
 	return &pieceService{
 		pieceRepo:    pieceRepo,
 		pieceDefRepo: pieceDefRepo,
 		orderRepo:    orderRepo,
-		projectRepo:  projectRepo,
-		clientRepo:   clientRepo,
 	}
 }
 
 // CreatePiece orchestrates piece creation:
-// 1. Verify the full ownership chain (User → Client → Project → Order).
-// 2. Load the PieceDefinition and verify visibility.
-// 3. Build the domain entity (which validates its own fields).
+// 1. Verify the owning order belongs to the user.
+// 2. Verify the piece definition is accessible to the user.
+// 3. Build the domain entity (which validates all fields).
 // 4. Validate dimensions against the definition schema.
 // 5. Persist via repository.
-func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, clientID uuid.UUID, projectID uuid.UUID, params entities.CreatePieceParams) (*entities.Piece, error) {
-	// Step 1: Verify full ownership chain
-	_, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, params.OrderID, projectID, clientID, userID)
+func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, params entities.CreatePieceParams) (*entities.Piece, error) {
+	// Step 1: Verify order ownership
+	_, err := s.orderRepo.GetByIDForOwner(ctx, params.OrderID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 2: Load PieceDefinition and verify visibility
-	def, err := verifyPieceDefAccess(ctx, s.pieceDefRepo, params.DefinitionID, userID)
+	// Step 2: Verify piece definition accessibility
+	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, params.DefinitionID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +59,7 @@ func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, client
 		return nil, err
 	}
 
-	// Step 4: Validate dimensions against the definition schema
+	// Step 4: Validate dimensions against definition schema
 	if err := piece.ValidateAgainst(def); err != nil {
 		return nil, err
 	}
@@ -86,15 +72,15 @@ func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, client
 	return piece, nil
 }
 
-// GetPieceByID retrieves a piece by ID, verifying the full ownership chain.
-func (s *pieceService) GetPieceByID(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Piece, error) {
-	return verifyPieceOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, s.pieceRepo, id, orderID, projectID, clientID, userID)
+// GetPieceByID retrieves a piece by ID, ensuring it belongs to the given user.
+func (s *pieceService) GetPieceByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Piece, error) {
+	return s.pieceRepo.GetByIDForOwner(ctx, id, userID)
 }
 
-// ListPiecesByOrderID retrieves a paginated list of pieces belonging to an order.
-// Verifies the full ownership chain.
-func (s *pieceService) ListPiecesByOrderID(ctx context.Context, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Piece], error) {
-	_, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, orderID, projectID, clientID, userID)
+// ListPiecesByOrderID retrieves a paginated list of pieces for an order,
+// ensuring the order belongs to the given user.
+func (s *pieceService) ListPiecesByOrderID(ctx context.Context, orderID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Piece], error) {
+	_, err := s.orderRepo.GetByIDForOwner(ctx, orderID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Piece]{}, err
 	}
@@ -108,13 +94,15 @@ func (s *pieceService) ListPiecesByOrderID(ctx context.Context, orderID uuid.UUI
 }
 
 // UpdatePiece applies a partial update to an existing piece.
-// Verifies the full ownership chain.
-func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, params entities.UpdatePieceParams) (*entities.Piece, error) {
-	piece, err := verifyPieceOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, s.pieceRepo, id, orderID, projectID, clientID, userID)
+// Only non-nil fields in params are updated. Ensures the piece belongs to the given user.
+// If dimensions change, they are re-validated against the piece definition schema.
+func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceParams) (*entities.Piece, error) {
+	piece, err := s.pieceRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
 
+	// Nothing to update
 	if !params.HasChanges() {
 		return piece, nil
 	}
@@ -132,7 +120,6 @@ func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, orderID uu
 	if params.Dimensions != nil {
 		piece.Dimensions = *params.Dimensions
 
-		// Re-validate dimensions against the definition schema
 		def, err := s.pieceDefRepo.GetByID(ctx, piece.DefinitionID)
 		if err != nil {
 			return nil, err
@@ -142,6 +129,7 @@ func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, orderID uu
 		}
 	}
 
+	// Update timestamp and persist
 	piece.UpdatedAt = time.Now()
 	if err := s.pieceRepo.Update(ctx, piece); err != nil {
 		return nil, err
@@ -150,9 +138,9 @@ func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, orderID uu
 	return piece, nil
 }
 
-// DeletePiece removes a piece, verifying the full ownership chain.
-func (s *pieceService) DeletePiece(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) error {
-	piece, err := verifyPieceOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, s.pieceRepo, id, orderID, projectID, clientID, userID)
+// DeletePiece removes a piece, ensuring it belongs to the given user.
+func (s *pieceService) DeletePiece(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	piece, err := s.pieceRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
 	}

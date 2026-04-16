@@ -67,6 +67,33 @@ func (r *PostgresPieceDefinitionRepository) GetByID(ctx context.Context, id uuid
 	return toPieceDefEntity(&model)
 }
 
+// GetByIDForOwner returns a piece definition that is either predefined (visible
+// to everyone) or owned by the given user. Returns a specific error for diagnostics.
+func (r *PostgresPieceDefinitionRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.PieceDefinition, error) {
+	var model PieceDefinitionModel
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND (predefined = ? OR user_id = ?)", id, true, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnosePieceDefFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toPieceDefEntity(&model)
+}
+
+func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return repositories.ErrPieceDefNotFound
+	}
+	return repositories.ErrPieceDefNotOwned
+}
+
 // ListByUserID returns all predefined definitions + custom definitions created by the user.
 func (r *PostgresPieceDefinitionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
 	var totalItems int64

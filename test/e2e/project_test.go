@@ -112,7 +112,7 @@ func TestE2E_CreateProject_NonExistingClient_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_CreateProject_WrongUser_Returns403(t *testing.T) {
+func TestE2E_CreateProject_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID, _ := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 	_, _, token2 := createUserAndClient(t, "Pedro", "pedro@example.com", "Other Corp")
@@ -121,7 +121,7 @@ func TestE2E_CreateProject_WrongUser_Returns403(t *testing.T) {
 		"name": "Tower",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── List Projects ───────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ func TestE2E_GetProject_InvalidID_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestE2E_GetProject_WrongUser_Returns403(t *testing.T) {
+func TestE2E_GetProject_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, token1 := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 	_, _, token2 := createUserAndClient(t, "Pedro", "pedro@example.com", "Other Corp")
@@ -244,7 +244,7 @@ func TestE2E_GetProject_WrongUser_Returns403(t *testing.T) {
 
 	// Try to access from user2's token using user1's client
 	resp := helpers.AuthGetJSON(t, projURL(clientID1, projectID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Update Project ──────────────────────────────────────────────────────────
@@ -315,7 +315,7 @@ func TestE2E_UpdateProject_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_UpdateProject_WrongUser_Returns403(t *testing.T) {
+func TestE2E_UpdateProject_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, token1 := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 	_, _, token2 := createUserAndClient(t, "Pedro", "pedro@example.com", "Other Corp")
@@ -329,7 +329,7 @@ func TestE2E_UpdateProject_WrongUser_Returns403(t *testing.T) {
 		"name": "Stolen",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Delete Project ──────────────────────────────────────────────────────────
@@ -359,7 +359,7 @@ func TestE2E_DeleteProject_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_DeleteProject_WrongUser_Returns403(t *testing.T) {
+func TestE2E_DeleteProject_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, token1 := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 	_, _, token2 := createUserAndClient(t, "Pedro", "pedro@example.com", "Other Corp")
@@ -370,7 +370,7 @@ func TestE2E_DeleteProject_WrongUser_Returns403(t *testing.T) {
 	projectID := created["id"].(string)
 
 	resp := helpers.AuthDeleteJSON(t, projURL(clientID1, projectID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────

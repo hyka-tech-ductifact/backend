@@ -113,7 +113,7 @@ func TestE2E_CreateOrder_NonExistingProject_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_CreateOrder_WrongUser_Returns403(t *testing.T) {
+func TestE2E_CreateOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID, projectID, _ := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -122,7 +122,7 @@ func TestE2E_CreateOrder_WrongUser_Returns403(t *testing.T) {
 		"title": "Order",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── List Orders ─────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ func TestE2E_GetOrder_InvalidID_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestE2E_GetOrder_WrongUser_Returns403(t *testing.T) {
+func TestE2E_GetOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -239,7 +239,7 @@ func TestE2E_GetOrder_WrongUser_Returns403(t *testing.T) {
 	orderID := created["id"].(string)
 
 	resp := helpers.AuthGetJSON(t, orderURL(clientID1, projectID1, orderID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Update Order ────────────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ func TestE2E_UpdateOrder_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_UpdateOrder_WrongUser_Returns403(t *testing.T) {
+func TestE2E_UpdateOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -316,7 +316,7 @@ func TestE2E_UpdateOrder_WrongUser_Returns403(t *testing.T) {
 		"title": "Stolen",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestE2E_UpdateOrder_InvalidStatus_Returns400(t *testing.T) {
@@ -362,7 +362,7 @@ func TestE2E_DeleteOrder_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_DeleteOrder_WrongUser_Returns403(t *testing.T) {
+func TestE2E_DeleteOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -373,7 +373,7 @@ func TestE2E_DeleteOrder_WrongUser_Returns403(t *testing.T) {
 	orderID := created["id"].(string)
 
 	resp := helpers.AuthDeleteJSON(t, orderURL(clientID1, projectID1, orderID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────

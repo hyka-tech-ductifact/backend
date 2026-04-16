@@ -52,7 +52,7 @@ func main() {
 
 	// --- Order wiring ---
 	orderRepo := persistence.NewPostgresOrderRepository(db)
-	orderService := services.NewOrderService(orderRepo, projectRepo, clientRepo)
+	orderService := services.NewOrderService(orderRepo, projectRepo)
 
 	// --- Piece Definition wiring ---
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
@@ -60,7 +60,7 @@ func main() {
 
 	// --- Piece wiring ---
 	pieceRepo := persistence.NewPostgresPieceRepository(db)
-	pieceService := services.NewPieceService(pieceRepo, pieceDefRepo, orderRepo, projectRepo, clientRepo)
+	pieceService := services.NewPieceService(pieceRepo, pieceDefRepo, orderRepo)
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)

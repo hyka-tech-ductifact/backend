@@ -8,6 +8,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -110,7 +111,7 @@ func TestGetPieceDefinitionByID_WithCustomDef_NotOwned_ReturnsError(t *testing.T
 	result, err := svc.GetPieceDefinitionByID(context.Background(), def.ID, uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrPieceDefNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotOwned)
 }
 
 func TestGetPieceDefinitionByID_NotFound_ReturnsError(t *testing.T) {
@@ -119,7 +120,7 @@ func TestGetPieceDefinitionByID_NotFound_ReturnsError(t *testing.T) {
 	result, err := svc.GetPieceDefinitionByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrPieceDefNotFound)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotFound)
 }
 
 // =============================================================================
@@ -233,7 +234,7 @@ func TestUpdatePieceDefinition_NotOwned_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrPieceDefNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotOwned)
 }
 
 // =============================================================================
@@ -273,7 +274,7 @@ func TestDeletePieceDefinition_NotOwned_ReturnsError(t *testing.T) {
 
 	err := svc.DeletePieceDefinition(context.Background(), def.ID, uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrPieceDefNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotOwned)
 }
 
 func TestDeletePieceDefinition_NotFound_ReturnsError(t *testing.T) {
@@ -281,5 +282,5 @@ func TestDeletePieceDefinition_NotFound_ReturnsError(t *testing.T) {
 
 	err := svc.DeletePieceDefinition(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrPieceDefNotFound)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotFound)
 }

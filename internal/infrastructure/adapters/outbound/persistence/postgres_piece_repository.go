@@ -68,6 +68,58 @@ func (r *PostgresPieceRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	return toPieceEntity(&model)
 }
 
+func (r *PostgresPieceRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error) {
+	var model PieceModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN orders ON orders.id = pieces.order_id AND orders.deleted_at IS NULL").
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("pieces.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnosePieceFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toPieceEntity(&model)
+}
+
+func (r *PostgresPieceRepository) diagnosePieceFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var piece PieceModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&piece).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrPieceNotFound
+		}
+		return err
+	}
+	var order OrderModel
+	if err := r.db.WithContext(ctx).Where("id = ?", piece.OrderID).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrOrderNotFound
+		}
+		return err
+	}
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrProjectNotFound
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrClientNotFound
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		return repositories.ErrPieceNotOwned
+	}
+	return repositories.ErrPieceNotFound
+}
+
 func (r *PostgresPieceRepository) ListByOrderID(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {
 	var totalItems int64
 

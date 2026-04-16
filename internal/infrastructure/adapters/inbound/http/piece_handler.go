@@ -60,18 +60,6 @@ func (h *PieceHandler) CreatePiece(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
 	orderID, err := uuid.Parse(c.Param("order_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
@@ -90,7 +78,7 @@ func (h *PieceHandler) CreatePiece(c *gin.Context) {
 		return
 	}
 
-	piece, err := h.pieceService.CreatePiece(c.Request.Context(), userID, clientID, projectID, entities.CreatePieceParams{
+	piece, err := h.pieceService.CreatePiece(c.Request.Context(), userID, entities.CreatePieceParams{
 		Title:        req.Title,
 		OrderID:      orderID,
 		DefinitionID: definitionID,
@@ -112,18 +100,6 @@ func (h *PieceHandler) ListPieces(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
 	orderID, err := uuid.Parse(c.Param("order_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
@@ -136,7 +112,7 @@ func (h *PieceHandler) ListPieces(c *gin.Context) {
 		return
 	}
 
-	result, err := h.pieceService.ListPiecesByOrderID(c.Request.Context(), orderID, projectID, clientID, userID, pg)
+	result, err := h.pieceService.ListPiecesByOrderID(c.Request.Context(), orderID, userID, pg)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -163,31 +139,13 @@ func (h *PieceHandler) GetPiece(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
-	orderID, err := uuid.Parse(c.Param("order_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
-		return
-	}
-
 	pieceID, err := uuid.Parse(c.Param("piece_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid piece ID format"})
 		return
 	}
 
-	piece, err := h.pieceService.GetPieceByID(c.Request.Context(), pieceID, orderID, projectID, clientID, userID)
+	piece, err := h.pieceService.GetPieceByID(c.Request.Context(), pieceID, userID)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -203,24 +161,6 @@ func (h *PieceHandler) UpdatePiece(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
-	orderID, err := uuid.Parse(c.Param("order_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
-		return
-	}
-
 	pieceID, err := uuid.Parse(c.Param("piece_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid piece ID format"})
@@ -233,7 +173,7 @@ func (h *PieceHandler) UpdatePiece(c *gin.Context) {
 		return
 	}
 
-	piece, err := h.pieceService.UpdatePiece(c.Request.Context(), pieceID, orderID, projectID, clientID, userID, entities.UpdatePieceParams{
+	piece, err := h.pieceService.UpdatePiece(c.Request.Context(), pieceID, userID, entities.UpdatePieceParams{
 		Title:      req.Title,
 		Dimensions: req.Dimensions,
 		Quantity:   req.Quantity,
@@ -253,31 +193,13 @@ func (h *PieceHandler) DeletePiece(c *gin.Context) {
 		return
 	}
 
-	clientID, err := uuid.Parse(c.Param("client_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client ID format"})
-		return
-	}
-
-	projectID, err := uuid.Parse(c.Param("project_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project ID format"})
-		return
-	}
-
-	orderID, err := uuid.Parse(c.Param("order_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID format"})
-		return
-	}
-
 	pieceID, err := uuid.Parse(c.Param("piece_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid piece ID format"})
 		return
 	}
 
-	if err := h.pieceService.DeletePiece(c.Request.Context(), pieceID, orderID, projectID, clientID, userID); err != nil {
+	if err := h.pieceService.DeletePiece(c.Request.Context(), pieceID, userID); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

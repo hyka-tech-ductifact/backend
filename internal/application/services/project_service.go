@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -10,13 +9,6 @@ import (
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
-)
-
-// --- Application-level errors ---
-
-var (
-	ErrProjectNotFound = errors.New("project not found")
-	ErrProjectNotOwned = errors.New("project does not belong to this client")
 )
 
 // projectService implements usecases.ProjectService.
@@ -27,9 +19,7 @@ type projectService struct {
 }
 
 // NewProjectService creates a new ProjectService.
-// It receives the project and client repositories (outbound ports).
-// The client repository is needed to verify that the owning client exists
-// and belongs to the authenticated user.
+// The client repository is needed to verify ownership during Create and List.
 func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo repositories.ClientRepository) *projectService {
 	return &projectService{
 		projectRepo: projectRepo,
@@ -38,12 +28,12 @@ func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo re
 }
 
 // CreateProject orchestrates project creation:
-// 1. Verify the owning client exists and belongs to the user.
+// 1. Verify the owning client belongs to the user.
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
 func (s *projectService) CreateProject(ctx context.Context, userID uuid.UUID, params entities.CreateProjectParams) (*entities.Project, error) {
 	// Step 1: Verify client ownership
-	_, err := verifyClientOwnership(ctx, s.clientRepo, params.ClientID, userID)
+	_, err := s.clientRepo.GetByIDForOwner(ctx, params.ClientID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,17 +52,15 @@ func (s *projectService) CreateProject(ctx context.Context, userID uuid.UUID, pa
 	return project, nil
 }
 
-// GetProjectByID retrieves a project by ID, ensuring the client belongs to the user
-// and the project belongs to the client.
-func (s *projectService) GetProjectByID(ctx context.Context, id uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Project, error) {
-	return verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, id, clientID, userID)
+// GetProjectByID retrieves a project by ID, ensuring it belongs to the given user.
+func (s *projectService) GetProjectByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Project, error) {
+	return s.projectRepo.GetByIDForOwner(ctx, id, userID)
 }
 
-// ListProjectsByClientID retrieves a paginated list of projects belonging to a client.
-// Ensures the client belongs to the authenticated user.
+// ListProjectsByClientID retrieves a paginated list of projects for a client,
+// ensuring the client belongs to the given user.
 func (s *projectService) ListProjectsByClientID(ctx context.Context, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Project], error) {
-	// Verify ownership chain: User → Client
-	_, err := verifyClientOwnership(ctx, s.clientRepo, clientID, userID)
+	_, err := s.clientRepo.GetByIDForOwner(ctx, clientID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Project]{}, err
 	}
@@ -86,10 +74,9 @@ func (s *projectService) ListProjectsByClientID(ctx context.Context, clientID uu
 }
 
 // UpdateProject applies a partial update to an existing project.
-// Only non-nil fields in params are updated. Ensures the client belongs to the user
-// and the project belongs to the client.
-func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, clientID uuid.UUID, userID uuid.UUID, params entities.UpdateProjectParams) (*entities.Project, error) {
-	project, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, id, clientID, userID)
+// Only non-nil fields in params are updated. Ensures the project belongs to the given user.
+func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateProjectParams) (*entities.Project, error) {
+	project, err := s.projectRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +86,6 @@ func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, client
 		return project, nil
 	}
 
-	// Apply changes
 	if params.Name != nil {
 		if err := project.SetName(*params.Name); err != nil {
 			return nil, err
@@ -135,10 +121,9 @@ func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, client
 	return project, nil
 }
 
-// DeleteProject removes a project, ensuring the client belongs to the user
-// and the project belongs to the client.
-func (s *projectService) DeleteProject(ctx context.Context, id uuid.UUID, clientID uuid.UUID, userID uuid.UUID) error {
-	project, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, id, clientID, userID)
+// DeleteProject removes a project, ensuring it belongs to the given user.
+func (s *projectService) DeleteProject(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	project, err := s.projectRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
 	}

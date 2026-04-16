@@ -61,9 +61,12 @@ func userRepoReturning(user *entities.User) *mocks.MockUserRepository {
 // a copy of the given client (or ErrNotFound if client is nil).
 func clientRepoReturning(client *entities.Client) *mocks.MockClientRepository {
 	return &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
 			if client == nil {
-				return nil, repositories.ErrNotFound
+				return nil, repositories.ErrClientNotFound
+			}
+			if client.UserID != ownerID {
+				return nil, repositories.ErrClientNotOwned
 			}
 			cp := *client
 			return &cp, nil
@@ -95,9 +98,9 @@ func newTestProject(clientID uuid.UUID) *entities.Project {
 // a copy of the given project (or ErrNotFound if project is nil).
 func projectRepoReturning(project *entities.Project) *mocks.MockProjectRepository {
 	return &mocks.MockProjectRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Project, error) {
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
 			if project == nil {
-				return nil, repositories.ErrNotFound
+				return nil, repositories.ErrProjectNotFound
 			}
 			cp := *project
 			return &cp, nil
@@ -125,9 +128,9 @@ func newTestOrder(projectID uuid.UUID) *entities.Order {
 // a copy of the given order (or ErrNotFound if order is nil).
 func orderRepoReturning(order *entities.Order) *mocks.MockOrderRepository {
 	return &mocks.MockOrderRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Order, error) {
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
 			if order == nil {
-				return nil, repositories.ErrNotFound
+				return nil, repositories.ErrOrderNotFound
 			}
 			cp := *order
 			return &cp, nil
@@ -169,6 +172,16 @@ func newTestPredefinedPieceDef() *entities.PieceDefinition {
 // always returns a copy of the given definition (or ErrNotFound if def is nil).
 func pieceDefRepoReturning(def *entities.PieceDefinition) *mocks.MockPieceDefinitionRepository {
 	return &mocks.MockPieceDefinitionRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.PieceDefinition, error) {
+			if def == nil {
+				return nil, repositories.ErrPieceDefNotFound
+			}
+			if !def.Predefined && (def.UserID == nil || *def.UserID != ownerID) {
+				return nil, repositories.ErrPieceDefNotOwned
+			}
+			cp := *def
+			return &cp, nil
+		},
 		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.PieceDefinition, error) {
 			if def == nil {
 				return nil, repositories.ErrNotFound
@@ -200,9 +213,9 @@ func newTestPiece(orderID uuid.UUID, defID uuid.UUID) *entities.Piece {
 // always returns a copy of the given piece (or ErrNotFound if piece is nil).
 func pieceRepoReturning(piece *entities.Piece) *mocks.MockPieceRepository {
 	return &mocks.MockPieceRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Piece, error) {
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error) {
 			if piece == nil {
-				return nil, repositories.ErrNotFound
+				return nil, repositories.ErrPieceNotFound
 			}
 			cp := *piece
 			return &cp, nil

@@ -8,6 +8,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -103,7 +104,7 @@ func TestGetClientByID_WithNonExistingClient_ReturnsError(t *testing.T) {
 	result, err := svc.GetClientByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
 
 func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
@@ -114,7 +115,7 @@ func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
 	result, err := svc.GetClientByID(context.Background(), client.ID, uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }
 
 // =============================================================================
@@ -199,7 +200,7 @@ func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }
 
 func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
@@ -210,7 +211,7 @@ func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
 
 func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
@@ -270,7 +271,7 @@ func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 
 	err := svc.DeleteClient(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
 
 func TestDeleteClient_WithWrongUser_ReturnsError(t *testing.T) {
@@ -280,5 +281,5 @@ func TestDeleteClient_WithWrongUser_ReturnsError(t *testing.T) {
 
 	err := svc.DeleteClient(context.Background(), client.ID, uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }

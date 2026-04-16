@@ -62,6 +62,50 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	return toOrderEntity(&model), nil
 }
 
+func (r *PostgresOrderRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+	var model OrderModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("orders.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnoseOrderFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toOrderEntity(&model), nil
+}
+
+func (r *PostgresOrderRepository) diagnoseOrderFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var order OrderModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrOrderNotFound
+		}
+		return err
+	}
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrProjectNotFound
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrClientNotFound
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		return repositories.ErrOrderNotOwned
+	}
+	return repositories.ErrOrderNotFound
+}
+
 func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
 	var totalItems int64
 

@@ -9,6 +9,7 @@ import (
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/config"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
@@ -40,27 +41,27 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrInvalidCredentials, http.StatusUnauthorized, "invalid email or password")
 	helpers.RegisterDomainError(services.ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid or expired refresh token")
 	helpers.RegisterDomainError(services.ErrAccountLocked, http.StatusTooManyRequests, "account temporarily locked, please try again later")
-	helpers.RegisterDomainError(services.ErrClientNotFound, http.StatusNotFound, "client not found")
-	helpers.RegisterDomainError(services.ErrClientNotOwned, http.StatusForbidden, "client does not belong to this user")
-	helpers.RegisterDomainError(services.ErrProjectNotFound, http.StatusNotFound, "project not found")
-	helpers.RegisterDomainError(services.ErrProjectNotOwned, http.StatusForbidden, "project does not belong to this client")
+	helpers.RegisterDomainError(repositories.ErrClientNotFound, http.StatusNotFound, "client not found")
+	helpers.RegisterDomainError(repositories.ErrClientNotOwned, http.StatusNotFound, "client not found")
+	helpers.RegisterDomainError(repositories.ErrProjectNotFound, http.StatusNotFound, "project not found")
+	helpers.RegisterDomainError(repositories.ErrProjectNotOwned, http.StatusNotFound, "project not found")
 	helpers.RegisterDomainError(entities.ErrEmptyUserName, http.StatusBadRequest, "user name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrEmptyClientName, http.StatusBadRequest, "client name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrEmptyProjectName, http.StatusBadRequest, "project name cannot be empty")
-	helpers.RegisterDomainError(services.ErrOrderNotFound, http.StatusNotFound, "order not found")
-	helpers.RegisterDomainError(services.ErrOrderNotOwned, http.StatusForbidden, "order does not belong to this project")
+	helpers.RegisterDomainError(repositories.ErrOrderNotFound, http.StatusNotFound, "order not found")
+	helpers.RegisterDomainError(repositories.ErrOrderNotOwned, http.StatusNotFound, "order not found")
 	helpers.RegisterDomainError(entities.ErrEmptyOrderTitle, http.StatusBadRequest, "order title cannot be empty")
 	helpers.RegisterDomainError(entities.ErrInvalidOrderStatus, http.StatusBadRequest, "order status must be 'pending' or 'completed'")
-	helpers.RegisterDomainError(services.ErrPieceDefNotFound, http.StatusNotFound, "piece definition not found")
+	helpers.RegisterDomainError(repositories.ErrPieceDefNotFound, http.StatusNotFound, "piece definition not found")
 	helpers.RegisterDomainError(entities.ErrEmptyPieceDefName, http.StatusBadRequest, "piece definition name cannot be empty")
 	helpers.RegisterDomainError(entities.ErrTooManyDimensionFields, http.StatusBadRequest, "piece definition cannot have more than 10 dimension fields")
 	helpers.RegisterDomainError(entities.ErrNoDimensionFields, http.StatusBadRequest, "piece definition must have at least one dimension field")
 	helpers.RegisterDomainError(entities.ErrDuplicateDimensionLabel, http.StatusBadRequest, "dimension labels must be unique")
 	helpers.RegisterDomainError(entities.ErrEmptyDimensionLabel, http.StatusBadRequest, "dimension label cannot be empty")
 	helpers.RegisterDomainError(services.ErrPieceDefPredefined, http.StatusForbidden, "predefined piece definitions cannot be modified")
-	helpers.RegisterDomainError(services.ErrPieceDefNotOwned, http.StatusForbidden, "piece definition does not belong to this user")
-	helpers.RegisterDomainError(services.ErrPieceNotFound, http.StatusNotFound, "piece not found")
-	helpers.RegisterDomainError(services.ErrPieceNotOwned, http.StatusForbidden, "piece does not belong to this order")
+	helpers.RegisterDomainError(repositories.ErrPieceDefNotOwned, http.StatusNotFound, "piece definition not found")
+	helpers.RegisterDomainError(repositories.ErrPieceNotFound, http.StatusNotFound, "piece not found")
+	helpers.RegisterDomainError(repositories.ErrPieceNotOwned, http.StatusNotFound, "piece not found")
 	helpers.RegisterDomainError(entities.ErrEmptyPieceTitle, http.StatusBadRequest, "piece title cannot be empty")
 	helpers.RegisterDomainError(entities.ErrInvalidPieceQuantity, http.StatusBadRequest, "piece quantity must be at least 1")
 	helpers.RegisterDomainError(entities.ErrMissingDimensions, http.StatusBadRequest, "missing required dimensions")
