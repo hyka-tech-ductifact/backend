@@ -107,6 +107,30 @@ func verifyPieceDefAccess(ctx context.Context, pieceDefRepo repositories.PieceDe
 	return def, nil
 }
 
+// verifyPieceOwnership verifies the full ownership chain: User → Client → Project → Order → Piece.
+// Returns the piece or an application-level error.
+func verifyPieceOwnership(ctx context.Context, clientRepo repositories.ClientRepository, projectRepo repositories.ProjectRepository, orderRepo repositories.OrderRepository, pieceRepo repositories.PieceRepository, pieceID uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Piece, error) {
+	// Verify User → Client → Project → Order chain
+	_, err := verifyOrderOwnership(ctx, clientRepo, projectRepo, orderRepo, orderID, projectID, clientID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify piece exists and belongs to order
+	piece, err := pieceRepo.GetByID(ctx, pieceID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrPieceNotFound
+		}
+		return nil, err
+	}
+	if piece.OrderID != orderID {
+		return nil, ErrPieceNotOwned
+	}
+
+	return piece, nil
+}
+
 // verifyPieceDefOwnership fetches a piece definition by ID and ensures it belongs
 // to the given user and can be modified. Returns ErrPieceDefPredefined for predefined
 // definitions and ErrPieceDefNotOwned for custom definitions not owned by the user.
