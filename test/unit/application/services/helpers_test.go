@@ -138,7 +138,92 @@ func orderRepoReturning(order *entities.Order) *mocks.MockOrderRepository {
 	}
 }
 
+// newTestPieceDef creates a custom PieceDefinition with sensible defaults.
+func newTestPieceDef(userID uuid.UUID) *entities.PieceDefinition {
+	return &entities.PieceDefinition{
+		ID:              uuid.New(),
+		Name:            "Rectangle",
+		ImageURL:        "https://example.com/rect.png",
+		DimensionSchema: []string{"Length", "Width"},
+		Predefined:      false,
+		UserID:          &userID,
+		CreatedAt:       time.Now().Add(-time.Hour),
+		UpdatedAt:       time.Now().Add(-time.Hour),
+	}
+}
+
+// newTestPredefinedPieceDef creates a predefined PieceDefinition (no owner).
+func newTestPredefinedPieceDef() *entities.PieceDefinition {
+	return &entities.PieceDefinition{
+		ID:              uuid.New(),
+		Name:            "Standard Beam",
+		DimensionSchema: []string{"Length", "Width", "Height"},
+		Predefined:      true,
+		UserID:          nil,
+		CreatedAt:       time.Now().Add(-time.Hour),
+		UpdatedAt:       time.Now().Add(-time.Hour),
+	}
+}
+
+// pieceDefRepoReturning builds a MockPieceDefinitionRepository whose GetByIDFn
+// always returns a copy of the given definition (or ErrNotFound if def is nil).
+func pieceDefRepoReturning(def *entities.PieceDefinition) *mocks.MockPieceDefinitionRepository {
+	return &mocks.MockPieceDefinitionRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.PieceDefinition, error) {
+			if def == nil {
+				return nil, repositories.ErrNotFound
+			}
+			cp := *def
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, d *entities.PieceDefinition) error {
+			return nil
+		},
+	}
+}
+
+// newTestPiece creates a Piece with sensible defaults and timestamps in the past.
+func newTestPiece(orderID uuid.UUID, defID uuid.UUID) *entities.Piece {
+	return &entities.Piece{
+		ID:           uuid.New(),
+		Title:        "Side panel",
+		OrderID:      orderID,
+		DefinitionID: defID,
+		Dimensions:   map[string]float64{"Length": 150.5, "Width": 80.0},
+		Quantity:     15,
+		CreatedAt:    time.Now().Add(-time.Hour),
+		UpdatedAt:    time.Now().Add(-time.Hour),
+	}
+}
+
+// pieceRepoReturning builds a MockPieceRepository whose GetByIDFn
+// always returns a copy of the given piece (or ErrNotFound if piece is nil).
+func pieceRepoReturning(piece *entities.Piece) *mocks.MockPieceRepository {
+	return &mocks.MockPieceRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Piece, error) {
+			if piece == nil {
+				return nil, repositories.ErrNotFound
+			}
+			cp := *piece
+			return &cp, nil
+		},
+		UpdateFn: func(ctx context.Context, p *entities.Piece) error {
+			return nil
+		},
+	}
+}
+
 // strPtr returns a pointer to the given string. Useful for optional update fields.
 func strPtr(s string) *string {
 	return &s
+}
+
+// intPtr returns a pointer to the given int. Useful for optional update fields.
+func intPtr(i int) *int {
+	return &i
+}
+
+// dimsPtr returns a pointer to the given dimensions map. Useful for optional update fields.
+func dimsPtr(d map[string]float64) *map[string]float64 {
+	return &d
 }
