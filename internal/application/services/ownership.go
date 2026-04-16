@@ -101,7 +101,7 @@ func verifyPieceDefAccess(ctx context.Context, pieceDefRepo repositories.PieceDe
 	}
 
 	if def.UserID == nil || *def.UserID != userID {
-		return nil, ErrPieceDefNotFound
+		return nil, ErrPieceDefNotOwned
 	}
 
 	return def, nil
@@ -111,20 +111,13 @@ func verifyPieceDefAccess(ctx context.Context, pieceDefRepo repositories.PieceDe
 // to the given user and can be modified. Returns ErrPieceDefPredefined for predefined
 // definitions and ErrPieceDefNotOwned for custom definitions not owned by the user.
 func verifyPieceDefOwnership(ctx context.Context, pieceDefRepo repositories.PieceDefinitionRepository, defID uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
-	def, err := pieceDefRepo.GetByID(ctx, defID)
+	def, err := verifyPieceDefAccess(ctx, pieceDefRepo, defID, userID)
 	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, ErrPieceDefNotFound
-		}
 		return nil, err
 	}
 
 	if def.Predefined {
 		return nil, ErrPieceDefPredefined
-	}
-
-	if def.UserID == nil || *def.UserID != userID {
-		return nil, ErrPieceDefNotOwned
 	}
 
 	return def, nil
