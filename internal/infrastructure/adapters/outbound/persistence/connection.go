@@ -34,6 +34,11 @@ func NewPostgresConnection(cfg config.Database, logLevel string) (*gorm.DB, erro
 
 	slog.Info("database migrations applied successfully")
 
+	// Seed predefined piece definitions (upsert — safe to run every startup).
+	if err := SeedPredefinedPieceDefinitions(db); err != nil {
+		return nil, fmt.Errorf("failed to seed predefined piece definitions: %w", err)
+	}
+
 	return db, nil
 }
 
