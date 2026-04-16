@@ -57,7 +57,7 @@ func NewProjectHandler(projectService usecases.ProjectService) *ProjectHandler {
 	return &ProjectHandler{projectService: projectService}
 }
 
-// CreateProject handles POST /users/me/clients/:client_id/projects
+// CreateProject handles POST /clients/:client_id/projects
 func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -92,7 +92,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, toProjectResponse(project))
 }
 
-// ListProjects handles GET /users/me/clients/:client_id/projects?page=1&page_size=20
+// ListProjects handles GET /clients/:client_id/projects?page=1&page_size=20
 func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -131,7 +131,7 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	})
 }
 
-// GetProject handles GET /users/me/clients/:client_id/projects/:project_id
+// GetProject handles GET /projects/:project_id
 func (h *ProjectHandler) GetProject(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -153,7 +153,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 	c.JSON(http.StatusOK, toProjectResponse(project))
 }
 
-// UpdateProject handles PUT /users/me/clients/:client_id/projects/:project_id
+// UpdateProject handles PUT /projects/:project_id
 func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -187,7 +187,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	c.JSON(http.StatusOK, toProjectResponse(project))
 }
 
-// DeleteProject handles DELETE /users/me/clients/:client_id/projects/:project_id
+// DeleteProject handles DELETE /projects/:project_id
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {

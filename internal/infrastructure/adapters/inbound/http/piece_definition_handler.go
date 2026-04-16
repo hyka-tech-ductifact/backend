@@ -51,7 +51,7 @@ func NewPieceDefinitionHandler(pieceDefService usecases.PieceDefinitionService) 
 	return &PieceDefinitionHandler{pieceDefService: pieceDefService}
 }
 
-// CreatePieceDefinition handles POST /users/me/piece-definitions
+// CreatePieceDefinition handles POST /piece-definitions
 func (h *PieceDefinitionHandler) CreatePieceDefinition(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -77,7 +77,7 @@ func (h *PieceDefinitionHandler) CreatePieceDefinition(c *gin.Context) {
 	c.JSON(http.StatusCreated, toPieceDefResponse(def))
 }
 
-// ListPieceDefinitions handles GET /users/me/piece-definitions
+// ListPieceDefinitions handles GET /piece-definitions
 func (h *PieceDefinitionHandler) ListPieceDefinitions(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -110,7 +110,7 @@ func (h *PieceDefinitionHandler) ListPieceDefinitions(c *gin.Context) {
 	})
 }
 
-// GetPieceDefinition handles GET /users/me/piece-definitions/:piece_definition_id
+// GetPieceDefinition handles GET /piece-definitions/:piece_definition_id
 func (h *PieceDefinitionHandler) GetPieceDefinition(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -132,7 +132,7 @@ func (h *PieceDefinitionHandler) GetPieceDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, toPieceDefResponse(def))
 }
 
-// UpdatePieceDefinition handles PUT /users/me/piece-definitions/:piece_definition_id
+// UpdatePieceDefinition handles PUT /piece-definitions/:piece_definition_id
 func (h *PieceDefinitionHandler) UpdatePieceDefinition(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -168,7 +168,7 @@ func (h *PieceDefinitionHandler) UpdatePieceDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, toPieceDefResponse(def))
 }
 
-// DeletePieceDefinition handles DELETE /users/me/piece-definitions/:piece_definition_id
+// DeletePieceDefinition handles DELETE /piece-definitions/:piece_definition_id
 func (h *PieceDefinitionHandler) DeletePieceDefinition(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {

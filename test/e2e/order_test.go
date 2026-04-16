@@ -26,22 +26,23 @@ func createUserClientAndProject(t *testing.T, userName, email, clientName, proje
 	return userID, clientID, projectID, token
 }
 
-// orderURL builds the full URL for order endpoints under a project.
-func orderURL(clientID, projectID string, extra ...string) string {
-	base := "/users/me/clients/" + clientID + "/projects/" + projectID + "/orders"
-	if len(extra) > 0 {
-		base += "/" + extra[0]
-	}
-	return url(base)
+// orderURL builds the full URL for order collection endpoints under a project.
+func orderURL(projectID string) string {
+	return url("/projects/" + projectID + "/orders")
+}
+
+// orderItemURL builds the full URL for a single order endpoint.
+func orderItemURL(orderID string) string {
+	return url("/orders/" + orderID)
 }
 
 // ─── Create Order ────────────────────────────────────────────────────────────
 
 func TestE2E_CreateOrder_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	resp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title":       "Steel beams – lot 3",
 		"description": "First batch of structural steel",
 	})
@@ -58,9 +59,9 @@ func TestE2E_CreateOrder_Success(t *testing.T) {
 
 func TestE2E_CreateOrder_WithStatus_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	resp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title":  "Concrete mix – delivery 1",
 		"status": "completed",
 	})
@@ -72,18 +73,18 @@ func TestE2E_CreateOrder_WithStatus_Success(t *testing.T) {
 
 func TestE2E_CreateOrder_MissingTitle_Returns400(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{})
+	resp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestE2E_CreateOrder_InvalidStatus_Returns400(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	resp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title":  "Some order",
 		"status": "invalid",
 	})
@@ -93,9 +94,9 @@ func TestE2E_CreateOrder_InvalidStatus_Returns400(t *testing.T) {
 
 func TestE2E_CreateOrder_NoToken_Returns401(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, _ := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, _ := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.PostJSON(t, orderURL(clientID, projectID), map[string]string{
+	resp := helpers.PostJSON(t, orderURL(projectID), map[string]string{
 		"title": "Order",
 	})
 
@@ -104,9 +105,9 @@ func TestE2E_CreateOrder_NoToken_Returns401(t *testing.T) {
 
 func TestE2E_CreateOrder_NonExistingProject_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, "00000000-0000-0000-0000-000000000000"), token, map[string]string{
+	resp := helpers.AuthPostJSON(t, orderURL("00000000-0000-0000-0000-000000000000"), token, map[string]string{
 		"title": "Order",
 	})
 
@@ -115,10 +116,10 @@ func TestE2E_CreateOrder_NonExistingProject_Returns404(t *testing.T) {
 
 func TestE2E_CreateOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, _ := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, _ := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
 
-	resp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token2, map[string]string{
+	resp := helpers.AuthPostJSON(t, orderURL(projectID), token2, map[string]string{
 		"title": "Order",
 	})
 
@@ -129,17 +130,17 @@ func TestE2E_CreateOrder_WrongUser_Returns404(t *testing.T) {
 
 func TestE2E_ListOrders_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	r1 := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{"title": "Order A"})
+	r1 := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{"title": "Order A"})
 	require.Equal(t, http.StatusCreated, r1.StatusCode)
 	r1.Body.Close()
 
-	r2 := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{"title": "Order B"})
+	r2 := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{"title": "Order B"})
 	require.Equal(t, http.StatusCreated, r2.StatusCode)
 	r2.Body.Close()
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID, projectID), token)
+	resp := helpers.AuthGetJSON(t, orderURL(projectID), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := helpers.ParseBody(t, resp)
@@ -149,9 +150,9 @@ func TestE2E_ListOrders_Success(t *testing.T) {
 
 func TestE2E_ListOrders_Empty(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID, projectID), token)
+	resp := helpers.AuthGetJSON(t, orderURL(projectID), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := helpers.ParseBody(t, resp)
@@ -170,16 +171,16 @@ func TestE2E_ListOrders_DoesNotReturnOtherProjectsOrders(t *testing.T) {
 	projectID2 := proj2Body["id"].(string)
 
 	// Create an order under each project
-	r1 := helpers.AuthPostJSON(t, orderURL(clientID, projectID1), token, map[string]string{"title": "Order A"})
+	r1 := helpers.AuthPostJSON(t, orderURL(projectID1), token, map[string]string{"title": "Order A"})
 	require.Equal(t, http.StatusCreated, r1.StatusCode)
 	r1.Body.Close()
 
-	r2 := helpers.AuthPostJSON(t, orderURL(clientID, projectID2), token, map[string]string{"title": "Order B"})
+	r2 := helpers.AuthPostJSON(t, orderURL(projectID2), token, map[string]string{"title": "Order B"})
 	require.Equal(t, http.StatusCreated, r2.StatusCode)
 	r2.Body.Close()
 
 	// Listing orders under project1 should only return Order A
-	listResp := helpers.AuthGetJSON(t, orderURL(clientID, projectID1), token)
+	listResp := helpers.AuthGetJSON(t, orderURL(projectID1), token)
 	assert.Equal(t, http.StatusOK, listResp.StatusCode)
 	listBody := helpers.ParseBody(t, listResp)
 	orders := listBody["data"].([]any)
@@ -191,9 +192,9 @@ func TestE2E_ListOrders_DoesNotReturnOtherProjectsOrders(t *testing.T) {
 
 func TestE2E_GetOrder_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title":       "Steel beams – lot 3",
 		"description": "First batch",
 	})
@@ -201,7 +202,7 @@ func TestE2E_GetOrder_Success(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID, projectID, orderID), token)
+	resp := helpers.AuthGetJSON(t, orderItemURL(orderID), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 
@@ -214,31 +215,31 @@ func TestE2E_GetOrder_Success(t *testing.T) {
 
 func TestE2E_GetOrder_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID, projectID, "00000000-0000-0000-0000-000000000000"), token)
+	resp := helpers.AuthGetJSON(t, orderItemURL("00000000-0000-0000-0000-000000000000"), token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestE2E_GetOrder_InvalidID_Returns400(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID, projectID, "not-a-uuid"), token)
+	resp := helpers.AuthGetJSON(t, orderItemURL("not-a-uuid"), token)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestE2E_GetOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID1, projectID1), token1, map[string]string{"title": "Private Order"})
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID1), token1, map[string]string{"title": "Private Order"})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthGetJSON(t, orderURL(clientID1, projectID1, orderID), token2)
+	resp := helpers.AuthGetJSON(t, orderItemURL(orderID), token2)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -246,16 +247,16 @@ func TestE2E_GetOrder_WrongUser_Returns404(t *testing.T) {
 
 func TestE2E_UpdateOrder_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title": "Old Title",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, orderItemURL(orderID), token, map[string]string{
 		"title":       "New Title",
 		"status":      "completed",
 		"description": "Updated description",
@@ -271,9 +272,9 @@ func TestE2E_UpdateOrder_Success(t *testing.T) {
 
 func TestE2E_UpdateOrder_PartialUpdate_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title": "Original Title",
 	})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
@@ -281,7 +282,7 @@ func TestE2E_UpdateOrder_PartialUpdate_Success(t *testing.T) {
 	orderID := created["id"].(string)
 
 	// Only update status — title should remain unchanged
-	resp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, orderItemURL(orderID), token, map[string]string{
 		"status": "completed",
 	})
 
@@ -293,9 +294,9 @@ func TestE2E_UpdateOrder_PartialUpdate_Success(t *testing.T) {
 
 func TestE2E_UpdateOrder_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, "00000000-0000-0000-0000-000000000000"), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, orderItemURL("00000000-0000-0000-0000-000000000000"), token, map[string]string{
 		"title": "Ghost",
 	})
 
@@ -304,15 +305,15 @@ func TestE2E_UpdateOrder_NotFound_Returns404(t *testing.T) {
 
 func TestE2E_UpdateOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID1, projectID1), token1, map[string]string{"title": "Private"})
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID1), token1, map[string]string{"title": "Private"})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthPutJSON(t, orderURL(clientID1, projectID1, orderID), token2, map[string]string{
+	resp := helpers.AuthPutJSON(t, orderItemURL(orderID), token2, map[string]string{
 		"title": "Stolen",
 	})
 
@@ -321,14 +322,14 @@ func TestE2E_UpdateOrder_WrongUser_Returns404(t *testing.T) {
 
 func TestE2E_UpdateOrder_InvalidStatus_Returns400(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{"title": "Order"})
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{"title": "Order"})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, orderItemURL(orderID), token, map[string]string{
 		"status": "invalid",
 	})
 
@@ -339,40 +340,40 @@ func TestE2E_UpdateOrder_InvalidStatus_Returns400(t *testing.T) {
 
 func TestE2E_DeleteOrder_Success(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{"title": "To Delete"})
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{"title": "To Delete"})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthDeleteJSON(t, orderURL(clientID, projectID, orderID), token)
+	resp := helpers.AuthDeleteJSON(t, orderItemURL(orderID), token)
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 
 	// Verify it's gone
-	getResp := helpers.AuthGetJSON(t, orderURL(clientID, projectID, orderID), token)
+	getResp := helpers.AuthGetJSON(t, orderItemURL(orderID), token)
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }
 
 func TestE2E_DeleteOrder_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, _, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 
-	resp := helpers.AuthDeleteJSON(t, orderURL(clientID, projectID, "00000000-0000-0000-0000-000000000000"), token)
+	resp := helpers.AuthDeleteJSON(t, orderItemURL("00000000-0000-0000-0000-000000000000"), token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestE2E_DeleteOrder_WrongUser_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID1, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+	_, _, projectID1, token1 := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
 
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID1, projectID1), token1, map[string]string{"title": "Private"})
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID1), token1, map[string]string{"title": "Private"})
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	orderID := created["id"].(string)
 
-	resp := helpers.AuthDeleteJSON(t, orderURL(clientID1, projectID1, orderID), token2)
+	resp := helpers.AuthDeleteJSON(t, orderItemURL(orderID), token2)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -380,10 +381,10 @@ func TestE2E_DeleteOrder_WrongUser_Returns404(t *testing.T) {
 
 func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	clean(t)
-	_, clientID, projectID, token := createUserClientAndProject(t, "Ana", "ana@example.com", "Acme Corp", "Tower B")
+	_, _, projectID, token := createUserClientAndProject(t, "Ana", "ana@example.com", "Acme Corp", "Tower B")
 
 	// 1. Create with default status
-	createResp := helpers.AuthPostJSON(t, orderURL(clientID, projectID), token, map[string]string{
+	createResp := helpers.AuthPostJSON(t, orderURL(projectID), token, map[string]string{
 		"title":       "Steel beams – lot 3",
 		"description": "First batch of structural steel",
 	})
@@ -396,7 +397,7 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, projectID, created["project_id"])
 
 	// 2. Get — verify persisted
-	getResp := helpers.AuthGetJSON(t, orderURL(clientID, projectID, orderID), token)
+	getResp := helpers.AuthGetJSON(t, orderItemURL(orderID), token)
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	fetched := helpers.ParseBody(t, getResp)
 	assert.Equal(t, "Steel beams – lot 3", fetched["title"])
@@ -404,7 +405,7 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "First batch of structural steel", fetched["description"])
 
 	// 3. Update title + status + description
-	updateResp := helpers.AuthPutJSON(t, orderURL(clientID, projectID, orderID), token, map[string]string{
+	updateResp := helpers.AuthPutJSON(t, orderItemURL(orderID), token, map[string]string{
 		"title":       "Steel beams – lot 3 (updated)",
 		"status":      "completed",
 		"description": "Updated description",
@@ -416,7 +417,7 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "Updated description", updated["description"])
 
 	// 4. List — should have 1 order
-	listResp := helpers.AuthGetJSON(t, orderURL(clientID, projectID), token)
+	listResp := helpers.AuthGetJSON(t, orderURL(projectID), token)
 	assert.Equal(t, http.StatusOK, listResp.StatusCode)
 	listBody := helpers.ParseBody(t, listResp)
 	orders := listBody["data"].([]any)
@@ -424,11 +425,11 @@ func TestE2E_Order_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "Steel beams – lot 3 (updated)", orders[0].(map[string]any)["title"])
 
 	// 5. Delete
-	deleteResp := helpers.AuthDeleteJSON(t, orderURL(clientID, projectID, orderID), token)
+	deleteResp := helpers.AuthDeleteJSON(t, orderItemURL(orderID), token)
 	assert.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
 
 	// 6. List — should be empty now
-	listResp2 := helpers.AuthGetJSON(t, orderURL(clientID, projectID), token)
+	listResp2 := helpers.AuthGetJSON(t, orderURL(projectID), token)
 	assert.Equal(t, http.StatusOK, listResp2.StatusCode)
 	listBody2 := helpers.ParseBody(t, listResp2)
 	ordersAfter := listBody2["data"].([]any)

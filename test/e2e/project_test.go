@@ -16,7 +16,7 @@ func createUserAndClient(t *testing.T, userName, email, clientName string) (stri
 	t.Helper()
 	userID, token := createUserForClients(t, userName, email)
 
-	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{
+	resp := helpers.AuthPostJSON(t, url("/clients"), token, map[string]string{
 		"name": clientName,
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -26,13 +26,15 @@ func createUserAndClient(t *testing.T, userName, email, clientName string) (stri
 	return userID, clientID, token
 }
 
-// projURL builds the full URL for project endpoints under a client.
-func projURL(clientID string, extra ...string) string {
-	base := "/users/me/clients/" + clientID + "/projects"
-	if len(extra) > 0 {
-		base += "/" + extra[0]
-	}
-	return url(base)
+// projURL builds the full URL for project collection endpoints under a client.
+// For item endpoints (GET/PUT/DELETE), use projItemURL instead.
+func projURL(clientID string) string {
+	return url("/clients/" + clientID + "/projects")
+}
+
+// projItemURL builds the full URL for a single project endpoint.
+func projItemURL(projectID string) string {
+	return url("/projects/" + projectID)
 }
 
 // ─── Create Project ──────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ func TestE2E_ListProjects_DoesNotReturnOtherClientsProjects(t *testing.T) {
 	_, clientID1, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 
 	// Create a second client for the same user
-	resp := helpers.AuthPostJSON(t, url("/users/me/clients"), token, map[string]string{"name": "Beta Inc"})
+	resp := helpers.AuthPostJSON(t, url("/clients"), token, map[string]string{"name": "Beta Inc"})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	client2Body := helpers.ParseBody(t, resp)
 	clientID2 := client2Body["id"].(string)
@@ -203,7 +205,7 @@ func TestE2E_GetProject_Success(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	projectID := created["id"].(string)
 
-	resp := helpers.AuthGetJSON(t, projURL(clientID, projectID), token)
+	resp := helpers.AuthGetJSON(t, projItemURL(projectID), token)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 
@@ -218,17 +220,17 @@ func TestE2E_GetProject_Success(t *testing.T) {
 
 func TestE2E_GetProject_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
+	_, _, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 
-	resp := helpers.AuthGetJSON(t, projURL(clientID, "00000000-0000-0000-0000-000000000000"), token)
+	resp := helpers.AuthGetJSON(t, projItemURL("00000000-0000-0000-0000-000000000000"), token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestE2E_GetProject_InvalidID_Returns400(t *testing.T) {
 	clean(t)
-	_, clientID, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
+	_, _, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 
-	resp := helpers.AuthGetJSON(t, projURL(clientID, "not-a-uuid"), token)
+	resp := helpers.AuthGetJSON(t, projItemURL("not-a-uuid"), token)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
@@ -243,7 +245,7 @@ func TestE2E_GetProject_WrongUser_Returns404(t *testing.T) {
 	projectID := created["id"].(string)
 
 	// Try to access from user2's token using user1's client
-	resp := helpers.AuthGetJSON(t, projURL(clientID1, projectID), token2)
+	resp := helpers.AuthGetJSON(t, projItemURL(projectID), token2)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -261,7 +263,7 @@ func TestE2E_UpdateProject_Success(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	projectID := created["id"].(string)
 
-	resp := helpers.AuthPutJSON(t, projURL(clientID, projectID), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, projItemURL(projectID), token, map[string]string{
 		"name":         "New Name",
 		"address":      "New Address",
 		"manager_name": "New Manager",
@@ -293,7 +295,7 @@ func TestE2E_UpdateProject_PartialUpdate_Success(t *testing.T) {
 	projectID := created["id"].(string)
 
 	// Only update address — other fields should remain unchanged
-	resp := helpers.AuthPutJSON(t, projURL(clientID, projectID), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, projItemURL(projectID), token, map[string]string{
 		"address": "Updated Address Only",
 	})
 
@@ -306,9 +308,9 @@ func TestE2E_UpdateProject_PartialUpdate_Success(t *testing.T) {
 
 func TestE2E_UpdateProject_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
+	_, _, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 
-	resp := helpers.AuthPutJSON(t, projURL(clientID, "00000000-0000-0000-0000-000000000000"), token, map[string]string{
+	resp := helpers.AuthPutJSON(t, projItemURL("00000000-0000-0000-0000-000000000000"), token, map[string]string{
 		"name": "Ghost",
 	})
 
@@ -325,7 +327,7 @@ func TestE2E_UpdateProject_WrongUser_Returns404(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	projectID := created["id"].(string)
 
-	resp := helpers.AuthPutJSON(t, projURL(clientID1, projectID), token2, map[string]string{
+	resp := helpers.AuthPutJSON(t, projItemURL(projectID), token2, map[string]string{
 		"name": "Stolen",
 	})
 
@@ -343,19 +345,19 @@ func TestE2E_DeleteProject_Success(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	projectID := created["id"].(string)
 
-	resp := helpers.AuthDeleteJSON(t, projURL(clientID, projectID), token)
+	resp := helpers.AuthDeleteJSON(t, projItemURL(projectID), token)
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 
 	// Verify it's gone
-	getResp := helpers.AuthGetJSON(t, projURL(clientID, projectID), token)
+	getResp := helpers.AuthGetJSON(t, projItemURL(projectID), token)
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }
 
 func TestE2E_DeleteProject_NotFound_Returns404(t *testing.T) {
 	clean(t)
-	_, clientID, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
+	_, _, token := createUserAndClient(t, "Juan", "juan@example.com", "Acme Corp")
 
-	resp := helpers.AuthDeleteJSON(t, projURL(clientID, "00000000-0000-0000-0000-000000000000"), token)
+	resp := helpers.AuthDeleteJSON(t, projItemURL("00000000-0000-0000-0000-000000000000"), token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -369,7 +371,7 @@ func TestE2E_DeleteProject_WrongUser_Returns404(t *testing.T) {
 	created := helpers.ParseBody(t, createResp)
 	projectID := created["id"].(string)
 
-	resp := helpers.AuthDeleteJSON(t, projURL(clientID1, projectID), token2)
+	resp := helpers.AuthDeleteJSON(t, projItemURL(projectID), token2)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -397,7 +399,7 @@ func TestE2E_Project_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "14-storey residential building, phase 1", created["description"])
 
 	// 2. Get — verify persisted
-	getResp := helpers.AuthGetJSON(t, projURL(clientID, projectID), token)
+	getResp := helpers.AuthGetJSON(t, projItemURL(projectID), token)
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	fetched := helpers.ParseBody(t, getResp)
 	assert.Equal(t, "Residential Tower B", fetched["name"])
@@ -405,7 +407,7 @@ func TestE2E_Project_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "Carlos Pérez", fetched["manager_name"])
 
 	// 3. Update all fields
-	updateResp := helpers.AuthPutJSON(t, projURL(clientID, projectID), token, map[string]string{
+	updateResp := helpers.AuthPutJSON(t, projItemURL(projectID), token, map[string]string{
 		"name":         "Tower B - Phase 2",
 		"address":      "Avenida de la Constitución 1",
 		"manager_name": "Ana García",
@@ -429,7 +431,7 @@ func TestE2E_Project_FullFlow_Create_Get_Update_List_Delete(t *testing.T) {
 	assert.Equal(t, "Tower B - Phase 2", projects[0].(map[string]any)["name"])
 
 	// 5. Delete
-	deleteResp := helpers.AuthDeleteJSON(t, projURL(clientID, projectID), token)
+	deleteResp := helpers.AuthDeleteJSON(t, projItemURL(projectID), token)
 	assert.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
 
 	// 6. List — should be empty now
