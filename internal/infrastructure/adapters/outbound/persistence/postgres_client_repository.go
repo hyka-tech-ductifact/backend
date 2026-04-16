@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -61,6 +62,34 @@ func (r *PostgresClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 		return nil, err
 	}
 	return toClientEntity(&model), nil
+}
+
+func (r *PostgresClientRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
+	var model ClientModel
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnoseClientFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toClientEntity(&model), nil
+}
+
+func (r *PostgresClientRepository) diagnoseClientFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&ClientModel{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return repositories.ErrClientNotFound
+	}
+	slog.Warn("ownership: client belongs to different user",
+		"client_id", id,
+		"requester_id", ownerID)
+	return repositories.ErrClientNotOwned
 }
 
 func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {

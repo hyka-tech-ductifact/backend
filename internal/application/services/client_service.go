@@ -15,8 +15,8 @@ import (
 // --- Application-level errors ---
 
 var (
-	ErrClientNotFound = errors.New("client not found")
-	ErrClientNotOwned = errors.New("client does not belong to this user")
+	ErrClientNotFound = repositories.ErrClientNotFound
+	ErrClientNotOwned = repositories.ErrClientNotOwned
 )
 
 // clientService implements usecases.ClientService.
@@ -66,7 +66,7 @@ func (s *clientService) CreateClient(ctx context.Context, params entities.Create
 
 // GetClientByID retrieves a client by ID, ensuring it belongs to the given user.
 func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
-	return verifyClientOwnership(ctx, s.clientRepo, id, userID)
+	return s.clientRepo.GetByIDForOwner(ctx, id, userID)
 }
 
 // ListClientsByUserID retrieves a paginated list of clients belonging to a user.
@@ -82,7 +82,7 @@ func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUI
 // UpdateClient applies a partial update to an existing client.
 // Only non-nil fields in params are updated. Ensures the client belongs to the given user.
 func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateClientParams) (*entities.Client, error) {
-	client, err := verifyClientOwnership(ctx, s.clientRepo, id, userID)
+	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 
 // DeleteClient removes a client, ensuring it belongs to the given user.
 func (s *clientService) DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	client, err := verifyClientOwnership(ctx, s.clientRepo, id, userID)
+	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
 	}
