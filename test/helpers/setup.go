@@ -27,11 +27,19 @@ func LoadEnv() {
 
 // SetupTestDB creates a PostgreSQL database connection for testing.
 // Reads credentials from the .env file at the project root.
+// The underlying *sql.DB is automatically closed when the test finishes.
 func SetupTestDB(t *testing.T) *gorm.DB {
 	LoadEnv()
 
 	db, err := ConnectTestDB()
 	require.NoError(t, err, "failed to connect to test DB")
+
+	t.Cleanup(func() {
+		sqlDB, err := db.DB()
+		if err == nil {
+			sqlDB.Close()
+		}
+	})
 
 	return db
 }
