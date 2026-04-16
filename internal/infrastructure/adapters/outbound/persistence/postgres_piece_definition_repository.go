@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -92,9 +91,6 @@ func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.
 	if count == 0 {
 		return repositories.ErrPieceDefNotFound
 	}
-	slog.Warn("ownership: piece definition belongs to different user",
-		"piece_definition_id", id,
-		"requester_id", ownerID)
 	return repositories.ErrPieceDefNotOwned
 }
 

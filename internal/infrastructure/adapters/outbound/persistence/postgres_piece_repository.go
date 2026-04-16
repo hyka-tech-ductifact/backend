@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -97,36 +96,25 @@ func (r *PostgresPieceRepository) diagnosePieceFailure(ctx context.Context, id u
 	var order OrderModel
 	if err := r.db.WithContext(ctx).Where("id = ?", piece.OrderID).First(&order).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: piece's order not found",
-				"piece_id", id, "order_id", piece.OrderID)
-			return repositories.ErrPieceNotOwned
+			return repositories.ErrOrderNotFound
 		}
 		return err
 	}
 	var project ProjectModel
 	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: piece's project not found",
-				"piece_id", id, "order_id", piece.OrderID, "project_id", order.ProjectID)
-			return repositories.ErrPieceNotOwned
+			return repositories.ErrProjectNotFound
 		}
 		return err
 	}
 	var client ClientModel
 	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: piece's client not found",
-				"piece_id", id, "order_id", piece.OrderID,
-				"project_id", order.ProjectID, "client_id", project.ClientID)
-			return repositories.ErrPieceNotOwned
+			return repositories.ErrClientNotFound
 		}
 		return err
 	}
 	if client.UserID != ownerID {
-		slog.Warn("ownership: piece's client belongs to different user",
-			"piece_id", id, "order_id", piece.OrderID,
-			"project_id", order.ProjectID, "client_id", project.ClientID,
-			"owner_id", client.UserID, "requester_id", ownerID)
 		return repositories.ErrPieceNotOwned
 	}
 	return repositories.ErrPieceNotFound

@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -86,9 +85,6 @@ func (r *PostgresClientRepository) diagnoseClientFailure(ctx context.Context, id
 	if count == 0 {
 		return repositories.ErrClientNotFound
 	}
-	slog.Warn("ownership: client belongs to different user",
-		"client_id", id,
-		"requester_id", ownerID)
 	return repositories.ErrClientNotOwned
 }
 

@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -90,26 +89,18 @@ func (r *PostgresOrderRepository) diagnoseOrderFailure(ctx context.Context, id u
 	var project ProjectModel
 	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: order's project not found",
-				"order_id", id, "project_id", order.ProjectID)
-			return repositories.ErrOrderNotOwned
+			return repositories.ErrProjectNotFound
 		}
 		return err
 	}
 	var client ClientModel
 	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: order's client not found",
-				"order_id", id, "project_id", order.ProjectID, "client_id", project.ClientID)
-			return repositories.ErrOrderNotOwned
+			return repositories.ErrClientNotFound
 		}
 		return err
 	}
 	if client.UserID != ownerID {
-		slog.Warn("ownership: order's client belongs to different user",
-			"order_id", id, "project_id", order.ProjectID,
-			"client_id", project.ClientID, "owner_id", client.UserID,
-			"requester_id", ownerID)
 		return repositories.ErrOrderNotOwned
 	}
 	return repositories.ErrOrderNotFound

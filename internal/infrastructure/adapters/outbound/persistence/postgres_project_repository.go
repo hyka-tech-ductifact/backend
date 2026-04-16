@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -91,16 +90,11 @@ func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, 
 	var client ClientModel
 	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("ownership: project's client not found",
-				"project_id", id, "client_id", project.ClientID)
-			return repositories.ErrProjectNotOwned
+			return repositories.ErrClientNotFound
 		}
 		return err
 	}
 	if client.UserID != ownerID {
-		slog.Warn("ownership: project's client belongs to different user",
-			"project_id", id, "client_id", project.ClientID,
-			"owner_id", client.UserID, "requester_id", ownerID)
 		return repositories.ErrProjectNotOwned
 	}
 	return repositories.ErrProjectNotFound
