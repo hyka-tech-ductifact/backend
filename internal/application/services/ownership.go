@@ -82,3 +82,50 @@ func verifyOrderOwnership(ctx context.Context, clientRepo repositories.ClientRep
 
 	return order, nil
 }
+
+// verifyPieceDefAccess fetches a piece definition by ID and ensures the user can see it.
+// Predefined definitions are visible to everyone. Custom definitions are only
+// visible to their creator. Returns ErrPieceDefNotFound if the definition does
+// not exist or the user cannot access it.
+func verifyPieceDefAccess(ctx context.Context, pieceDefRepo repositories.PieceDefinitionRepository, defID uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+	def, err := pieceDefRepo.GetByID(ctx, defID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrPieceDefNotFound
+		}
+		return nil, err
+	}
+
+	if def.Predefined {
+		return def, nil
+	}
+
+	if def.UserID == nil || *def.UserID != userID {
+		return nil, ErrPieceDefNotFound
+	}
+
+	return def, nil
+}
+
+// verifyPieceDefOwnership fetches a piece definition by ID and ensures it belongs
+// to the given user and can be modified. Returns ErrPieceDefPredefined for predefined
+// definitions and ErrPieceDefNotOwned for custom definitions not owned by the user.
+func verifyPieceDefOwnership(ctx context.Context, pieceDefRepo repositories.PieceDefinitionRepository, defID uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+	def, err := pieceDefRepo.GetByID(ctx, defID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrPieceDefNotFound
+		}
+		return nil, err
+	}
+
+	if def.Predefined {
+		return nil, ErrPieceDefPredefined
+	}
+
+	if def.UserID == nil || *def.UserID != userID {
+		return nil, ErrPieceDefNotOwned
+	}
+
+	return def, nil
+}
