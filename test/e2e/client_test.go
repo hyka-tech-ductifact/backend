@@ -198,7 +198,7 @@ func TestE2E_GetClient_InvalidID_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestE2E_GetClient_WrongUser_Returns403(t *testing.T) {
+func TestE2E_GetClient_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -211,7 +211,7 @@ func TestE2E_GetClient_WrongUser_Returns403(t *testing.T) {
 
 	// Try to access from user2's token
 	resp := helpers.AuthGetJSON(t, url("/users/me/clients/"+clientID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Update Client ───────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ func TestE2E_UpdateClient_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_UpdateClient_WrongUser_Returns403(t *testing.T) {
+func TestE2E_UpdateClient_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -294,7 +294,7 @@ func TestE2E_UpdateClient_WrongUser_Returns403(t *testing.T) {
 		"name": "Stolen",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Delete Client ───────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ func TestE2E_DeleteClient_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_DeleteClient_WrongUser_Returns403(t *testing.T) {
+func TestE2E_DeleteClient_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")
 	_, token2 := createUserForClients(t, "Pedro", "pedro@example.com")
@@ -335,7 +335,7 @@ func TestE2E_DeleteClient_WrongUser_Returns403(t *testing.T) {
 	clientID := created["id"].(string)
 
 	resp := helpers.AuthDeleteJSON(t, url("/users/me/clients/"+clientID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────

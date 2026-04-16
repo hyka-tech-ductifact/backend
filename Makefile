@@ -28,7 +28,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 .PHONY: help \
 	dev app-build app-start ensure-seed \
 	services-start services-stop \
-	test test-unit test-integration test-contract test-e2e test-clean \
+	test test-unit test-integration test-e2e test-clean \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
 	validate-branch fetch-contract \
@@ -54,7 +54,6 @@ help:
 	@echo "    test             - Run all tests"
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
-	@echo "    test-contract    - Run contract tests (requires running server)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
@@ -162,7 +161,7 @@ define run-tests
 endef
 
 # Run all tests
-test: test-unit test-integration test-contract test-e2e
+test: test-unit test-integration test-e2e
 
 # Run unit tests — no dependencies needed
 test-unit:
@@ -173,11 +172,6 @@ test-unit:
 test-integration:
 	@echo "Running integration tests..."
 	$(call run-tests,integration,./test/integration/...)
-
-# Run contract tests — requires server running (make app-start)
-test-contract:
-	@echo "Running contract tests..."
-	$(call run-tests,contract,./test/contract/...)
 
 # Run E2E tests — requires server running (make app-start)
 test-e2e:

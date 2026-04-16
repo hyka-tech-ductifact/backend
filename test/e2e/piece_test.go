@@ -123,7 +123,7 @@ func TestE2E_CreatePiece_NoToken_Returns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestE2E_CreatePiece_WrongUser_Returns403(t *testing.T) {
+func TestE2E_CreatePiece_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	clientID, projectID, orderID, defID, _ := createFullChainForPieces(t)
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -135,7 +135,7 @@ func TestE2E_CreatePiece_WrongUser_Returns403(t *testing.T) {
 		"quantity":      1,
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestE2E_CreatePiece_NonExistingOrder_Returns404(t *testing.T) {
@@ -232,7 +232,7 @@ func TestE2E_GetPiece_InvalidID_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestE2E_GetPiece_WrongUser_Returns403(t *testing.T) {
+func TestE2E_GetPiece_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	clientID, projectID, orderID, defID, token := createFullChainForPieces(t)
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -246,7 +246,7 @@ func TestE2E_GetPiece_WrongUser_Returns403(t *testing.T) {
 	pieceID := created["id"].(string)
 
 	resp := helpers.AuthGetJSON(t, pieceURL(clientID, projectID, orderID, pieceID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Update Piece ────────────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ func TestE2E_UpdatePiece_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_UpdatePiece_WrongUser_Returns403(t *testing.T) {
+func TestE2E_UpdatePiece_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	clientID, projectID, orderID, defID, token := createFullChainForPieces(t)
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -348,7 +348,7 @@ func TestE2E_UpdatePiece_WrongUser_Returns403(t *testing.T) {
 		"title": "Stolen",
 	})
 
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Delete Piece ────────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@ func TestE2E_DeletePiece_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestE2E_DeletePiece_WrongUser_Returns403(t *testing.T) {
+func TestE2E_DeletePiece_WrongUser_Returns404(t *testing.T) {
 	clean(t)
 	clientID, projectID, orderID, defID, token := createFullChainForPieces(t)
 	_, _, _, token2 := createUserClientAndProject(t, "Pedro", "pedro@example.com", "Other Corp", "Other Proj")
@@ -395,7 +395,7 @@ func TestE2E_DeletePiece_WrongUser_Returns403(t *testing.T) {
 	pieceID := created["id"].(string)
 
 	resp := helpers.AuthDeleteJSON(t, pieceURL(clientID, projectID, orderID, pieceID), token2)
-	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // ─── Full Flow ───────────────────────────────────────────────────────────────
