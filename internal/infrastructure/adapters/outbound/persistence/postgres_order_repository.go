@@ -115,38 +115,6 @@ func (r *PostgresOrderRepository) diagnoseOrderFailure(ctx context.Context, id u
 	return repositories.ErrOrderNotFound
 }
 
-func (r *PostgresOrderRepository) ListByProjectIDForOwner(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
-	var totalItems int64
-
-	baseQuery := r.db.WithContext(ctx).Model(&OrderModel{}).
-		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
-		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
-		Where("orders.project_id = ? AND clients.user_id = ?", projectID, ownerID)
-
-	if err := baseQuery.Count(&totalItems).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var models []OrderModel
-	err := r.db.WithContext(ctx).
-		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
-		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
-		Where("orders.project_id = ? AND clients.user_id = ?", projectID, ownerID).
-		Order("orders.created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
-	if err != nil {
-		return nil, 0, err
-	}
-
-	orders := make([]*entities.Order, len(models))
-	for i := range models {
-		orders[i] = toOrderEntity(&models[i])
-	}
-	return orders, totalItems, nil
-}
-
 func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
 	var totalItems int64
 

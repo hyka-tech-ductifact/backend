@@ -16,7 +16,6 @@ type PieceRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*entities.Piece, error)
 	GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error)
 	ListByOrderID(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error)
-	ListByOrderIDForOwner(ctx context.Context, orderID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error)
 	Update(ctx context.Context, piece *entities.Piece) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

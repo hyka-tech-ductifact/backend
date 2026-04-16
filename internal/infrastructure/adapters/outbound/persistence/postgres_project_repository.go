@@ -106,36 +106,6 @@ func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, 
 	return repositories.ErrProjectNotFound
 }
 
-func (r *PostgresProjectRepository) ListByClientIDForOwner(ctx context.Context, clientID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
-	var totalItems int64
-
-	baseQuery := r.db.WithContext(ctx).Model(&ProjectModel{}).
-		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
-		Where("projects.client_id = ? AND clients.user_id = ?", clientID, ownerID)
-
-	if err := baseQuery.Count(&totalItems).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var models []ProjectModel
-	err := r.db.WithContext(ctx).
-		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
-		Where("projects.client_id = ? AND clients.user_id = ?", clientID, ownerID).
-		Order("projects.created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
-	if err != nil {
-		return nil, 0, err
-	}
-
-	projects := make([]*entities.Project, len(models))
-	for i := range models {
-		projects[i] = toProjectEntity(&models[i])
-	}
-	return projects, totalItems, nil
-}
-
 func (r *PostgresProjectRepository) ListByClientID(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
 	var totalItems int64
 
