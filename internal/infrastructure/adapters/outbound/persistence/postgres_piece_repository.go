@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -66,6 +67,107 @@ func (r *PostgresPieceRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 		return nil, err
 	}
 	return toPieceEntity(&model)
+}
+
+func (r *PostgresPieceRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error) {
+	var model PieceModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN orders ON orders.id = pieces.order_id AND orders.deleted_at IS NULL").
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("pieces.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnosePieceFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toPieceEntity(&model)
+}
+
+func (r *PostgresPieceRepository) diagnosePieceFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var piece PieceModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&piece).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrPieceNotFound
+		}
+		return err
+	}
+	var order OrderModel
+	if err := r.db.WithContext(ctx).Where("id = ?", piece.OrderID).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: piece's order not found",
+				"piece_id", id, "order_id", piece.OrderID)
+			return repositories.ErrPieceNotOwned
+		}
+		return err
+	}
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: piece's project not found",
+				"piece_id", id, "order_id", piece.OrderID, "project_id", order.ProjectID)
+			return repositories.ErrPieceNotOwned
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: piece's client not found",
+				"piece_id", id, "order_id", piece.OrderID,
+				"project_id", order.ProjectID, "client_id", project.ClientID)
+			return repositories.ErrPieceNotOwned
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		slog.Warn("ownership: piece's client belongs to different user",
+			"piece_id", id, "order_id", piece.OrderID,
+			"project_id", order.ProjectID, "client_id", project.ClientID,
+			"owner_id", client.UserID, "requester_id", ownerID)
+		return repositories.ErrPieceNotOwned
+	}
+	return repositories.ErrPieceNotFound
+}
+
+func (r *PostgresPieceRepository) ListByOrderIDForOwner(ctx context.Context, orderID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {
+	var totalItems int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&PieceModel{}).
+		Joins("JOIN orders ON orders.id = pieces.order_id AND orders.deleted_at IS NULL").
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("pieces.order_id = ? AND clients.user_id = ?", orderID, ownerID)
+
+	if err := baseQuery.Count(&totalItems).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var models []PieceModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN orders ON orders.id = pieces.order_id AND orders.deleted_at IS NULL").
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("pieces.order_id = ? AND clients.user_id = ?", orderID, ownerID).
+		Order("pieces.created_at DESC").
+		Offset((pg.Page - 1) * pg.PageSize).
+		Limit(pg.PageSize).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	pieces := make([]*entities.Piece, 0, len(models))
+	for i := range models {
+		piece, err := toPieceEntity(&models[i])
+		if err != nil {
+			return nil, 0, err
+		}
+		pieces = append(pieces, piece)
+	}
+	return pieces, totalItems, nil
 }
 
 func (r *PostgresPieceRepository) ListByOrderID(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {

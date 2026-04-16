@@ -12,9 +12,9 @@ import (
 // PieceService is the inbound port for piece operations.
 // Inbound adapters (HTTP handlers, CLI, etc.) depend on this interface.
 type PieceService interface {
-	CreatePiece(ctx context.Context, userID uuid.UUID, clientID uuid.UUID, projectID uuid.UUID, params entities.CreatePieceParams) (*entities.Piece, error)
-	GetPieceByID(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Piece, error)
-	ListPiecesByOrderID(ctx context.Context, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Piece], error)
-	UpdatePiece(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, params entities.UpdatePieceParams) (*entities.Piece, error)
-	DeletePiece(ctx context.Context, id uuid.UUID, orderID uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) error
+	CreatePiece(ctx context.Context, userID uuid.UUID, params entities.CreatePieceParams) (*entities.Piece, error)
+	GetPieceByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Piece, error)
+	ListPiecesByOrderID(ctx context.Context, orderID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Piece], error)
+	UpdatePiece(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceParams) (*entities.Piece, error)
+	DeletePiece(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 }
