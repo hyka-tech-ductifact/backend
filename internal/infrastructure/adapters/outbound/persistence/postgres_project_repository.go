@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -62,6 +63,77 @@ func (r *PostgresProjectRepository) GetByID(ctx context.Context, id uuid.UUID) (
 		return nil, err
 	}
 	return toProjectEntity(&model), nil
+}
+
+func (r *PostgresProjectRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+	var model ProjectModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("projects.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnoseProjectFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toProjectEntity(&model), nil
+}
+
+func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrProjectNotFound
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: project's client not found",
+				"project_id", id, "client_id", project.ClientID)
+			return repositories.ErrProjectNotOwned
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		slog.Warn("ownership: project's client belongs to different user",
+			"project_id", id, "client_id", project.ClientID,
+			"owner_id", client.UserID, "requester_id", ownerID)
+		return repositories.ErrProjectNotOwned
+	}
+	return repositories.ErrProjectNotFound
+}
+
+func (r *PostgresProjectRepository) ListByClientIDForOwner(ctx context.Context, clientID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
+	var totalItems int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&ProjectModel{}).
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("projects.client_id = ? AND clients.user_id = ?", clientID, ownerID)
+
+	if err := baseQuery.Count(&totalItems).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var models []ProjectModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("projects.client_id = ? AND clients.user_id = ?", clientID, ownerID).
+		Order("projects.created_at DESC").
+		Offset((pg.Page - 1) * pg.PageSize).
+		Limit(pg.PageSize).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	projects := make([]*entities.Project, len(models))
+	for i := range models {
+		projects[i] = toProjectEntity(&models[i])
+	}
+	return projects, totalItems, nil
 }
 
 func (r *PostgresProjectRepository) ListByClientID(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {

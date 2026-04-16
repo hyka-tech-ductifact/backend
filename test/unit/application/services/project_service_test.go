@@ -107,11 +107,10 @@ func TestCreateProject_WhenRepoFails_ReturnsError(t *testing.T) {
 
 func TestGetProjectByID_WithExistingProject_ReturnsProject(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{})
 
-	result, err := svc.GetProjectByID(context.Background(), project.ID, client.ID, userID)
+	result, err := svc.GetProjectByID(context.Background(), project.ID, userID)
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Name, result.Name)
@@ -119,45 +118,23 @@ func TestGetProjectByID_WithExistingProject_ReturnsProject(t *testing.T) {
 }
 
 func TestGetProjectByID_WithNonExistingProject_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	svc := services.NewProjectService(projectRepoReturning(nil), clientRepoReturning(client))
+	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{})
 
-	result, err := svc.GetProjectByID(context.Background(), uuid.New(), client.ID, userID)
+	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrProjectNotFound)
 }
 
-func TestGetProjectByID_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(nil))
+func TestGetProjectByID_WithNotOwnedProject_ReturnsError(t *testing.T) {
+	projectRepo := &mocks.MockProjectRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+			return nil, repositories.ErrProjectNotOwned
+		},
+	}
+	svc := services.NewProjectService(projectRepo, &mocks.MockClientRepository{})
 
-	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New(), uuid.New())
-
-	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
-}
-
-func TestGetProjectByID_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
-
-	result, err := svc.GetProjectByID(context.Background(), project.ID, client.ID, uuid.New())
-
-	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
-}
-
-func TestGetProjectByID_WithWrongClient_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	otherClientID := uuid.New()
-	project := newTestProject(otherClientID) // project belongs to a different client
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
-
-	result, err := svc.GetProjectByID(context.Background(), project.ID, client.ID, userID)
+	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
@@ -234,11 +211,10 @@ func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
 
 func TestUpdateProject_WithNewName_UpdatesName(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), project.ID, client.ID, userID, entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
 	})
 
@@ -248,11 +224,10 @@ func TestUpdateProject_WithNewName_UpdatesName(t *testing.T) {
 
 func TestUpdateProject_WithAllFields_UpdatesAll(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), project.ID, client.ID, userID, entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name:        strPtr("Updated Tower"),
 		Address:     strPtr("New Address 5"),
 		ManagerName: strPtr("New Manager"),
@@ -270,11 +245,10 @@ func TestUpdateProject_WithAllFields_UpdatesAll(t *testing.T) {
 
 func TestUpdateProject_WithEmptyName_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), project.ID, client.ID, userID, entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr(""),
 	})
 
@@ -282,26 +256,27 @@ func TestUpdateProject_WithEmptyName_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, entities.ErrEmptyProjectName)
 }
 
-func TestUpdateProject_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+func TestUpdateProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
+	projectRepo := &mocks.MockProjectRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+			return nil, repositories.ErrProjectNotOwned
+		},
+	}
+	svc := services.NewProjectService(projectRepo, &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), project.ID, client.ID, uuid.New(), entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), uuid.New(), uuid.New(), entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
 }
 
 func TestUpdateProject_WithNonExistingProject_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	svc := services.NewProjectService(projectRepoReturning(nil), clientRepoReturning(client))
+	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), uuid.New(), client.ID, userID, entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), uuid.New(), userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
 	})
 
@@ -311,12 +286,11 @@ func TestUpdateProject_WithNonExistingProject_ReturnsError(t *testing.T) {
 
 func TestUpdateProject_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	oldTime := project.UpdatedAt
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{})
 
-	result, err := svc.UpdateProject(context.Background(), project.ID, client.ID, userID, entities.UpdateProjectParams{
+	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
 	})
 
@@ -326,17 +300,16 @@ func TestUpdateProject_UpdatesTimestamp(t *testing.T) {
 
 func TestUpdateProject_WithNoChanges_SkipsPersistence(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	repo := projectRepoReturning(project)
 	updateCalled := false
 	repo.UpdateFn = func(ctx context.Context, p *entities.Project) error {
 		updateCalled = true
 		return nil
 	}
-	svc := services.NewProjectService(repo, clientRepoReturning(client))
+	svc := services.NewProjectService(repo, &mocks.MockClientRepository{})
 
-	_, err := svc.UpdateProject(context.Background(), project.ID, client.ID, userID, entities.UpdateProjectParams{})
+	_, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{})
 
 	require.NoError(t, err)
 	assert.False(t, updateCalled, "Update should not be called when no fields change")
@@ -348,49 +321,40 @@ func TestUpdateProject_WithNoChanges_SkipsPersistence(t *testing.T) {
 
 func TestDeleteProject_WithExistingProject_Succeeds(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	deleteCalled := false
 	repo := projectRepoReturning(project)
 	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
 		deleteCalled = true
 		return nil
 	}
-	svc := services.NewProjectService(repo, clientRepoReturning(client))
+	svc := services.NewProjectService(repo, &mocks.MockClientRepository{})
 
-	err := svc.DeleteProject(context.Background(), project.ID, client.ID, userID)
+	err := svc.DeleteProject(context.Background(), project.ID, userID)
 
 	assert.NoError(t, err)
 	assert.True(t, deleteCalled)
 }
 
 func TestDeleteProject_WithNonExistingProject_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	svc := services.NewProjectService(projectRepoReturning(nil), clientRepoReturning(client))
+	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{})
 
-	err := svc.DeleteProject(context.Background(), uuid.New(), client.ID, userID)
+	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New())
 
 	assert.ErrorIs(t, err, services.ErrProjectNotFound)
 }
 
-func TestDeleteProject_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	svc := services.NewProjectService(projectRepoReturning(project), clientRepoReturning(client))
+func TestDeleteProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
+	projectRepo := &mocks.MockProjectRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+			return nil, repositories.ErrProjectNotOwned
+		},
+	}
+	svc := services.NewProjectService(projectRepo, &mocks.MockClientRepository{})
 
-	err := svc.DeleteProject(context.Background(), project.ID, client.ID, uuid.New())
+	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
-}
-
-func TestDeleteProject_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(nil))
-
-	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New(), uuid.New())
-
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
 }
 
 // =============================================================================
@@ -399,7 +363,7 @@ func TestDeleteProject_WithNonExistingClient_ReturnsError(t *testing.T) {
 
 func TestCreateProject_WhenClientRepoFails_ReturnsError(t *testing.T) {
 	clientRepo := &mocks.MockClientRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
 			return nil, errors.New("db timeout")
 		},
 	}
@@ -413,6 +377,3 @@ func TestCreateProject_WhenClientRepoFails_ReturnsError(t *testing.T) {
 	assert.Nil(t, project)
 	assert.EqualError(t, err, "db timeout")
 }
-
-// Ensure unused import for repositories is resolved
-var _ = repositories.ErrNotFound
