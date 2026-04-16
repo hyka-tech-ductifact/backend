@@ -32,9 +32,9 @@ type UpdateClientRequest struct {
 type ClientResponse struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
-	Phone       string `json:"phone"`
-	Email       string `json:"email"`
-	Description string `json:"description"`
+	Phone       string `json:"phone,omitempty"`
+	Email       string `json:"email,omitempty"`
+	Description string `json:"description,omitempty"`
 	UserID      string `json:"user_id"`
 }
 

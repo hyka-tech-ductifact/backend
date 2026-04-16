@@ -15,6 +15,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -68,11 +69,20 @@ func SetupRoutes(
 	helpers.RegisterDomainError(entities.ErrUnexpectedDimensions, http.StatusBadRequest, "unexpected dimensions")
 	helpers.RegisterDomainError(entities.ErrInvalidDimensionValues, http.StatusBadRequest, "dimension values must be positive")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
+	helpers.RegisterDomainError(valueobjects.ErrPasswordTooLong, http.StatusBadRequest, "password must not exceed 72 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 
+	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
+	// Makes ShouldBindJSON return 400 for bodies with extra properties.
+	binding.EnableDecoderDisallowUnknownFields = true
+
 	// --- Create router WITHOUT default middlewares ---
 	r := gin.New()
+
+	// Return 405 Method Not Allowed (with Allow header) instead of 404
+	// for routes that exist but don't support the requested HTTP method.
+	r.HandleMethodNotAllowed = true
 
 	// --- Register middlewares in correct order ---
 	// 1. Request ID: first, so all logs include the ID

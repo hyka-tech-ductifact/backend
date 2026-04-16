@@ -29,9 +29,10 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	dev app-build app-start ensure-seed \
 	services-start services-stop \
 	test test-unit test-integration test-e2e test-clean \
+	test-contract test-contract-fuzz \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
-	validate-branch fetch-contract \
+	validate-branch ensure-contract \
 	changelog
 
 # ═══════════════════════════════════════════════════════════════
@@ -55,6 +56,8 @@ help:
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
+	@echo "    test-contract    - Run contract tests with Schemathesis (requires running server)"
+	@echo "    test-contract-fuzz - Continuous fuzz testing (60s, requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
@@ -65,7 +68,8 @@ help:
 	@echo "                 standard-quiet, standard-verbose, pkgname-and-test-fails"
 	@echo ""
 	@echo "  Contracts:"
-	@echo "    fetch-contract   - Download bundled.yaml from contracts release"
+	@echo "    ensure-contract  - Ensure bundled.yaml is present"
+	@echo "                       Uses ../contracts if available, otherwise downloads from release"
 	@echo ""
 	@echo "  Docker (smoke test):"
 	@echo "    docker-build     - Build Docker image"
@@ -178,6 +182,24 @@ test-e2e:
 	@echo "Running E2E tests..."
 	$(call run-tests,e2e,./test/e2e/...)
 
+# Schemathesis defaults (override via env or .env)
+ST               ?= $(HOME)/.local/bin/st
+ST_API_HOST      ?= localhost
+ST_API_PORT      ?= 8080
+ST_AUTH_NAME     ?= Schemathesis Bot
+ST_AUTH_EMAIL    ?= st-$(shell date +%s)@test.ductifact.dev
+ST_AUTH_PASSWORD ?= password123
+export ST_API_HOST ST_API_PORT ST_AUTH_NAME ST_AUTH_EMAIL ST_AUTH_PASSWORD
+
+# Run contract tests with Schemathesis against the OpenAPI spec.
+# Requires: running API server (make app-start) and schemathesis installed.
+# A fresh user is registered automatically on each run (unique email via timestamp).
+test-contract: ensure-contract
+	@echo "Running contract tests (Schemathesis)..."
+	@echo "  Auth user: $(ST_AUTH_EMAIL)"
+	$(ST) run contracts/openapi/bundled.yaml --url http://$(ST_API_HOST):$(ST_API_PORT)/v1
+	@echo "✅ Contract tests passed"
+
 # Clear Go test cache
 test-clean:
 	@echo "Clearing test cache..."
@@ -188,36 +210,33 @@ test-clean:
 # Contracts
 # ═══════════════════════════════════════════════════════════════
 
-# Download bundled.yaml from the contracts GitHub Release matching ContractVersion.
-# The version is read from the Go source (internal/config/contract_version.go).
-# The file is saved to contracts/openapi/bundled.yaml (git-ignored).
-fetch-contract:
-	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
-	@if [ -z "$(CONTRACT_VERSION)" ]; then \
-		echo "❌ Could not read ContractVersion from internal/config/contract_version.go"; \
-		exit 1; \
-	fi; \
-	echo "Fetching contracts v$(CONTRACT_VERSION)..."; \
-	mkdir -p contracts/openapi; \
-	curl -fsSL \
-		"https://github.com/$(CONTRACTS_REPO)/releases/download/v$(CONTRACT_VERSION)/bundled.yaml" \
-		-o contracts/openapi/bundled.yaml; \
-	echo "✅ contracts/openapi/bundled.yaml (v$(CONTRACT_VERSION))"
-
-# Fetch contract only if bundled.yaml doesn't exist or its version
-# doesn't match ContractVersion from Go source.
+# Ensure bundled.yaml is present and up to date.
+# Tries ../contracts/openapi/bundled.yaml first (local dev), otherwise
+# downloads from the GitHub release matching ContractVersion.
 ensure-contract:
 	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
-	@if [ ! -f contracts/openapi/bundled.yaml ]; then \
-		echo "OpenAPI spec not found, fetching..."; \
-		$(MAKE) fetch-contract; \
-	else \
+	@mkdir -p contracts/openapi; \
+	if [ -f ../contracts/openapi/bundled.yaml ]; then \
+		cp ../contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml; \
 		SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
-		if [ "$$SPEC_VERSION" != "$(CONTRACT_VERSION)" ]; then \
-			echo "⚠️  bundled.yaml is v$$SPEC_VERSION but ContractVersion is $(CONTRACT_VERSION)"; \
-			echo "   Re-fetching to match..."; \
-			$(MAKE) fetch-contract; \
+		echo "✅ bundled.yaml v$$SPEC_VERSION (local)"; \
+	else \
+		if [ ! -f contracts/openapi/bundled.yaml ]; then \
+			NEED_FETCH=1; \
+		else \
+			SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
+			if [ "$$SPEC_VERSION" != "$(CONTRACT_VERSION)" ]; then \
+				echo "⚠️  bundled.yaml is v$$SPEC_VERSION but ContractVersion is $(CONTRACT_VERSION)"; \
+				NEED_FETCH=1; \
+			fi; \
 		fi; \
+		if [ "$$NEED_FETCH" = "1" ]; then \
+			echo "Fetching contracts v$(CONTRACT_VERSION)..."; \
+			curl -fsSL \
+				"https://github.com/$(CONTRACTS_REPO)/releases/download/v$(CONTRACT_VERSION)/bundled.yaml" \
+				-o contracts/openapi/bundled.yaml; \
+		fi; \
+		echo "✅ bundled.yaml v$(CONTRACT_VERSION) (release)"; \
 	fi
 
 # ═══════════════════════════════════════════════════════════════

@@ -50,6 +50,10 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Schemathesis reports & Hypothesis DB
+schemathesis-report/
+.hypothesis/
+
 # Temporary files
 tmp/
 temp/
