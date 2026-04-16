@@ -25,6 +25,8 @@ func SetupRoutes(
 	clientService usecases.ClientService,
 	projectService usecases.ProjectService,
 	orderService usecases.OrderService,
+	pieceDefService usecases.PieceDefinitionService,
+	pieceService usecases.PieceService,
 	authService usecases.AuthService,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
@@ -49,6 +51,21 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrOrderNotOwned, http.StatusForbidden, "order does not belong to this project")
 	helpers.RegisterDomainError(entities.ErrEmptyOrderTitle, http.StatusBadRequest, "order title cannot be empty")
 	helpers.RegisterDomainError(entities.ErrInvalidOrderStatus, http.StatusBadRequest, "order status must be 'pending' or 'completed'")
+	helpers.RegisterDomainError(services.ErrPieceDefNotFound, http.StatusNotFound, "piece definition not found")
+	helpers.RegisterDomainError(entities.ErrEmptyPieceDefName, http.StatusBadRequest, "piece definition name cannot be empty")
+	helpers.RegisterDomainError(entities.ErrTooManyDimensionFields, http.StatusBadRequest, "piece definition cannot have more than 10 dimension fields")
+	helpers.RegisterDomainError(entities.ErrNoDimensionFields, http.StatusBadRequest, "piece definition must have at least one dimension field")
+	helpers.RegisterDomainError(entities.ErrDuplicateDimensionLabel, http.StatusBadRequest, "dimension labels must be unique")
+	helpers.RegisterDomainError(entities.ErrEmptyDimensionLabel, http.StatusBadRequest, "dimension label cannot be empty")
+	helpers.RegisterDomainError(services.ErrPieceDefPredefined, http.StatusForbidden, "predefined piece definitions cannot be modified")
+	helpers.RegisterDomainError(services.ErrPieceDefNotOwned, http.StatusForbidden, "piece definition does not belong to this user")
+	helpers.RegisterDomainError(services.ErrPieceNotFound, http.StatusNotFound, "piece not found")
+	helpers.RegisterDomainError(services.ErrPieceNotOwned, http.StatusForbidden, "piece does not belong to this order")
+	helpers.RegisterDomainError(entities.ErrEmptyPieceTitle, http.StatusBadRequest, "piece title cannot be empty")
+	helpers.RegisterDomainError(entities.ErrInvalidPieceQuantity, http.StatusBadRequest, "piece quantity must be at least 1")
+	helpers.RegisterDomainError(entities.ErrMissingDimensions, http.StatusBadRequest, "missing required dimensions")
+	helpers.RegisterDomainError(entities.ErrUnexpectedDimensions, http.StatusBadRequest, "unexpected dimensions")
+	helpers.RegisterDomainError(entities.ErrInvalidDimensionValues, http.StatusBadRequest, "dimension values must be positive")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
@@ -152,6 +169,28 @@ func SetupRoutes(
 		orderRoutes.GET("/:order_id", orderHandler.GetOrder)
 		orderRoutes.PUT("/:order_id", orderHandler.UpdateOrder)
 		orderRoutes.DELETE("/:order_id", orderHandler.DeleteOrder)
+	}
+
+	// Piece Definition routes — user-scoped (predefined + custom)
+	pieceDefHandler := NewPieceDefinitionHandler(pieceDefService)
+	pieceDefRoutes := protected.Group("/users/me/piece-definitions")
+	{
+		pieceDefRoutes.POST("", pieceDefHandler.CreatePieceDefinition)
+		pieceDefRoutes.GET("", pieceDefHandler.ListPieceDefinitions)
+		pieceDefRoutes.GET("/:piece_definition_id", pieceDefHandler.GetPieceDefinition)
+		pieceDefRoutes.PUT("/:piece_definition_id", pieceDefHandler.UpdatePieceDefinition)
+		pieceDefRoutes.DELETE("/:piece_definition_id", pieceDefHandler.DeletePieceDefinition)
+	}
+
+	// Piece routes — nested under an order
+	pieceHandler := NewPieceHandler(pieceService)
+	pieceRoutes := protected.Group("/users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces")
+	{
+		pieceRoutes.POST("", pieceHandler.CreatePiece)
+		pieceRoutes.GET("", pieceHandler.ListPieces)
+		pieceRoutes.GET("/:piece_id", pieceHandler.GetPiece)
+		pieceRoutes.PUT("/:piece_id", pieceHandler.UpdatePiece)
+		pieceRoutes.DELETE("/:piece_id", pieceHandler.DeletePiece)
 	}
 
 	return r
