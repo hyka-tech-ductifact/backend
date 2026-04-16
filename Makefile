@@ -182,14 +182,11 @@ test-e2e:
 	@echo "Running E2E tests..."
 	$(call run-tests,e2e,./test/e2e/...)
 
-# Schemathesis defaults (override via env or .env)
+# ─── Schemathesis (contract testing) ─────────────────────────
+# Only ST_AUTH_EMAIL is dynamic (unique per run). Everything else lives in schemathesis.toml.
 ST               ?= $(HOME)/.local/bin/st
-ST_API_HOST      ?= localhost
-ST_API_PORT      ?= 8080
-ST_AUTH_NAME     ?= Schemathesis Bot
-ST_AUTH_EMAIL    ?= st-$(shell date +%s)@test.ductifact.dev
-ST_AUTH_PASSWORD ?= password123
-export ST_API_HOST ST_API_PORT ST_AUTH_NAME ST_AUTH_EMAIL ST_AUTH_PASSWORD
+ST_AUTH_EMAIL    := st-$(shell date +%s)@test.ductifact.dev
+export ST_AUTH_EMAIL
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make app-start) and schemathesis installed.
@@ -197,7 +194,7 @@ export ST_API_HOST ST_API_PORT ST_AUTH_NAME ST_AUTH_EMAIL ST_AUTH_PASSWORD
 test-contract: ensure-contract
 	@echo "Running contract tests (Schemathesis)..."
 	@echo "  Auth user: $(ST_AUTH_EMAIL)"
-	$(ST) run contracts/openapi/bundled.yaml --url http://$(ST_API_HOST):$(ST_API_PORT)/v1
+	$(ST) run contracts/openapi/bundled.yaml --url http://localhost:8080/v1
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache
