@@ -11,11 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	ErrOrderNotFound = repositories.ErrOrderNotFound
-	ErrOrderNotOwned = repositories.ErrOrderNotOwned
-)
-
 type orderService struct {
 	orderRepo   repositories.OrderRepository
 	projectRepo repositories.ProjectRepository

@@ -11,13 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Application-level errors (aliases for repository ownership errors) ---
-
-var (
-	ErrProjectNotFound = repositories.ErrProjectNotFound
-	ErrProjectNotOwned = repositories.ErrProjectNotOwned
-)
-
 // projectService implements usecases.ProjectService.
 type projectService struct {
 	projectRepo repositories.ProjectRepository

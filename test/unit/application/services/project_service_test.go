@@ -65,7 +65,7 @@ func TestCreateProject_WithNonExistingClient_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, project)
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
 
 func TestCreateProject_WithWrongUser_ReturnsError(t *testing.T) {
@@ -79,7 +79,7 @@ func TestCreateProject_WithWrongUser_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, project)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }
 
 func TestCreateProject_WhenRepoFails_ReturnsError(t *testing.T) {
@@ -123,7 +123,7 @@ func TestGetProjectByID_WithNonExistingProject_ReturnsError(t *testing.T) {
 	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrProjectNotFound)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotFound)
 }
 
 func TestGetProjectByID_WithNotOwnedProject_ReturnsError(t *testing.T) {
@@ -137,7 +137,7 @@ func TestGetProjectByID_WithNotOwnedProject_ReturnsError(t *testing.T) {
 	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }
 
 // =============================================================================
@@ -191,7 +191,7 @@ func TestListProjectsByClientID_WithNonExistingClient_ReturnsError(t *testing.T)
 	pg, _ := pagination.NewPagination(1, 20)
 	_, err := svc.ListProjectsByClientID(context.Background(), uuid.New(), uuid.New(), pg)
 
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
+	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
 
 func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
@@ -202,7 +202,7 @@ func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
 	pg, _ := pagination.NewPagination(1, 20)
 	_, err := svc.ListProjectsByClientID(context.Background(), client.ID, uuid.New(), pg)
 
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }
 
 // =============================================================================
@@ -269,7 +269,7 @@ func TestUpdateProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }
 
 func TestUpdateProject_WithNonExistingProject_ReturnsError(t *testing.T) {
@@ -281,7 +281,7 @@ func TestUpdateProject_WithNonExistingProject_ReturnsError(t *testing.T) {
 	})
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrProjectNotFound)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotFound)
 }
 
 func TestUpdateProject_UpdatesTimestamp(t *testing.T) {
@@ -341,7 +341,7 @@ func TestDeleteProject_WithNonExistingProject_ReturnsError(t *testing.T) {
 
 	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrProjectNotFound)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotFound)
 }
 
 func TestDeleteProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
@@ -354,7 +354,7 @@ func TestDeleteProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
 
 	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }
 
 // =============================================================================

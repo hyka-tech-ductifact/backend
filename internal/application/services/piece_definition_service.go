@@ -14,11 +14,7 @@ import (
 
 // --- Application-level errors ---
 
-var (
-	ErrPieceDefNotFound   = repositories.ErrPieceDefNotFound
-	ErrPieceDefPredefined = errors.New("predefined piece definitions cannot be modified")
-	ErrPieceDefNotOwned   = repositories.ErrPieceDefNotOwned
-)
+var ErrPieceDefPredefined = errors.New("predefined piece definitions cannot be modified")
 
 // pieceDefinitionService implements usecases.PieceDefinitionService.
 // Unexported struct: can only be created via NewPieceDefinitionService.

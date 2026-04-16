@@ -12,13 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Application-level errors ---
-
-var (
-	ErrClientNotFound = repositories.ErrClientNotFound
-	ErrClientNotOwned = repositories.ErrClientNotOwned
-)
-
 // clientService implements usecases.ClientService.
 // Unexported struct: can only be created via NewClientService.
 type clientService struct {

@@ -11,11 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	ErrPieceNotFound = repositories.ErrPieceNotFound
-	ErrPieceNotOwned = repositories.ErrPieceNotOwned
-)
-
 type pieceService struct {
 	pieceRepo    repositories.PieceRepository
 	pieceDefRepo repositories.PieceDefinitionRepository
