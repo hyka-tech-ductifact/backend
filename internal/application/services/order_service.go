@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -12,55 +11,37 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Application-level errors ---
-
 var (
-	ErrOrderNotFound = errors.New("order not found")
-	ErrOrderNotOwned = errors.New("order does not belong to this project")
+	ErrOrderNotFound = repositories.ErrOrderNotFound
+	ErrOrderNotOwned = repositories.ErrOrderNotOwned
 )
 
-// orderService implements usecases.OrderService.
-// Unexported struct: can only be created via NewOrderService.
 type orderService struct {
 	orderRepo   repositories.OrderRepository
 	projectRepo repositories.ProjectRepository
-	clientRepo  repositories.ClientRepository
 }
 
-// NewOrderService creates a new OrderService.
-// It receives the order, project, and client repositories (outbound ports).
-// The project and client repositories are needed to verify the full ownership chain:
-// User → Client → Project → Order.
 func NewOrderService(
 	orderRepo repositories.OrderRepository,
 	projectRepo repositories.ProjectRepository,
-	clientRepo repositories.ClientRepository,
 ) *orderService {
 	return &orderService{
 		orderRepo:   orderRepo,
 		projectRepo: projectRepo,
-		clientRepo:  clientRepo,
 	}
 }
 
-// CreateOrder orchestrates order creation:
-// 1. Verify the full ownership chain (User → Client → Project).
-// 2. Build the domain entity (which validates all fields).
-// 3. Persist via repository.
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, clientID uuid.UUID, params entities.CreateOrderParams) (*entities.Order, error) {
-	// Step 1: Verify full ownership chain
-	_, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, params.ProjectID, clientID, userID)
+func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, params entities.CreateOrderParams) (*entities.Order, error) {
+	_, err := s.projectRepo.GetByIDForOwner(ctx, params.ProjectID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 2: Domain entity validates its own invariants
 	order, err := entities.NewOrder(params)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 3: Persist
 	if err := s.orderRepo.Create(ctx, order); err != nil {
 		return nil, err
 	}
@@ -68,15 +49,12 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, client
 	return order, nil
 }
 
-// GetOrderByID retrieves an order by ID, verifying the full ownership chain.
-func (s *orderService) GetOrderByID(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) (*entities.Order, error) {
-	return verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
+func (s *orderService) GetOrderByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Order, error) {
+	return s.orderRepo.GetByIDForOwner(ctx, id, userID)
 }
 
-// ListOrdersByProjectID retrieves a paginated list of orders belonging to a project.
-// Verifies the full ownership chain.
-func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Order], error) {
-	_, err := verifyProjectOwnership(ctx, s.clientRepo, s.projectRepo, projectID, clientID, userID)
+func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Order], error) {
+	_, err := s.projectRepo.GetByIDForOwner(ctx, projectID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Order]{}, err
 	}
@@ -89,10 +67,8 @@ func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid
 	return pagination.NewResult(orders, pg, totalItems), nil
 }
 
-// UpdateOrder applies a partial update to an existing order.
-// Verifies the full ownership chain.
-func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID, params entities.UpdateOrderParams) (*entities.Order, error) {
-	order, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
+func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateOrderParams) (*entities.Order, error) {
+	order, err := s.orderRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +99,8 @@ func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, projectID 
 	return order, nil
 }
 
-// DeleteOrder removes an order, verifying the full ownership chain.
-func (s *orderService) DeleteOrder(ctx context.Context, id uuid.UUID, projectID uuid.UUID, clientID uuid.UUID, userID uuid.UUID) error {
-	order, err := verifyOrderOwnership(ctx, s.clientRepo, s.projectRepo, s.orderRepo, id, projectID, clientID, userID)
+func (s *orderService) DeleteOrder(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	order, err := s.orderRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
 	}

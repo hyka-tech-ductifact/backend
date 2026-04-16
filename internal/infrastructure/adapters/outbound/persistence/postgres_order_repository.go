@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -60,6 +61,90 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 		return nil, err
 	}
 	return toOrderEntity(&model), nil
+}
+
+func (r *PostgresOrderRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+	var model OrderModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("orders.id = ? AND clients.user_id = ?", id, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnoseOrderFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toOrderEntity(&model), nil
+}
+
+func (r *PostgresOrderRepository) diagnoseOrderFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var order OrderModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repositories.ErrOrderNotFound
+		}
+		return err
+	}
+	var project ProjectModel
+	if err := r.db.WithContext(ctx).Where("id = ?", order.ProjectID).First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: order's project not found",
+				"order_id", id, "project_id", order.ProjectID)
+			return repositories.ErrOrderNotOwned
+		}
+		return err
+	}
+	var client ClientModel
+	if err := r.db.WithContext(ctx).Where("id = ?", project.ClientID).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("ownership: order's client not found",
+				"order_id", id, "project_id", order.ProjectID, "client_id", project.ClientID)
+			return repositories.ErrOrderNotOwned
+		}
+		return err
+	}
+	if client.UserID != ownerID {
+		slog.Warn("ownership: order's client belongs to different user",
+			"order_id", id, "project_id", order.ProjectID,
+			"client_id", project.ClientID, "owner_id", client.UserID,
+			"requester_id", ownerID)
+		return repositories.ErrOrderNotOwned
+	}
+	return repositories.ErrOrderNotFound
+}
+
+func (r *PostgresOrderRepository) ListByProjectIDForOwner(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+	var totalItems int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&OrderModel{}).
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("orders.project_id = ? AND clients.user_id = ?", projectID, ownerID)
+
+	if err := baseQuery.Count(&totalItems).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var models []OrderModel
+	err := r.db.WithContext(ctx).
+		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
+		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
+		Where("orders.project_id = ? AND clients.user_id = ?", projectID, ownerID).
+		Order("orders.created_at DESC").
+		Offset((pg.Page - 1) * pg.PageSize).
+		Limit(pg.PageSize).
+		Find(&models).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orders := make([]*entities.Order, len(models))
+	for i := range models {
+		orders[i] = toOrderEntity(&models[i])
+	}
+	return orders, totalItems, nil
 }
 
 func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {

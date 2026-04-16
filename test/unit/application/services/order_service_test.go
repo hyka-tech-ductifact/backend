@@ -8,6 +8,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
@@ -21,11 +22,10 @@ import (
 
 func TestCreateOrder_WithValidData_ReturnsOrder(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project))
 
-	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
+	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		Title:       "Steel beams – lot 3",
 		Description: "First batch of structural steel",
 		ProjectID:   project.ID,
@@ -40,11 +40,10 @@ func TestCreateOrder_WithValidData_ReturnsOrder(t *testing.T) {
 
 func TestCreateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
+	project := newTestProject(uuid.New())
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project))
 
-	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
+	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		ProjectID: project.ID,
 	})
 
@@ -52,75 +51,46 @@ func TestCreateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, entities.ErrEmptyOrderTitle)
 }
 
-func TestCreateOrder_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, &mocks.MockProjectRepository{}, clientRepoReturning(nil))
-
-	order, err := svc.CreateOrder(context.Background(), uuid.New(), uuid.New(), entities.CreateOrderParams{
-		Title:     "Steel beams",
-		ProjectID: uuid.New(),
-	})
-
-	assert.Nil(t, order)
-	assert.ErrorIs(t, err, services.ErrClientNotFound)
-}
-
-func TestCreateOrder_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
-
-	order, err := svc.CreateOrder(context.Background(), uuid.New(), client.ID, entities.CreateOrderParams{
-		Title:     "Steel beams",
-		ProjectID: project.ID,
-	})
-
-	assert.Nil(t, order)
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
-}
-
 func TestCreateOrder_WithNonExistingProject_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(nil), clientRepoReturning(client))
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(nil))
 
-	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
+	order, err := svc.CreateOrder(context.Background(), uuid.New(), entities.CreateOrderParams{
 		Title:     "Steel beams",
 		ProjectID: uuid.New(),
 	})
 
 	assert.Nil(t, order)
-	assert.ErrorIs(t, err, services.ErrProjectNotFound)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotFound)
 }
 
-func TestCreateOrder_WithWrongClient_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	otherClientID := uuid.New()
-	project := newTestProject(otherClientID) // project belongs to a different client
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
+func TestCreateOrder_WithProjectNotOwned_ReturnsError(t *testing.T) {
+	projectRepo := &mocks.MockProjectRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+			return nil, repositories.ErrProjectNotOwned
+		},
+	}
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo)
 
-	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
+	order, err := svc.CreateOrder(context.Background(), uuid.New(), entities.CreateOrderParams{
 		Title:     "Steel beams",
-		ProjectID: project.ID,
+		ProjectID: uuid.New(),
 	})
 
 	assert.Nil(t, order)
-	assert.ErrorIs(t, err, services.ErrProjectNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }
 
 func TestCreateOrder_WhenRepoFails_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	orderRepo := &mocks.MockOrderRepository{
 		CreateFn: func(ctx context.Context, order *entities.Order) error {
 			return errors.New("db connection lost")
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
 
-	order, err := svc.CreateOrder(context.Background(), userID, client.ID, entities.CreateOrderParams{
+	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		Title:     "Steel beams",
 		ProjectID: project.ID,
 	})
@@ -135,12 +105,10 @@ func TestCreateOrder_WhenRepoFails_ReturnsError(t *testing.T) {
 
 func TestGetOrderByID_WithExistingOrder_ReturnsOrder(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
-	result, err := svc.GetOrderByID(context.Background(), order.ID, project.ID, client.ID, userID)
+	result, err := svc.GetOrderByID(context.Background(), order.ID, userID)
 
 	require.NoError(t, err)
 	assert.Equal(t, order.Title, result.Title)
@@ -148,29 +116,26 @@ func TestGetOrderByID_WithExistingOrder_ReturnsOrder(t *testing.T) {
 }
 
 func TestGetOrderByID_WithNonExistingOrder_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(orderRepoReturning(nil), projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{})
 
-	result, err := svc.GetOrderByID(context.Background(), uuid.New(), project.ID, client.ID, userID)
+	result, err := svc.GetOrderByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrOrderNotFound)
+	assert.ErrorIs(t, err, repositories.ErrOrderNotFound)
 }
 
-func TestGetOrderByID_WithWrongProject_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	otherProjectID := uuid.New()
-	order := newTestOrder(otherProjectID) // order belongs to a different project
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+func TestGetOrderByID_WithNotOwned_ReturnsError(t *testing.T) {
+	orderRepo := &mocks.MockOrderRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+			return nil, repositories.ErrOrderNotOwned
+		},
+	}
+	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{})
 
-	result, err := svc.GetOrderByID(context.Background(), order.ID, project.ID, client.ID, userID)
+	result, err := svc.GetOrderByID(context.Background(), uuid.New(), uuid.New())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, services.ErrOrderNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrOrderNotOwned)
 }
 
 // =============================================================================
@@ -179,8 +144,7 @@ func TestGetOrderByID_WithWrongProject_ReturnsError(t *testing.T) {
 
 func TestListOrdersByProjectID_ReturnsOrders(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	expected := []*entities.Order{
 		{ID: uuid.New(), Title: "Order 1", ProjectID: project.ID},
 		{ID: uuid.New(), Title: "Order 2", ProjectID: project.ID},
@@ -190,10 +154,10 @@ func TestListOrdersByProjectID_ReturnsOrders(t *testing.T) {
 			return expected, 2, nil
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
 
 	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, client.ID, userID, pg)
+	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
@@ -202,33 +166,34 @@ func TestListOrdersByProjectID_ReturnsOrders(t *testing.T) {
 
 func TestListOrdersByProjectID_EmptyList(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
+	project := newTestProject(uuid.New())
 	orderRepo := &mocks.MockOrderRepository{
 		ListByProjectIDFn: func(ctx context.Context, pID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
 			return []*entities.Order{}, 0, nil
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
 
 	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, client.ID, userID, pg)
+	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)
 	assert.Equal(t, int64(0), result.TotalItems)
 }
 
-func TestListOrdersByProjectID_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), clientRepoReturning(client))
+func TestListOrdersByProjectID_WithProjectNotOwned_ReturnsError(t *testing.T) {
+	projectRepo := &mocks.MockProjectRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+			return nil, repositories.ErrProjectNotOwned
+		},
+	}
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	_, err := svc.ListOrdersByProjectID(context.Background(), project.ID, client.ID, uuid.New(), pg)
+	_, err := svc.ListOrdersByProjectID(context.Background(), uuid.New(), uuid.New(), pg)
 
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }
 
 // =============================================================================
@@ -237,12 +202,10 @@ func TestListOrdersByProjectID_WithWrongUser_ReturnsError(t *testing.T) {
 
 func TestUpdateOrder_WithNewTitle_UpdatesTitle(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr("New Title"),
 	})
 
@@ -252,13 +215,11 @@ func TestUpdateOrder_WithNewTitle_UpdatesTitle(t *testing.T) {
 
 func TestUpdateOrder_WithStatus_UpdatesStatus(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
 	completed := "completed"
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Status: &completed,
 	})
 
@@ -268,12 +229,10 @@ func TestUpdateOrder_WithStatus_UpdatesStatus(t *testing.T) {
 
 func TestUpdateOrder_WithDescription_UpdatesDescription(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Description: strPtr("Updated description"),
 	})
 
@@ -283,12 +242,10 @@ func TestUpdateOrder_WithDescription_UpdatesDescription(t *testing.T) {
 
 func TestUpdateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr(""),
 	})
 
@@ -298,13 +255,11 @@ func TestUpdateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 
 func TestUpdateOrder_WithInvalidStatus_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	order := newTestOrder(uuid.New())
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
 	invalid := "invalid"
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Status: &invalid,
 	})
 
@@ -314,18 +269,16 @@ func TestUpdateOrder_WithInvalidStatus_ReturnsError(t *testing.T) {
 
 func TestUpdateOrder_WithNoChanges_SkipsPersistence(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
+	order := newTestOrder(uuid.New())
 	repo := orderRepoReturning(order)
 	updateCalled := false
 	repo.UpdateFn = func(ctx context.Context, o *entities.Order) error {
 		updateCalled = true
 		return nil
 	}
-	svc := services.NewOrderService(repo, projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{})
 
-	_, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{})
+	_, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{})
 
 	require.NoError(t, err)
 	assert.False(t, updateCalled, "Update should not be called when no fields change")
@@ -333,13 +286,11 @@ func TestUpdateOrder_WithNoChanges_SkipsPersistence(t *testing.T) {
 
 func TestUpdateOrder_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
+	order := newTestOrder(uuid.New())
 	oldTime := order.UpdatedAt
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
 
-	result, err := svc.UpdateOrder(context.Background(), order.ID, project.ID, client.ID, userID, entities.UpdateOrderParams{
+	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr("New Title"),
 	})
 
@@ -353,42 +304,38 @@ func TestUpdateOrder_UpdatesTimestamp(t *testing.T) {
 
 func TestDeleteOrder_WithExistingOrder_Succeeds(t *testing.T) {
 	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
+	order := newTestOrder(uuid.New())
 	deleteCalled := false
 	repo := orderRepoReturning(order)
 	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
 		deleteCalled = true
 		return nil
 	}
-	svc := services.NewOrderService(repo, projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{})
 
-	err := svc.DeleteOrder(context.Background(), order.ID, project.ID, client.ID, userID)
+	err := svc.DeleteOrder(context.Background(), order.ID, userID)
 
 	assert.NoError(t, err)
 	assert.True(t, deleteCalled)
 }
 
 func TestDeleteOrder_WithNonExistingOrder_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	client := newTestClient(userID)
-	project := newTestProject(client.ID)
-	svc := services.NewOrderService(orderRepoReturning(nil), projectRepoReturning(project), clientRepoReturning(client))
+	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{})
 
-	err := svc.DeleteOrder(context.Background(), uuid.New(), project.ID, client.ID, userID)
+	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrOrderNotFound)
+	assert.ErrorIs(t, err, repositories.ErrOrderNotFound)
 }
 
-func TestDeleteOrder_WithWrongUser_ReturnsError(t *testing.T) {
-	ownerID := uuid.New()
-	client := newTestClient(ownerID)
-	project := newTestProject(client.ID)
-	order := newTestOrder(project.ID)
-	svc := services.NewOrderService(orderRepoReturning(order), projectRepoReturning(project), clientRepoReturning(client))
+func TestDeleteOrder_WithNotOwned_ReturnsError(t *testing.T) {
+	orderRepo := &mocks.MockOrderRepository{
+		GetByIDForOwnerFn: func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+			return nil, repositories.ErrOrderNotOwned
+		},
+	}
+	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{})
 
-	err := svc.DeleteOrder(context.Background(), order.ID, project.ID, client.ID, uuid.New())
+	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New())
 
-	assert.ErrorIs(t, err, services.ErrClientNotOwned)
+	assert.ErrorIs(t, err, repositories.ErrOrderNotOwned)
 }

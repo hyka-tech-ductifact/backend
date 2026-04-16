@@ -12,11 +12,13 @@ import (
 // MockOrderRepository implements repositories.OrderRepository for testing.
 // Each method is a function field that you can configure per test.
 type MockOrderRepository struct {
-	CreateFn          func(ctx context.Context, order *entities.Order) error
-	GetByIDFn         func(ctx context.Context, id uuid.UUID) (*entities.Order, error)
-	ListByProjectIDFn func(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
-	UpdateFn          func(ctx context.Context, order *entities.Order) error
-	DeleteFn          func(ctx context.Context, id uuid.UUID) error
+	CreateFn                  func(ctx context.Context, order *entities.Order) error
+	GetByIDFn                 func(ctx context.Context, id uuid.UUID) (*entities.Order, error)
+	GetByIDForOwnerFn         func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error)
+	ListByProjectIDFn         func(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
+	ListByProjectIDForOwnerFn func(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
+	UpdateFn                  func(ctx context.Context, order *entities.Order) error
+	DeleteFn                  func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *MockOrderRepository) Create(ctx context.Context, order *entities.Order) error {
@@ -33,9 +35,23 @@ func (m *MockOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*entit
 	return nil, nil
 }
 
+func (m *MockOrderRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+	if m.GetByIDForOwnerFn != nil {
+		return m.GetByIDForOwnerFn(ctx, id, ownerID)
+	}
+	return nil, nil
+}
+
 func (m *MockOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
 	if m.ListByProjectIDFn != nil {
 		return m.ListByProjectIDFn(ctx, projectID, pg)
+	}
+	return nil, 0, nil
+}
+
+func (m *MockOrderRepository) ListByProjectIDForOwner(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+	if m.ListByProjectIDForOwnerFn != nil {
+		return m.ListByProjectIDForOwnerFn(ctx, projectID, ownerID, pg)
 	}
 	return nil, 0, nil
 }
