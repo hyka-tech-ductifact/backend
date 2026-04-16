@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -65,6 +66,36 @@ func (r *PostgresPieceDefinitionRepository) GetByID(ctx context.Context, id uuid
 		return nil, err
 	}
 	return toPieceDefEntity(&model)
+}
+
+// GetByIDForOwner returns a piece definition that is either predefined (visible
+// to everyone) or owned by the given user. Returns a specific error for diagnostics.
+func (r *PostgresPieceDefinitionRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.PieceDefinition, error) {
+	var model PieceDefinitionModel
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND (predefined = ? OR user_id = ?)", id, true, ownerID).
+		First(&model).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, r.diagnosePieceDefFailure(ctx, id, ownerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toPieceDefEntity(&model)
+}
+
+func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return repositories.ErrPieceDefNotFound
+	}
+	slog.Warn("ownership: piece definition belongs to different user",
+		"piece_definition_id", id,
+		"requester_id", ownerID)
+	return repositories.ErrPieceDefNotOwned
 }
 
 // ListByUserID returns all predefined definitions + custom definitions created by the user.

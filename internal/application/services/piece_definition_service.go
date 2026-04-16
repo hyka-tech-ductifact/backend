@@ -15,9 +15,9 @@ import (
 // --- Application-level errors ---
 
 var (
-	ErrPieceDefNotFound   = errors.New("piece definition not found")
+	ErrPieceDefNotFound   = repositories.ErrPieceDefNotFound
 	ErrPieceDefPredefined = errors.New("predefined piece definitions cannot be modified")
-	ErrPieceDefNotOwned   = errors.New("piece definition does not belong to this user")
+	ErrPieceDefNotOwned   = repositories.ErrPieceDefNotOwned
 )
 
 // pieceDefinitionService implements usecases.PieceDefinitionService.
@@ -58,7 +58,7 @@ func (s *pieceDefinitionService) CreatePieceDefinition(ctx context.Context, user
 // GetPieceDefinitionByID retrieves a piece definition by ID.
 // Returns the definition only if it is predefined or belongs to the requesting user.
 func (s *pieceDefinitionService) GetPieceDefinitionByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
-	return verifyPieceDefAccess(ctx, s.pieceDefRepo, id, userID)
+	return s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 }
 
 // ListPieceDefinitions retrieves a paginated list of piece definitions visible to the user.
@@ -75,9 +75,13 @@ func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userI
 // UpdatePieceDefinition applies a partial update to an existing piece definition.
 // Only custom (non-predefined) definitions owned by the user can be updated.
 func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceDefParams) (*entities.PieceDefinition, error) {
-	def, err := verifyPieceDefOwnership(ctx, s.pieceDefRepo, id, userID)
+	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	if def.Predefined {
+		return nil, ErrPieceDefPredefined
 	}
 
 	if !params.HasChanges() {
@@ -109,9 +113,13 @@ func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id u
 // DeletePieceDefinition removes a piece definition.
 // Only custom (non-predefined) definitions owned by the user can be deleted.
 func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	def, err := verifyPieceDefOwnership(ctx, s.pieceDefRepo, id, userID)
+	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
+	}
+
+	if def.Predefined {
+		return ErrPieceDefPredefined
 	}
 
 	return s.pieceDefRepo.Delete(ctx, def.ID)
