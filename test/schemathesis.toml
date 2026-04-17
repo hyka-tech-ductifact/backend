@@ -4,17 +4,16 @@
 # Docs: https://schemathesis.readthedocs.io/en/stable/reference/configuration/
 #
 # Usage:
-#   make test-contract                    (local — requires running API)
-#   schemathesis run contracts/openapi/bundled.yaml   (manual)
+#   make test-contract          (local — fast, ~30 s)
+#   make test-contract CI=1     (CI    — deep,  ~2 min)
+#
+# Depth is controlled via CLI flags injected by the Makefile:
+#   --max-examples, --workers, --phases
+# This TOML contains only settings that are the same for both modes.
 
 # ─── Base URL ────────────────────────────────────────────────
 # Overridden by --url flag from Makefile. This is a fallback.
 base-url = "http://localhost:8080/v1"
-
-# ─── Workers ─────────────────────────────────────────────────
-# Use 1 worker to avoid socket exhaustion in Docker containers.
-# "auto" works fine with native runs but overloads --network host.
-workers = 1
 
 # ─── Wait for API to be ready ────────────────────────────────
 wait-for-schema = 10
@@ -31,7 +30,6 @@ continue-on-failure = true
 # No auth config needed here — the CLI header takes precedence.
 
 # ─── Checks ─────────────────────────────────────────────────
-# All checks enabled by default. Tune expected statuses if needed.
 [checks]
 max_response_time = 10.0
 
@@ -45,13 +43,13 @@ enabled = false
 # ─── Data Generation ────────────────────────────────────────
 [generation]
 mode = "all"            # positive + negative data
-max-examples = 1       # per operation (increase for deeper testing)
 allow-x00 = false       # avoid NULL bytes that trip up Go handlers
 codec = "utf-8"
 database = ":memory:"   # don't persist hypothesis DB between runs
-with-security-parameters = false  # don't fuzz auth tokens; use dynamic auth only
+with-security-parameters = false  # don't fuzz auth tokens; use static header
 
 # ─── Phases ─────────────────────────────────────────────────
+# All enabled here; the Makefile may restrict via --phases for local runs.
 [phases.examples]
 enabled = true
 
