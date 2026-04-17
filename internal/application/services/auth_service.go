@@ -50,19 +50,21 @@ func NewAuthService(
 
 // Register creates a new user with a hashed password and returns a token pair.
 func (s *authService) Register(ctx context.Context, name, email, password string) (*entities.User, *ports.TokenPair, error) {
-	// Step 1: Check if email is already taken
+	// Step 1: Create user entity (validates name + email + password, hashes password)
+	// Done BEFORE the duplicate-email check so that invalid input always
+	// returns 400, regardless of whether the email is already taken.
+	user, err := entities.NewUser(name, email, password)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Step 2: Check if email is already taken
 	existing, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil && !errors.Is(err, repositories.ErrNotFound) {
 		return nil, nil, err
 	}
 	if existing != nil {
 		return nil, nil, ErrEmailAlreadyInUse
-	}
-
-	// Step 2: Create user entity (validates name + email + password, hashes password)
-	user, err := entities.NewUser(name, email, password)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	// Step 3: Persist

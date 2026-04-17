@@ -12,7 +12,7 @@ import (
 
 // pieceDefURL builds the full URL for piece definition endpoints.
 func pieceDefURL(extra ...string) string {
-	base := "/users/me/piece-definitions"
+	base := "/piece-definitions"
 	if len(extra) > 0 {
 		base += "/" + extra[0]
 	}

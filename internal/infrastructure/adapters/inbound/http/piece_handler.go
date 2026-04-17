@@ -53,7 +53,7 @@ func NewPieceHandler(pieceService usecases.PieceService) *PieceHandler {
 	return &PieceHandler{pieceService: pieceService}
 }
 
-// CreatePiece handles POST /users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces
+// CreatePiece handles POST /orders/:order_id/pieces
 func (h *PieceHandler) CreatePiece(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -93,7 +93,7 @@ func (h *PieceHandler) CreatePiece(c *gin.Context) {
 	c.JSON(http.StatusCreated, toPieceResponse(piece))
 }
 
-// ListPieces handles GET /users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces
+// ListPieces handles GET /orders/:order_id/pieces
 func (h *PieceHandler) ListPieces(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -132,7 +132,7 @@ func (h *PieceHandler) ListPieces(c *gin.Context) {
 	})
 }
 
-// GetPiece handles GET /users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces/:piece_id
+// GetPiece handles GET /orders/:order_id/pieces/:piece_id
 func (h *PieceHandler) GetPiece(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -154,7 +154,7 @@ func (h *PieceHandler) GetPiece(c *gin.Context) {
 	c.JSON(http.StatusOK, toPieceResponse(piece))
 }
 
-// UpdatePiece handles PUT /users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces/:piece_id
+// UpdatePiece handles PUT /orders/:order_id/pieces/:piece_id
 func (h *PieceHandler) UpdatePiece(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -186,7 +186,7 @@ func (h *PieceHandler) UpdatePiece(c *gin.Context) {
 	c.JSON(http.StatusOK, toPieceResponse(piece))
 }
 
-// DeletePiece handles DELETE /users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces/:piece_id
+// DeletePiece handles DELETE /orders/:order_id/pieces/:piece_id
 func (h *PieceHandler) DeletePiece(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {

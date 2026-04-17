@@ -51,7 +51,7 @@ func NewOrderHandler(orderService usecases.OrderService) *OrderHandler {
 	return &OrderHandler{orderService: orderService}
 }
 
-// CreateOrder handles POST /users/me/clients/:client_id/projects/:project_id/orders
+// CreateOrder handles POST /projects/:project_id/orders
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -84,7 +84,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	c.JSON(http.StatusCreated, toOrderResponse(order))
 }
 
-// ListOrders handles GET /users/me/clients/:client_id/projects/:project_id/orders
+// ListOrders handles GET /projects/:project_id/orders
 func (h *OrderHandler) ListOrders(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -123,7 +123,7 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 	})
 }
 
-// GetOrder handles GET /users/me/clients/:client_id/projects/:project_id/orders/:order_id
+// GetOrder handles GET /orders/:order_id
 func (h *OrderHandler) GetOrder(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -145,7 +145,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, toOrderResponse(order))
 }
 
-// UpdateOrder handles PUT /users/me/clients/:client_id/projects/:project_id/orders/:order_id
+// UpdateOrder handles PUT /orders/:order_id
 func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -177,7 +177,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, toOrderResponse(order))
 }
 
-// DeleteOrder handles DELETE /users/me/clients/:client_id/projects/:project_id/orders/:order_id
+// DeleteOrder handles DELETE /orders/:order_id
 func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {

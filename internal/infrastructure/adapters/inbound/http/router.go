@@ -15,6 +15,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/inbound/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -68,11 +69,20 @@ func SetupRoutes(
 	helpers.RegisterDomainError(entities.ErrUnexpectedDimensions, http.StatusBadRequest, "unexpected dimensions")
 	helpers.RegisterDomainError(entities.ErrInvalidDimensionValues, http.StatusBadRequest, "dimension values must be positive")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
+	helpers.RegisterDomainError(valueobjects.ErrPasswordTooLong, http.StatusBadRequest, "password must not exceed 72 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 
+	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
+	// Makes ShouldBindJSON return 400 for bodies with extra properties.
+	binding.EnableDecoderDisallowUnknownFields = true
+
 	// --- Create router WITHOUT default middlewares ---
 	r := gin.New()
+
+	// Return 405 Method Not Allowed (with Allow header) instead of 404
+	// for routes that exist but don't support the requested HTTP method.
+	r.HandleMethodNotAllowed = true
 
 	// --- Register middlewares in correct order ---
 	// 1. Request ID: first, so all logs include the ID
@@ -139,9 +149,9 @@ func SetupRoutes(
 		userRoutes.PUT("/me", userHandler.UpdateMe)
 	}
 
-	// Client routes — always "my" clients (userID from token)
+	// Client routes — scoped by JWT (userID from token)
 	clientHandler := NewClientHandler(clientService)
-	clientRoutes := protected.Group("/users/me/clients")
+	clientRoutes := protected.Group("/clients")
 	{
 		clientRoutes.POST("", clientHandler.CreateClient)
 		clientRoutes.GET("", clientHandler.ListClients)
@@ -150,31 +160,31 @@ func SetupRoutes(
 		clientRoutes.DELETE("/:client_id", clientHandler.DeleteClient)
 	}
 
-	// Project routes — nested under a client
+	// Project routes — collection nested under client, item flat
 	projectHandler := NewProjectHandler(projectService)
-	projectRoutes := protected.Group("/users/me/clients/:client_id/projects")
+	protected.POST("/clients/:client_id/projects", projectHandler.CreateProject)
+	protected.GET("/clients/:client_id/projects", projectHandler.ListProjects)
+	projectRoutes := protected.Group("/projects")
 	{
-		projectRoutes.POST("", projectHandler.CreateProject)
-		projectRoutes.GET("", projectHandler.ListProjects)
 		projectRoutes.GET("/:project_id", projectHandler.GetProject)
 		projectRoutes.PUT("/:project_id", projectHandler.UpdateProject)
 		projectRoutes.DELETE("/:project_id", projectHandler.DeleteProject)
 	}
 
-	// Order routes — nested under a project
+	// Order routes — collection nested under project, item flat
 	orderHandler := NewOrderHandler(orderService)
-	orderRoutes := protected.Group("/users/me/clients/:client_id/projects/:project_id/orders")
+	protected.POST("/projects/:project_id/orders", orderHandler.CreateOrder)
+	protected.GET("/projects/:project_id/orders", orderHandler.ListOrders)
+	orderRoutes := protected.Group("/orders")
 	{
-		orderRoutes.POST("", orderHandler.CreateOrder)
-		orderRoutes.GET("", orderHandler.ListOrders)
 		orderRoutes.GET("/:order_id", orderHandler.GetOrder)
 		orderRoutes.PUT("/:order_id", orderHandler.UpdateOrder)
 		orderRoutes.DELETE("/:order_id", orderHandler.DeleteOrder)
 	}
 
-	// Piece Definition routes — user-scoped (predefined + custom)
+	// Piece Definition routes — flat, user-scoped (predefined + custom)
 	pieceDefHandler := NewPieceDefinitionHandler(pieceDefService)
-	pieceDefRoutes := protected.Group("/users/me/piece-definitions")
+	pieceDefRoutes := protected.Group("/piece-definitions")
 	{
 		pieceDefRoutes.POST("", pieceDefHandler.CreatePieceDefinition)
 		pieceDefRoutes.GET("", pieceDefHandler.ListPieceDefinitions)
@@ -183,9 +193,9 @@ func SetupRoutes(
 		pieceDefRoutes.DELETE("/:piece_definition_id", pieceDefHandler.DeletePieceDefinition)
 	}
 
-	// Piece routes — nested under an order
+	// Piece routes — always nested under order (weak entity)
 	pieceHandler := NewPieceHandler(pieceService)
-	pieceRoutes := protected.Group("/users/me/clients/:client_id/projects/:project_id/orders/:order_id/pieces")
+	pieceRoutes := protected.Group("/orders/:order_id/pieces")
 	{
 		pieceRoutes.POST("", pieceHandler.CreatePiece)
 		pieceRoutes.GET("", pieceHandler.ListPieces)

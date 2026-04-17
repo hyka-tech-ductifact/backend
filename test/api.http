@@ -154,7 +154,7 @@ GET {{baseUrl}}/users/me
 # =============================================================================
 
 ### Create a client (all fields)
-POST {{baseUrl}}/users/me/clients
+POST {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -166,7 +166,7 @@ Content-Type: application/json
 }
 
 ### Create a client (minimal — name only)
-POST {{baseUrl}}/users/me/clients
+POST {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -175,15 +175,15 @@ Content-Type: application/json
 }
 
 ### List my clients
-GET {{baseUrl}}/users/me/clients
+GET {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 
 ### Get a client by ID (replace with actual UUID)
-GET {{baseUrl}}/users/me/clients/{{client_id}}
+GET {{baseUrl}}/clients/{{client_id}}
 Authorization: Bearer {{token}}
 
 ### Update a client (all fields)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}
+PUT {{baseUrl}}/clients/{{client_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -195,7 +195,7 @@ Content-Type: application/json
 }
 
 ### Update a client (partial — phone only)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}
+PUT {{baseUrl}}/clients/{{client_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -204,7 +204,7 @@ Content-Type: application/json
 }
 
 ### Delete a client
-DELETE {{baseUrl}}/users/me/clients/{{client_id}}
+DELETE {{baseUrl}}/clients/{{client_id}}
 Authorization: Bearer {{token}}
 
 # =============================================================================
@@ -212,14 +212,14 @@ Authorization: Bearer {{token}}
 # =============================================================================
 
 ### Create client — missing name → 400
-POST {{baseUrl}}/users/me/clients
+POST {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {}
 
 ### Create client — invalid phone → 400
-POST {{baseUrl}}/users/me/clients
+POST {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -229,7 +229,7 @@ Content-Type: application/json
 }
 
 ### Create client — invalid email → 400
-POST {{baseUrl}}/users/me/clients
+POST {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -239,7 +239,7 @@ Content-Type: application/json
 }
 
 ### Get client — invalid UUID → 400
-GET {{baseUrl}}/users/me/clients/not-a-uuid
+GET {{baseUrl}}/clients/not-a-uuid
 Authorization: Bearer {{token}}
 
 # =============================================================================
@@ -250,7 +250,7 @@ Authorization: Bearer {{token}}
 @project_id = <paste-project-uuid-here>
 
 ### Create a project (all fields)
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+POST {{baseUrl}}/clients/{{client_id}}/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -263,7 +263,7 @@ Content-Type: application/json
 }
 
 ### Create a project (minimal — name only)
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+POST {{baseUrl}}/clients/{{client_id}}/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -272,19 +272,19 @@ Content-Type: application/json
 }
 
 ### List projects for a client
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects
+GET {{baseUrl}}/clients/{{client_id}}/projects
 Authorization: Bearer {{token}}
 
 ### List projects — page 2
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects?page=2&page_size=5
+GET {{baseUrl}}/clients/{{client_id}}/projects?page=2&page_size=5
 Authorization: Bearer {{token}}
 
 ### Get a project by ID
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+GET {{baseUrl}}/projects/{{project_id}}
 Authorization: Bearer {{token}}
 
 ### Update a project (all fields)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+PUT {{baseUrl}}/projects/{{project_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -297,7 +297,7 @@ Content-Type: application/json
 }
 
 ### Update a project (partial — address only)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+PUT {{baseUrl}}/projects/{{project_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -306,7 +306,7 @@ Content-Type: application/json
 }
 
 ### Delete a project
-DELETE {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}
+DELETE {{baseUrl}}/projects/{{project_id}}
 Authorization: Bearer {{token}}
 
 # =============================================================================
@@ -314,14 +314,14 @@ Authorization: Bearer {{token}}
 # =============================================================================
 
 ### Create project — missing name → 400
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+POST {{baseUrl}}/clients/{{client_id}}/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {}
 
 ### Create project — invalid phone → 400
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects
+POST {{baseUrl}}/clients/{{client_id}}/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -331,7 +331,7 @@ Content-Type: application/json
 }
 
 ### Create project — non-existing client → 404
-POST {{baseUrl}}/users/me/clients/00000000-0000-0000-0000-000000000000/projects
+POST {{baseUrl}}/clients/00000000-0000-0000-0000-000000000000/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -340,7 +340,7 @@ Content-Type: application/json
 }
 
 ### Get project — invalid UUID → 400
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/not-a-uuid
+GET {{baseUrl}}/projects/not-a-uuid
 Authorization: Bearer {{token}}
 
 # =============================================================================
@@ -350,7 +350,7 @@ Authorization: Bearer {{token}}
 @order_id = <paste-order-uuid-here>
 
 ### Create an order (default status = pending)
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+POST {{baseUrl}}/projects/{{project_id}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -360,7 +360,7 @@ Content-Type: application/json
 }
 
 ### Create an order (with status)
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+POST {{baseUrl}}/projects/{{project_id}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -371,19 +371,19 @@ Content-Type: application/json
 }
 
 ### List orders for a project
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+GET {{baseUrl}}/projects/{{project_id}}/orders
 Authorization: Bearer {{token}}
 
 ### List orders — page 2
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders?page=2&page_size=5
+GET {{baseUrl}}/projects/{{project_id}}/orders?page=2&page_size=5
 Authorization: Bearer {{token}}
 
 ### Get an order by ID
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+GET {{baseUrl}}/orders/{{order_id}}
 Authorization: Bearer {{token}}
 
 ### Update an order (all fields)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+PUT {{baseUrl}}/orders/{{order_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -394,7 +394,7 @@ Content-Type: application/json
 }
 
 ### Update an order (partial — status only)
-PUT {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+PUT {{baseUrl}}/orders/{{order_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -403,7 +403,7 @@ Content-Type: application/json
 }
 
 ### Delete an order
-DELETE {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/{{order_id}}
+DELETE {{baseUrl}}/orders/{{order_id}}
 Authorization: Bearer {{token}}
 
 # =============================================================================
@@ -411,14 +411,14 @@ Authorization: Bearer {{token}}
 # =============================================================================
 
 ### Create order — missing title → 400
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+POST {{baseUrl}}/projects/{{project_id}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {}
 
 ### Create order — invalid status → 400
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders
+POST {{baseUrl}}/projects/{{project_id}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -428,7 +428,7 @@ Content-Type: application/json
 }
 
 ### Create order — non-existing project → 404
-POST {{baseUrl}}/users/me/clients/{{client_id}}/projects/00000000-0000-0000-0000-000000000000/orders
+POST {{baseUrl}}/projects/00000000-0000-0000-0000-000000000000/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -437,5 +437,5 @@ Content-Type: application/json
 }
 
 ### Get order — invalid UUID → 400
-GET {{baseUrl}}/users/me/clients/{{client_id}}/projects/{{project_id}}/orders/not-a-uuid
+GET {{baseUrl}}/projects/{{project_id}}/orders/not-a-uuid
 Authorization: Bearer {{token}}
