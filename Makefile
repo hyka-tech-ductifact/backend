@@ -192,17 +192,24 @@ ST_MAX_EXAMPLES ?= 1
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make app-start) and Docker.
-# A fresh user is registered automatically on each run (unique email via timestamp).
+# Auth: tries register first; falls back to login if user already exists.
 test-contract: ensure-contract
 	@echo "Running contract tests (Schemathesis)..."
 	@mkdir -p schemathesis-report
-	$(eval _ST_EMAIL := st-$(shell date +%s)@test.ductifact.dev)
-	$(eval _ST_TOKEN := $(shell curl -sf http://localhost:8080/v1/auth/register \
+	@TOKEN=$$(curl -sf http://localhost:8080/v1/auth/register \
 		-H 'Content-Type: application/json' \
-		-d '{"name":"Schemathesis Bot","email":"$(_ST_EMAIL)","password":"password123"}' \
-		| python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])"))
-	@test -n "$(_ST_TOKEN)" || { echo "❌ Failed to register auth user — is the API running?"; exit 1; }
-	@echo "  Auth user: $(_ST_EMAIL) ✅"
+		-d '{"name":"Schemathesis Bot","email":"st@test.ductifact.dev","password":"password123"}' \
+		| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
+	if [ -z "$$TOKEN" ]; then \
+		TOKEN=$$(curl -sf http://localhost:8080/v1/auth/login \
+			-H 'Content-Type: application/json' \
+			-d '{"email":"st@test.ductifact.dev","password":"password123"}' \
+			| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
+	fi; \
+	if [ -z "$$TOKEN" ]; then \
+		echo "❌ Could not obtain auth token — is the API running?"; exit 1; \
+	fi; \
+	echo "  Auth token obtained ✅"; \
 	docker run --rm --network host \
 		--user 0:0 \
 		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
@@ -211,7 +218,7 @@ test-contract: ensure-contract
 		-w /spec \
 		$(ST_IMAGE) \
 		run bundled.yaml --url http://localhost:8080/v1 \
-		-H 'Authorization: Bearer $(_ST_TOKEN)' \
+		-H "Authorization: Bearer $$TOKEN" \
 		--max-examples $(ST_MAX_EXAMPLES)
 	@echo "✅ Contract tests passed"
 
