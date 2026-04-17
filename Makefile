@@ -182,16 +182,12 @@ test-e2e:
 	$(call run-tests,e2e,./test/e2e/...)
 
 # ─── Schemathesis (contract testing) ─────────────────────────
-# Runs via Docker — no Python/pip needed. Uses --network host so the
-# container can reach the API on localhost:8080.
-#
-#   make test-contract                           (default ~30s)
-#   make test-contract ST_MAX_EXAMPLES=50        (deeper fuzzing)
+# Runs via Docker
 ST_IMAGE        ?= schemathesis/schemathesis:latest
 ST_MAX_EXAMPLES ?= 50
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
-# Requires: running API server (make app-start) and Docker.
+# Requires: running API server (make dev) and Docker.
 # Auth: tries register first; falls back to login if user already exists.
 test-contract: ensure-contract
 	@echo "Running contract tests (Schemathesis)..."
