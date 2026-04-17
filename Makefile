@@ -188,7 +188,7 @@ test-e2e:
 #   make test-contract                           (default ~30s)
 #   make test-contract ST_MAX_EXAMPLES=50        (deeper fuzzing)
 ST_IMAGE        ?= schemathesis/schemathesis:latest
-ST_MAX_EXAMPLES ?= 1
+ST_MAX_EXAMPLES ?= 50
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make app-start) and Docker.
