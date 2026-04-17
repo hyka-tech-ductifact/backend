@@ -213,7 +213,8 @@ test-contract: ensure-contract
 		-w /spec \
 		$(ST_IMAGE) \
 		run bundled.yaml \
-		-H "Authorization: Bearer $$TOKEN"
+		-H "Authorization: Bearer $$TOKEN" \
+		$(if $(ST_MAX_EXAMPLES),--max-examples $(ST_MAX_EXAMPLES),)
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache
