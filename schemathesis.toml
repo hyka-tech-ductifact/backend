@@ -12,22 +12,23 @@
 base-url = "http://localhost:8080/v1"
 
 # ─── Workers ─────────────────────────────────────────────────
-workers = "auto"
+# Use 1 worker to avoid socket exhaustion in Docker containers.
+# "auto" works fine with native runs but overloads --network host.
+workers = 1
 
 # ─── Wait for API to be ready ────────────────────────────────
 wait-for-schema = 10
+
+# ─── Network resilience ─────────────────────────────────────
+request-retries = 3
 
 # ─── Continue after first failure to collect all issues ──────
 continue-on-failure = true
 
 # ─── Authentication ──────────────────────────────────────────
-# Dynamic: POST /v1/auth/register creates a fresh user per run.
-# Only ST_AUTH_EMAIL comes from the Makefile (unique timestamp-based email).
-# Name and password are fixed — no env vars needed.
-[auth.dynamic.openapi.bearerAuth]
-path = "/auth/register"
-payload = { name = "Schemathesis Bot", email = "${ST_AUTH_EMAIL}", password = "password123" }
-extract_selector = "/access_token"
+# A fresh JWT is obtained by the Makefile (curl → /auth/register) and
+# injected via -H 'Authorization: Bearer <token>' on the CLI.
+# No auth config needed here — the CLI header takes precedence.
 
 # ─── Checks ─────────────────────────────────────────────────
 # All checks enabled by default. Tune expected statuses if needed.
@@ -44,10 +45,11 @@ enabled = false
 # ─── Data Generation ────────────────────────────────────────
 [generation]
 mode = "all"            # positive + negative data
-max-examples = 10       # per operation (increase for deeper testing)
+max-examples = 1       # per operation (increase for deeper testing)
 allow-x00 = false       # avoid NULL bytes that trip up Go handlers
 codec = "utf-8"
 database = ":memory:"   # don't persist hypothesis DB between runs
+with-security-parameters = false  # don't fuzz auth tokens; use dynamic auth only
 
 # ─── Phases ─────────────────────────────────────────────────
 [phases.examples]

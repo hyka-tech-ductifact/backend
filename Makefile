@@ -183,18 +183,32 @@ test-e2e:
 	$(call run-tests,e2e,./test/e2e/...)
 
 # ─── Schemathesis (contract testing) ─────────────────────────
-# Only ST_AUTH_EMAIL is dynamic (unique per run). Everything else lives in schemathesis.toml.
-ST               ?= $(HOME)/.local/bin/st
-ST_AUTH_EMAIL    := st-$(shell date +%s)@test.ductifact.dev
-export ST_AUTH_EMAIL
+# Runs via Docker — no Python/pip needed. Uses --network host so the
+# container can reach the API on localhost:8080.
+ST_IMAGE ?= schemathesis/schemathesis:latest
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
-# Requires: running API server (make app-start) and schemathesis installed.
+# Requires: running API server (make app-start) and Docker.
 # A fresh user is registered automatically on each run (unique email via timestamp).
 test-contract: ensure-contract
 	@echo "Running contract tests (Schemathesis)..."
-	@echo "  Auth user: $(ST_AUTH_EMAIL)"
-	$(ST) run contracts/openapi/bundled.yaml --url http://localhost:8080/v1
+	@mkdir -p schemathesis-report
+	$(eval _ST_EMAIL := st-$(shell date +%s)@test.ductifact.dev)
+	$(eval _ST_TOKEN := $(shell curl -sf http://localhost:8080/v1/auth/register \
+		-H 'Content-Type: application/json' \
+		-d '{"name":"Schemathesis Bot","email":"$(_ST_EMAIL)","password":"password123"}' \
+		| python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])"))
+	@test -n "$(_ST_TOKEN)" || { echo "❌ Failed to register auth user — is the API running?"; exit 1; }
+	@echo "  Auth user: $(_ST_EMAIL) ✅"
+	docker run --rm --network host \
+		--user 0:0 \
+		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
+		-v $(CURDIR)/schemathesis.toml:/spec/schemathesis.toml:ro \
+		-v $(CURDIR)/schemathesis-report:/spec/schemathesis-report \
+		-w /spec \
+		$(ST_IMAGE) \
+		run bundled.yaml --url http://localhost:8080/v1 \
+		-H 'Authorization: Bearer $(_ST_TOKEN)'
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache
