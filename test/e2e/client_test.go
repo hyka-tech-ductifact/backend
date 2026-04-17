@@ -63,9 +63,9 @@ func TestE2E_CreateClient_MinimalFields_Success(t *testing.T) {
 
 	assert.NotEmpty(t, body["id"])
 	assert.Equal(t, "Minimal Client", body["name"])
-	assert.Equal(t, "", body["phone"])
-	assert.Equal(t, "", body["email"])
-	assert.Equal(t, "", body["description"])
+	assert.Nil(t, body["phone"])
+	assert.Nil(t, body["email"])
+	assert.Nil(t, body["description"])
 	assert.Equal(t, userID, body["user_id"])
 }
 
