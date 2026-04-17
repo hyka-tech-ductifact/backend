@@ -3,6 +3,7 @@ package valueobjects
 import (
 	"crypto/sha256"
 	"errors"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -30,10 +31,10 @@ func NewPassword(raw string) (*Password, error) {
 	if raw == "" {
 		return nil, ErrPasswordEmpty
 	}
-	if len(raw) < 8 {
+	if utf8.RuneCountInString(raw) < 8 {
 		return nil, ErrPasswordTooShort
 	}
-	if len(raw) > 72 {
+	if utf8.RuneCountInString(raw) > 72 {
 		return nil, ErrPasswordTooLong
 	}
 
