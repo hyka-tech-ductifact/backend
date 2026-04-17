@@ -56,7 +56,7 @@ help:
 	@echo "    test-unit        - Run unit tests (no dependencies needed)"
 	@echo "    test-integration - Run integration tests (requires DB)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
-	@echo "    test-contract    - Run contract tests with Schemathesis (requires running server)"
+	@echo "    test-contract    - Run contract tests with Schemathesis (config: test/schemathesis.toml)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
@@ -182,9 +182,8 @@ test-e2e:
 	$(call run-tests,e2e,./test/e2e/...)
 
 # ─── Schemathesis (contract testing) ─────────────────────────
-# Runs via Docker
-ST_IMAGE        ?= schemathesis/schemathesis:latest
-ST_MAX_EXAMPLES ?= 50
+# Runs via Docker — config lives in test/schemathesis.toml
+ST_IMAGE ?= schemathesis/schemathesis:latest
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
@@ -213,9 +212,8 @@ test-contract: ensure-contract
 		-v $(CURDIR)/schemathesis-report:/spec/schemathesis-report \
 		-w /spec \
 		$(ST_IMAGE) \
-		run bundled.yaml --url http://localhost:8080/v1 \
-		-H "Authorization: Bearer $$TOKEN" \
-		--max-examples $(ST_MAX_EXAMPLES)
+		run bundled.yaml \
+		-H "Authorization: Bearer $$TOKEN"
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache

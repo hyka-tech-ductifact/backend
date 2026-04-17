@@ -4,15 +4,13 @@
 # Docs: https://schemathesis.readthedocs.io/en/stable/reference/configuration/
 #
 # Usage:
-#   make test-contract          (local — fast, ~30 s)
-#   make test-contract CI=1     (CI    — deep,  ~2 min)
+#   make test-contract                       (default: 50 examples)
+#   make test-contract ST_MAX_EXAMPLES=200   (deeper fuzzing)
 #
-# Depth is controlled via CLI flags injected by the Makefile:
-#   --max-examples, --workers, --phases
-# This TOML contains only settings that are the same for both modes.
+# Auth header (-H) is the only flag injected by the Makefile.
+# Everything else lives here.
 
 # ─── Base URL ────────────────────────────────────────────────
-# Overridden by --url flag from Makefile. This is a fallback.
 base-url = "http://localhost:8080/v1"
 
 # ─── Wait for API to be ready ────────────────────────────────
@@ -25,9 +23,8 @@ request-retries = 3
 continue-on-failure = true
 
 # ─── Authentication ──────────────────────────────────────────
-# A fresh JWT is obtained by the Makefile (curl → /auth/register) and
+# JWT obtained by the Makefile (curl → /auth/register|login) and
 # injected via -H 'Authorization: Bearer <token>' on the CLI.
-# No auth config needed here — the CLI header takes precedence.
 
 # ─── Checks ─────────────────────────────────────────────────
 [checks]
@@ -42,6 +39,7 @@ enabled = false
 
 # ─── Data Generation ────────────────────────────────────────
 [generation]
+max-examples = 50       # per operation (override: make test-contract ST_MAX_EXAMPLES=200)
 mode = "all"            # positive + negative data
 allow-x00 = false       # avoid NULL bytes that trip up Go handlers
 codec = "utf-8"
