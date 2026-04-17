@@ -46,8 +46,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch contract spec
-        run: make fetch-contract
+      - name: Ensure contract spec
+        run: make ensure-contract
 
       - name: Build and push (staging tag)
         uses: docker/build-push-action@v7
@@ -108,8 +108,8 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Fetch contract spec
-        run: make fetch-contract
+      - name: Ensure contract spec
+        run: make ensure-contract
 
       - name: Build and push (production tags)
         uses: docker/build-push-action@v7
