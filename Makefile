@@ -29,7 +29,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	dev app-build app-start ensure-seed \
 	services-start services-stop \
 	test test-unit test-integration test-e2e test-clean \
-	test-contract test-contract-fuzz \
+	test-contract \
 	docker-build docker-start docker-stop \
 	fmt lint deps clean \
 	validate-branch ensure-contract \
@@ -57,7 +57,6 @@ help:
 	@echo "    test-integration - Run integration tests (requires DB)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-contract    - Run contract tests with Schemathesis (requires running server)"
-	@echo "    test-contract-fuzz - Continuous fuzz testing (60s, requires running server)"
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
@@ -164,7 +163,7 @@ define run-tests
 	fi
 endef
 
-# Run all tests
+# Run all tests (contract tests run separately: make test-contract)
 test: test-unit test-integration test-e2e
 
 # Run unit tests — no dependencies needed
@@ -186,27 +185,16 @@ test-e2e:
 # Runs via Docker — no Python/pip needed. Uses --network host so the
 # container can reach the API on localhost:8080.
 #
-#   make test-contract          → local (fast):  examples + coverage, 1 example, 1 worker
-#   make test-contract CI=1     → CI    (deep):  all 4 phases, 50 examples, auto workers
-ST_IMAGE ?= schemathesis/schemathesis:latest
-
-# Depth knobs — overridden by CI=1
-ifeq ($(CI),1)
-  _ST_MAX_EXAMPLES := 50
-  _ST_WORKERS      := auto
-  _ST_PHASES       := examples,coverage,fuzzing,stateful
-else
-  _ST_MAX_EXAMPLES := 1
-  _ST_WORKERS      := 1
-  _ST_PHASES       := examples,coverage
-endif
+#   make test-contract                           (default ~30s)
+#   make test-contract ST_MAX_EXAMPLES=50        (deeper fuzzing)
+ST_IMAGE        ?= schemathesis/schemathesis:latest
+ST_MAX_EXAMPLES ?= 1
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make app-start) and Docker.
 # A fresh user is registered automatically on each run (unique email via timestamp).
 test-contract: ensure-contract
 	@echo "Running contract tests (Schemathesis)..."
-	@echo "  Mode: $(if $(filter 1,$(CI)),CI (deep),local (fast))  |  examples=$(_ST_MAX_EXAMPLES)  workers=$(_ST_WORKERS)  phases=$(_ST_PHASES)"
 	@mkdir -p schemathesis-report
 	$(eval _ST_EMAIL := st-$(shell date +%s)@test.ductifact.dev)
 	$(eval _ST_TOKEN := $(shell curl -sf http://localhost:8080/v1/auth/register \
@@ -224,9 +212,7 @@ test-contract: ensure-contract
 		$(ST_IMAGE) \
 		run bundled.yaml --url http://localhost:8080/v1 \
 		-H 'Authorization: Bearer $(_ST_TOKEN)' \
-		--max-examples $(_ST_MAX_EXAMPLES) \
-		-w $(_ST_WORKERS) \
-		--phases $(_ST_PHASES)
+		--max-examples $(ST_MAX_EXAMPLES)
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache
