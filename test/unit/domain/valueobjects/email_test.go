@@ -47,6 +47,9 @@ func TestNewEmail_WithInvalidEmails_ReturnsError(t *testing.T) {
 		{"no TLD", "user@example"},
 		{"only whitespace", "   "},
 		{"missing domain after at", "user@.com"},
+		{"domain label ends with hyphen", "user@example-.com"},
+		{"domain label starts with hyphen", "user@-example.com"},
+		{"domain label with only hyphen", "_0AncD@9nkNy0.Q-.Lf"},
 	}
 
 	for _, tt := range invalidEmails {
