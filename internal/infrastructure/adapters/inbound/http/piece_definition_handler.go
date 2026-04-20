@@ -237,21 +237,31 @@ func (h *PieceDefinitionHandler) DeletePieceDefinition(c *gin.Context) {
 
 // --- Mappers ---
 
+// toFileURL converts a storage key to a public URL served by the file proxy.
+// Returns empty string if the key is empty.
+func toFileURL(storageKey string) string {
+	if storageKey == "" {
+		return ""
+	}
+	return fileProxyPrefix + storageKey
+}
+
 // deriveThumbnailURL converts an original key to its thumbnail counterpart by convention.
-// "piece-definitions/{id}/original.png" → "piece-definitions/{id}/thumb.png"
+// "piece-definitions/{id}/original.png" → "/v1/files/piece-definitions/{id}/thumb.png"
 // Returns empty string if there's no image.
 func deriveThumbnailURL(imageURL string) string {
 	if imageURL == "" {
 		return ""
 	}
-	return strings.Replace(imageURL, "/original", "/thumb", 1)
+	thumbKey := strings.Replace(imageURL, "/original", "/thumb", 1)
+	return fileProxyPrefix + thumbKey
 }
 
 func toPieceDefResponse(def *entities.PieceDefinition) *PieceDefinitionResponse {
 	return &PieceDefinitionResponse{
 		ID:              def.ID.String(),
 		Name:            def.Name,
-		ImageURL:        def.ImageURL,
+		ImageURL:        toFileURL(def.ImageURL),
 		ThumbnailURL:    deriveThumbnailURL(def.ImageURL),
 		DimensionSchema: def.DimensionSchema,
 		Predefined:      def.Predefined,
