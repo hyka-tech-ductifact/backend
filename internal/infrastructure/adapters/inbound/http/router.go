@@ -19,6 +19,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// fileProxyPrefix is the URL prefix under which files are served.
+// Used by mappers to build full URLs from storage keys.
+const fileProxyPrefix = "/v1/files/"
+
 // SetupRoutes configures the HTTP router with public and protected route groups.
 // Protected routes require a valid JWT in the Authorization header.
 func SetupRoutes(

@@ -10,10 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// fileProxyPrefix is the URL prefix under which files are served.
-// Used by mappers to build full URLs from storage keys.
-const fileProxyPrefix = "/v1/files/"
-
 // FileHandler serves files from storage as a reverse proxy.
 // The client accesses /v1/files/{key} and the handler streams
 // the object directly from the FileStorage port (e.g. MinIO).
