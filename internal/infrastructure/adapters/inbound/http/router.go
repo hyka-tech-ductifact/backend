@@ -23,6 +23,7 @@ import (
 // Protected routes require a valid JWT in the Authorization header.
 func SetupRoutes(
 	healthChecker ports.HealthChecker,
+	fileStorage ports.FileStorage,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	projectService usecases.ProjectService,
@@ -121,6 +122,10 @@ func SetupRoutes(
 	// --- Versioned API routes ---
 
 	v1 := r.Group("/v1")
+
+	// File proxy — serves images from storage (public, cached)
+	fileHandler := NewFileHandler(fileStorage)
+	v1.GET("/files/*filepath", fileHandler.ServeFile)
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)
