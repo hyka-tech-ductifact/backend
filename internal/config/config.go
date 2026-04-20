@@ -26,6 +26,16 @@ type Config struct {
 	CORS          CORS
 	RateLimit     RateLimit
 	LoginThrottle LoginThrottle
+	MinIO         MinIO
+}
+
+// MinIO holds S3-compatible object storage settings.
+type MinIO struct {
+	Endpoint  string // e.g. "localhost:9000"
+	AccessKey string
+	SecretKey string
+	Bucket    string // e.g. "ductifact"
+	UseSSL    bool
 }
 
 // App holds general application settings.
@@ -123,6 +133,13 @@ func Load() Config {
 			Window:          parseDuration(required("LOGIN_THROTTLE_WINDOW")),
 			LockoutDuration: parseDuration(required("LOGIN_THROTTLE_LOCKOUT")),
 		},
+		MinIO: MinIO{
+			Endpoint:  required("MINIO_ENDPOINT"),
+			AccessKey: required("MINIO_ACCESS_KEY"),
+			SecretKey: required("MINIO_SECRET_KEY"),
+			Bucket:    required("MINIO_BUCKET"),
+			UseSSL:    parseBool(optional("MINIO_USE_SSL", "false")),
+		},
 	}
 }
 
@@ -167,4 +184,23 @@ func parseInt(s string) int {
 		panic(fmt.Sprintf("invalid integer %q: %v", s, err))
 	}
 	return n
+}
+
+// optional reads an environment variable and returns a default value if unset.
+func optional(key, defaultValue string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultValue
+	}
+	return v
+}
+
+// parseBool parses a string as a boolean ("true"/"false").
+// Panics if the format is invalid — this is a configuration error.
+func parseBool(s string) bool {
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		panic(fmt.Sprintf("invalid boolean %q: %v", s, err))
+	}
+	return b
 }
