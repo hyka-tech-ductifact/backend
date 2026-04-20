@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
@@ -116,7 +117,7 @@ func TestCreatePieceDefinition_WithOversizedImage_ReturnsError(t *testing.T) {
 // Compensation — rollback on failure
 // =============================================================================
 
-func TestCreatePieceDefinition_WhenThumbnailFails_DeletesOriginal(t *testing.T) {
+func TestCreatePieceDefinition_WhenThumbnailFailsWithDecodeError_ReturnsImageCorrupt(t *testing.T) {
 	var deletedKeys []string
 	storage := &mocks.MockFileStorage{
 		UploadFn: func(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
@@ -129,7 +130,7 @@ func TestCreatePieceDefinition_WhenThumbnailFails_DeletesOriginal(t *testing.T) 
 	}
 	imgProc := &mocks.MockImageProcessor{
 		GenerateThumbnailFn: func(src io.Reader) (io.Reader, string, int64, error) {
-			return nil, "", 0, errors.New("decode failed")
+			return nil, "", 0, ports.ErrImageDecode
 		},
 	}
 	svc := newPieceDefServiceCustom(&mocks.MockPieceDefinitionRepository{}, storage, imgProc)
@@ -140,9 +141,38 @@ func TestCreatePieceDefinition_WhenThumbnailFails_DeletesOriginal(t *testing.T) 
 	}, fakeFileInput("data"))
 
 	assert.Nil(t, def)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, services.ErrImageCorrupt)
 	assert.Len(t, deletedKeys, 1, "original should be cleaned up")
 	assert.True(t, strings.Contains(deletedKeys[0], "/original"))
+}
+
+func TestCreatePieceDefinition_WhenThumbnailFailsWithInternalError_ReturnsGenericError(t *testing.T) {
+	var deletedKeys []string
+	storage := &mocks.MockFileStorage{
+		UploadFn: func(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
+			return nil
+		},
+		DeleteFn: func(ctx context.Context, key string) error {
+			deletedKeys = append(deletedKeys, key)
+			return nil
+		},
+	}
+	imgProc := &mocks.MockImageProcessor{
+		GenerateThumbnailFn: func(src io.Reader) (io.Reader, string, int64, error) {
+			return nil, "", 0, errors.New("disk I/O error")
+		},
+	}
+	svc := newPieceDefServiceCustom(&mocks.MockPieceDefinitionRepository{}, storage, imgProc)
+
+	def, err := svc.CreatePieceDefinition(context.Background(), uuid.New(), entities.CreatePieceDefParams{
+		Name:            "Internal Fail",
+		DimensionSchema: []string{"L"},
+	}, fakeFileInput("data"))
+
+	assert.Nil(t, def)
+	assert.Error(t, err)
+	assert.NotErrorIs(t, err, services.ErrImageCorrupt, "generic errors should not be mapped to ErrImageCorrupt")
+	assert.Len(t, deletedKeys, 1, "original should be cleaned up")
 }
 
 func TestCreatePieceDefinition_WhenRepoFails_DeletesBothFiles(t *testing.T) {

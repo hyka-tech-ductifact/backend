@@ -26,6 +26,7 @@ var (
 	ErrPieceDefPredefined   = errors.New("predefined piece definitions cannot be modified")
 	ErrUnsupportedImageType = errors.New("unsupported image type: only JPEG, PNG and WebP are allowed")
 	ErrImageTooLarge        = errors.New("image exceeds the maximum allowed size of 5 MB")
+	ErrImageCorrupt         = errors.New("image is corrupt or cannot be decoded")
 )
 
 const (
@@ -244,6 +245,9 @@ func (s *pieceDefinitionService) uploadWithThumbnail(ctx context.Context, file *
 	thumbReader, thumbContentType, thumbSize, err := s.imageProcessor.GenerateThumbnail(bytes.NewReader(data))
 	if err != nil {
 		s.compensateDelete(ctx, keys.original)
+		if errors.Is(err, ports.ErrImageDecode) {
+			return nil, ErrImageCorrupt
+		}
 		return nil, fmt.Errorf("generating thumbnail: %w", err)
 	}
 

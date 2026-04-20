@@ -67,6 +67,7 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrPieceDefPredefined, http.StatusForbidden, "predefined piece definitions cannot be modified")
 	helpers.RegisterDomainError(services.ErrUnsupportedImageType, http.StatusBadRequest, "unsupported image type: only JPEG, PNG and WebP are allowed")
 	helpers.RegisterDomainError(services.ErrImageTooLarge, http.StatusBadRequest, "image exceeds the maximum allowed size of 5 MB")
+	helpers.RegisterDomainError(services.ErrImageCorrupt, http.StatusBadRequest, "image is corrupt or cannot be decoded")
 	helpers.RegisterDomainError(repositories.ErrPieceDefNotOwned, http.StatusNotFound, "piece definition not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotFound, http.StatusNotFound, "piece not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotOwned, http.StatusNotFound, "piece not found")

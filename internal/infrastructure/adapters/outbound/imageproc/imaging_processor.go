@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"ductifact/internal/application/ports"
+
 	"github.com/disintegration/imaging"
 )
 
@@ -27,7 +29,7 @@ func NewImagingProcessor() *ImagingProcessor {
 func (p *ImagingProcessor) GenerateThumbnail(src io.Reader) (io.Reader, string, int64, error) {
 	img, err := imaging.Decode(src)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("decoding image: %w", err)
+		return nil, "", 0, fmt.Errorf("decoding image: %w", fmt.Errorf("%s: %w", err.Error(), ports.ErrImageDecode))
 	}
 
 	thumb := imaging.Thumbnail(img, thumbWidth, thumbHeight, imaging.Lanczos)
