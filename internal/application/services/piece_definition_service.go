@@ -1,10 +1,18 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"ductifact/internal/application/ports"
+	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/pagination"
 	"ductifact/internal/domain/repositories"
@@ -14,37 +22,68 @@ import (
 
 // --- Application-level errors ---
 
-var ErrPieceDefPredefined = errors.New("predefined piece definitions cannot be modified")
+var (
+	ErrPieceDefPredefined   = errors.New("predefined piece definitions cannot be modified")
+	ErrUnsupportedImageType = errors.New("unsupported image type: only JPEG, PNG and WebP are allowed")
+	ErrImageTooLarge        = errors.New("image exceeds the maximum allowed size of 5 MB")
+)
+
+const (
+	maxImageSize = 5 << 20 // 5 MB
+	bucketPrefix = "piece-definitions"
+)
 
 // pieceDefinitionService implements usecases.PieceDefinitionService.
 // Unexported struct: can only be created via NewPieceDefinitionService.
 type pieceDefinitionService struct {
-	pieceDefRepo repositories.PieceDefinitionRepository
+	pieceDefRepo   repositories.PieceDefinitionRepository
+	fileStorage    ports.FileStorage
+	imageProcessor ports.ImageProcessor
 }
 
 // NewPieceDefinitionService creates a new PieceDefinitionService.
 func NewPieceDefinitionService(
 	pieceDefRepo repositories.PieceDefinitionRepository,
+	fileStorage ports.FileStorage,
+	imageProcessor ports.ImageProcessor,
 ) *pieceDefinitionService {
 	return &pieceDefinitionService{
-		pieceDefRepo: pieceDefRepo,
+		pieceDefRepo:   pieceDefRepo,
+		fileStorage:    fileStorage,
+		imageProcessor: imageProcessor,
 	}
 }
 
 // CreatePieceDefinition orchestrates piece definition creation:
-// 1. Build the domain entity (which validates all fields).
-// 2. Persist via repository.
-func (s *pieceDefinitionService) CreatePieceDefinition(ctx context.Context, userID uuid.UUID, params entities.CreatePieceDefParams) (*entities.PieceDefinition, error) {
+// 1. Upload image + thumbnail to storage (if file provided).
+// 2. Build the domain entity (which validates all fields).
+// 3. Persist via repository.
+// On failure: compensate by deleting uploaded files.
+func (s *pieceDefinitionService) CreatePieceDefinition(ctx context.Context, userID uuid.UUID, params entities.CreatePieceDefParams, file *usecases.FileInput) (*entities.PieceDefinition, error) {
 	// Ensure the creator is set from the authenticated user
 	params.UserID = userID
+
+	var keys *uploadedKeys
+
+	// --- Upload image if provided ---
+	if file != nil {
+		k, err := s.uploadWithThumbnail(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		keys = k
+		params.ImageURL = keys.original
+	}
 
 	// Domain entity validates its own invariants
 	def, err := entities.NewPieceDefinition(params)
 	if err != nil {
+		keys.rollback(ctx, s)
 		return nil, err
 	}
 
 	if err := s.pieceDefRepo.Create(ctx, def); err != nil {
+		keys.rollback(ctx, s)
 		return nil, err
 	}
 
@@ -70,7 +109,8 @@ func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userI
 
 // UpdatePieceDefinition applies a partial update to an existing piece definition.
 // Only custom (non-predefined) definitions owned by the user can be updated.
-func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceDefParams) (*entities.PieceDefinition, error) {
+// If a new image is provided, the old one is replaced (old files deleted).
+func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceDefParams, file *usecases.FileInput) (*entities.PieceDefinition, error) {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -80,7 +120,21 @@ func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id u
 		return nil, ErrPieceDefPredefined
 	}
 
-	if !params.HasChanges() {
+	// --- Upload new image if provided ---
+	var keys *uploadedKeys
+	oldImageURL := def.ImageURL
+
+	if file != nil {
+		k, err := s.uploadWithThumbnail(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		keys = k
+		imageURL := keys.original
+		params.ImageURL = &imageURL
+	}
+
+	if !params.HasChanges() && file == nil {
 		return def, nil
 	}
 
@@ -100,13 +154,22 @@ func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id u
 
 	def.UpdatedAt = time.Now()
 	if err := s.pieceDefRepo.Update(ctx, def); err != nil {
+		// Compensate: delete newly uploaded files if DB update fails
+		keys.rollback(ctx, s)
 		return nil, err
+	}
+
+	// --- Delete old files after successful persist ---
+	if file != nil && oldImageURL != "" {
+		s.compensateDelete(ctx, oldImageURL)
+		oldThumbKey := strings.Replace(oldImageURL, "/original", "/thumb", 1)
+		s.compensateDelete(ctx, oldThumbKey)
 	}
 
 	return def, nil
 }
 
-// DeletePieceDefinition removes a piece definition.
+// DeletePieceDefinition removes a piece definition and its associated images.
 // Only custom (non-predefined) definitions owned by the user can be deleted.
 func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
@@ -118,5 +181,106 @@ func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id u
 		return ErrPieceDefPredefined
 	}
 
-	return s.pieceDefRepo.Delete(ctx, def.ID)
+	if err := s.pieceDefRepo.Delete(ctx, def.ID); err != nil {
+		return err
+	}
+
+	// Best-effort cleanup of stored images after successful DB delete
+	if def.ImageURL != "" {
+		s.compensateDelete(ctx, def.ImageURL)
+		thumbKey := strings.Replace(def.ImageURL, "/original", "/thumb", 1)
+		s.compensateDelete(ctx, thumbKey)
+	}
+
+	return nil
+}
+
+// --- helpers ---
+
+// uploadedKeys holds the storage keys generated by uploadWithThumbnail.
+// nil-safe: calling rollback on a nil pointer is a no-op.
+type uploadedKeys struct {
+	original string
+	thumb    string
+}
+
+// rollback deletes both uploaded files (best-effort). Safe to call on nil.
+func (k *uploadedKeys) rollback(ctx context.Context, s *pieceDefinitionService) {
+	if k == nil {
+		return
+	}
+	s.compensateDelete(ctx, k.original)
+	s.compensateDelete(ctx, k.thumb)
+}
+
+// uploadWithThumbnail validates the image, uploads the original and a thumbnail
+// to storage, and returns the generated keys. On partial failure it compensates
+// by deleting whatever was already uploaded.
+func (s *pieceDefinitionService) uploadWithThumbnail(ctx context.Context, file *usecases.FileInput) (*uploadedKeys, error) {
+	if err := validateImage(file); err != nil {
+		return nil, err
+	}
+
+	id := uuid.New()
+	ext := normalizeExtension(file.Filename)
+	keys := &uploadedKeys{
+		original: fmt.Sprintf("%s/%s/original%s", bucketPrefix, id, ext),
+		thumb:    fmt.Sprintf("%s/%s/thumb%s", bucketPrefix, id, ext),
+	}
+
+	// Read the entire file into memory so we can feed it to both
+	// the original upload and the thumbnail generator.
+	data, err := io.ReadAll(file.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uploaded file: %w", err)
+	}
+
+	// Upload original
+	if err := s.fileStorage.Upload(ctx, keys.original, bytes.NewReader(data), file.ContentType, int64(len(data))); err != nil {
+		return nil, fmt.Errorf("uploading original image: %w", err)
+	}
+
+	// Generate and upload thumbnail
+	thumbReader, thumbContentType, thumbSize, err := s.imageProcessor.GenerateThumbnail(bytes.NewReader(data))
+	if err != nil {
+		s.compensateDelete(ctx, keys.original)
+		return nil, fmt.Errorf("generating thumbnail: %w", err)
+	}
+
+	if err := s.fileStorage.Upload(ctx, keys.thumb, thumbReader, thumbContentType, thumbSize); err != nil {
+		s.compensateDelete(ctx, keys.original)
+		return nil, fmt.Errorf("uploading thumbnail: %w", err)
+	}
+
+	return keys, nil
+}
+
+// compensateDelete is a best-effort cleanup. Errors are logged but not propagated.
+func (s *pieceDefinitionService) compensateDelete(ctx context.Context, key string) {
+	if err := s.fileStorage.Delete(ctx, key); err != nil {
+		slog.Warn("compensation: failed to delete file", "key", key, "error", err)
+	}
+}
+
+// validateImage checks file size and content type.
+func validateImage(file *usecases.FileInput) error {
+	if file.Size > maxImageSize {
+		return ErrImageTooLarge
+	}
+	switch file.ContentType {
+	case "image/jpeg", "image/png", "image/webp":
+		return nil
+	default:
+		return ErrUnsupportedImageType
+	}
+}
+
+// normalizeExtension extracts and normalizes the file extension.
+// Falls back to ".jpg" if no extension is present.
+func normalizeExtension(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		ext = ".jpg"
+	}
+	return ext
 }
