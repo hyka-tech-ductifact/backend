@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"ductifact/internal/application/ports"
 
@@ -30,8 +31,9 @@ func (h *FileHandler) ServeFile(c *gin.Context) {
 	if len(key) > 0 && key[0] == '/' {
 		key = key[1:] // strip leading slash
 	}
+	key = strings.TrimSpace(key)
 
-	if key == "" {
+	if key == "" || !strings.Contains(key, "/") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file path is required"})
 		return
 	}

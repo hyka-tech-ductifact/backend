@@ -69,10 +69,13 @@ func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileOb
 	info, err := obj.Stat()
 	if err != nil {
 		obj.Close()
-		// MinIO returns an ErrorResponse with Code "NoSuchKey" for missing objects
+		// MinIO returns an ErrorResponse with various codes for missing/invalid objects
 		errResp := minio.ErrorResponse{}
-		if errors.As(err, &errResp) && errResp.Code == "NoSuchKey" {
-			return nil, ports.ErrFileNotFound
+		if errors.As(err, &errResp) {
+			switch errResp.Code {
+			case "NoSuchKey", "NoSuchBucket", "InvalidObjectName":
+				return nil, ports.ErrFileNotFound
+			}
 		}
 		return nil, fmt.Errorf("minio stat %q: %w", key, err)
 	}

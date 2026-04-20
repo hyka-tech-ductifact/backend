@@ -105,3 +105,25 @@ func TestServeFile_ReceivesCorrectKeyWithoutLeadingSlash(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "piece-definitions/uuid/thumb.jpg", receivedKey)
 }
+
+func TestServeFile_WithWhitespaceOnlyPath_Returns400(t *testing.T) {
+	router := setupFileRouter(&mocks.MockFileStorage{})
+	req := httptest.NewRequest(http.MethodGet, "/v1/files/%C2%A0", nil) // non-breaking space
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "file path is required")
+}
+
+func TestServeFile_WithNoSlashInPath_Returns400(t *testing.T) {
+	router := setupFileRouter(&mocks.MockFileStorage{})
+	req := httptest.NewRequest(http.MethodGet, "/v1/files/invalid-no-slash", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "file path is required")
+}
