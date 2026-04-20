@@ -12,7 +12,9 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/config"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
+	"ductifact/internal/infrastructure/adapters/outbound/imageproc"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
+	"ductifact/internal/infrastructure/adapters/outbound/storage"
 	"ductifact/internal/infrastructure/auth"
 	"ductifact/internal/infrastructure/logging"
 	"ductifact/internal/infrastructure/ratelimit"
@@ -56,7 +58,21 @@ func main() {
 
 	// --- Piece Definition wiring ---
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
-	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo)
+
+	fileStorage, err := storage.NewMinIOStorage(
+		cfg.MinIO.Endpoint,
+		cfg.MinIO.AccessKey,
+		cfg.MinIO.SecretKey,
+		cfg.MinIO.Bucket,
+		cfg.MinIO.UseSSL,
+	)
+	if err != nil {
+		slog.Error("failed to connect to MinIO", "error", err)
+		os.Exit(1)
+	}
+
+	imageProcessor := imageproc.NewImagingProcessor()
+	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo, fileStorage, imageProcessor)
 
 	// --- Piece wiring ---
 	pieceRepo := persistence.NewPostgresPieceRepository(db)
