@@ -2,9 +2,12 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+
+	"ductifact/internal/application/ports"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -52,6 +55,33 @@ func (s *MinIOStorage) Upload(ctx context.Context, key string, reader io.Reader,
 		return fmt.Errorf("minio upload %q: %w", key, err)
 	}
 	return nil
+}
+
+// GetObject retrieves a file from MinIO by its key.
+// Returns ports.ErrFileNotFound if the key doesn't exist.
+func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileObject, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("minio get %q: %w", key, err)
+	}
+
+	// Stat to check existence and get metadata
+	info, err := obj.Stat()
+	if err != nil {
+		obj.Close()
+		// MinIO returns an ErrorResponse with Code "NoSuchKey" for missing objects
+		errResp := minio.ErrorResponse{}
+		if errors.As(err, &errResp) && errResp.Code == "NoSuchKey" {
+			return nil, ports.ErrFileNotFound
+		}
+		return nil, fmt.Errorf("minio stat %q: %w", key, err)
+	}
+
+	return &ports.FileObject{
+		Reader:      obj,
+		ContentType: info.ContentType,
+		Size:        info.Size,
+	}, nil
 }
 
 // Delete removes a file from MinIO. Returns nil if the file doesn't exist.
