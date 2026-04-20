@@ -135,8 +135,8 @@ func Load() Config {
 		},
 		MinIO: MinIO{
 			Endpoint:  required("MINIO_HOST") + ":" + required("MINIO_API_PORT"),
-			AccessKey: required("MINIO_ACCESS_KEY"),
-			SecretKey: required("MINIO_SECRET_KEY"),
+			AccessKey: required("MINIO_ROOT_USER"),
+			SecretKey: required("MINIO_ROOT_PASSWORD"),
 			Bucket:    required("MINIO_BUCKET"),
 			UseSSL:    parseBool(required("MINIO_USE_SSL")),
 		},
