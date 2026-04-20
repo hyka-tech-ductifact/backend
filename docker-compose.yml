@@ -1,6 +1,6 @@
 # Development compose — two modes:
-#   make services-start → only postgres (dev, app runs on host with air)
-#   make docker-start  → postgres + app in Docker (smoke test)
+#   make services-start → postgres + minio (dev, app runs on host with air)
+#   make docker-start  → postgres + minio + app in Docker (smoke test)
 #   make docker-stop   → stop everything
 
 services:
@@ -18,6 +18,25 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ductifact_dev_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "${MINIO_API_PORT}:9000"   # S3 API
+      - "${MINIO_CONSOLE_PORT}:9001"   # Web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,9 +69,18 @@ services:
       - LOGIN_THROTTLE_MAX_ATTEMPTS=${LOGIN_THROTTLE_MAX_ATTEMPTS}
       - LOGIN_THROTTLE_WINDOW=${LOGIN_THROTTLE_WINDOW}
       - LOGIN_THROTTLE_LOCKOUT=${LOGIN_THROTTLE_LOCKOUT}
+      - MINIO_HOST=minio
+      - MINIO_API_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_USE_SSL=false
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
 volumes:
   postgres_data:
+  minio_data:

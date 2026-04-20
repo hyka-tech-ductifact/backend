@@ -134,7 +134,7 @@ func Load() Config {
 			LockoutDuration: parseDuration(required("LOGIN_THROTTLE_LOCKOUT")),
 		},
 		MinIO: MinIO{
-			Endpoint:  required("MINIO_ENDPOINT"),
+			Endpoint:  required("MINIO_HOST") + ":" + required("MINIO_API_PORT"),
 			AccessKey: required("MINIO_ACCESS_KEY"),
 			SecretKey: required("MINIO_SECRET_KEY"),
 			Bucket:    required("MINIO_BUCKET"),
