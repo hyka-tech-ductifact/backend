@@ -138,7 +138,7 @@ func Load() Config {
 			AccessKey: required("MINIO_ACCESS_KEY"),
 			SecretKey: required("MINIO_SECRET_KEY"),
 			Bucket:    required("MINIO_BUCKET"),
-			UseSSL:    parseBool(optional("MINIO_USE_SSL", "false")),
+			UseSSL:    parseBool(required("MINIO_USE_SSL")),
 		},
 	}
 }
@@ -184,15 +184,6 @@ func parseInt(s string) int {
 		panic(fmt.Sprintf("invalid integer %q: %v", s, err))
 	}
 	return n
-}
-
-// optional reads an environment variable and returns a default value if unset.
-func optional(key, defaultValue string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		return defaultValue
-	}
-	return v
 }
 
 // parseBool parses a string as a boolean ("true"/"false").
