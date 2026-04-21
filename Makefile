@@ -324,7 +324,7 @@ deps:
 # BRANCH = source branch name (e.g. feat/add-login)
 # BASE   = target branch name (e.g. main) — only needed for target validation
 validate-branch:
-	@PATTERN='^(feat|fix|chore|hotfix)/.+$$'; \
+	@PATTERN='^(feat|fix|chore|hotfix|dependabot)/.+$$'; \
 	if [ -z "$$BRANCH" ]; then \
 		echo "❌ BRANCH env var is required"; exit 1; \
 	fi; \
