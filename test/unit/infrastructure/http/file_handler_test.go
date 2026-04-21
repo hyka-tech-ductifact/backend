@@ -128,16 +128,16 @@ func TestServeFile_WithNoSlashInPath_Returns400(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "file path is required")
 }
 
-// TestServeFile_WithDoubleSlashInPath_Returns400 reproduces the Schemathesis finding:
-// a key with %2F%2F (double slash) must return 400, not 500.
-func TestServeFile_WithDoubleSlashInPath_Returns400(t *testing.T) {
+// TestServeFile_WithDoubleSlashInPath_Returns404 reproduces the Schemathesis finding:
+// a key with %2F%2F (double slash) is forwarded to storage and returns 404 (not 500).
+func TestServeFile_WithDoubleSlashInPath_Returns404(t *testing.T) {
 	router := setupFileRouter(&mocks.MockFileStorage{})
-	// %2F%2F decodes to // — Gin URL-decodes the wildcard parameter
+	// %2F%2F decodes to // — storage will not find it → ErrFileNotFound (mock default)
 	req := httptest.NewRequest(http.MethodGet, "/v1/files/kUo9LSt%2F%2Fqv0avyvtRM882B.uq", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "file path is required")
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "file not found")
 }

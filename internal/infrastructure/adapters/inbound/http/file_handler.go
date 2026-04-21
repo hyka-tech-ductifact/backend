@@ -33,7 +33,7 @@ func (h *FileHandler) ServeFile(c *gin.Context) {
 	}
 	key = strings.TrimSpace(key)
 
-	if key == "" || !strings.Contains(key, "/") || strings.Contains(key, "//") {
+	if key == "" || !strings.Contains(key, "/") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file path is required"})
 		return
 	}
