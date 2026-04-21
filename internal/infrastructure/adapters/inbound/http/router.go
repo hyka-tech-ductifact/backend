@@ -19,10 +19,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// fileProxyPrefix is the URL prefix under which files are served.
+// Used by mappers to build full URLs from storage keys.
+const fileProxyPrefix = "/v1/files/"
+
 // SetupRoutes configures the HTTP router with public and protected route groups.
 // Protected routes require a valid JWT in the Authorization header.
 func SetupRoutes(
 	healthChecker ports.HealthChecker,
+	fileStorage ports.FileStorage,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	projectService usecases.ProjectService,
@@ -60,6 +65,9 @@ func SetupRoutes(
 	helpers.RegisterDomainError(entities.ErrDuplicateDimensionLabel, http.StatusBadRequest, "dimension labels must be unique")
 	helpers.RegisterDomainError(entities.ErrEmptyDimensionLabel, http.StatusBadRequest, "dimension label cannot be empty")
 	helpers.RegisterDomainError(services.ErrPieceDefPredefined, http.StatusForbidden, "predefined piece definitions cannot be modified")
+	helpers.RegisterDomainError(services.ErrUnsupportedImageType, http.StatusBadRequest, "unsupported image type: only JPEG, PNG and WebP are allowed")
+	helpers.RegisterDomainError(services.ErrImageTooLarge, http.StatusBadRequest, "image exceeds the maximum allowed size of 5 MB")
+	helpers.RegisterDomainError(services.ErrImageCorrupt, http.StatusBadRequest, "image is corrupt or cannot be decoded")
 	helpers.RegisterDomainError(repositories.ErrPieceDefNotOwned, http.StatusNotFound, "piece definition not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotFound, http.StatusNotFound, "piece not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotOwned, http.StatusNotFound, "piece not found")
@@ -119,6 +127,10 @@ func SetupRoutes(
 	// --- Versioned API routes ---
 
 	v1 := r.Group("/v1")
+
+	// File proxy — serves images from storage (public, cached)
+	fileHandler := NewFileHandler(fileStorage)
+	v1.GET("/files/*filepath", fileHandler.ServeFile)
 
 	// Auth routes
 	authHandler := NewAuthHandler(authService)

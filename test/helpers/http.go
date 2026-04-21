@@ -3,6 +3,10 @@ package helpers
 import (
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
+	"mime/multipart"
 	"net/http"
 	"testing"
 
@@ -120,4 +124,78 @@ func ParseBodyArray(t *testing.T, resp *http.Response, target any) {
 	defer resp.Body.Close()
 	err := json.NewDecoder(resp.Body).Decode(target)
 	require.NoError(t, err)
+}
+
+// --- Multipart helpers (for multipart/form-data endpoints) ---
+
+// MinimalPNG returns a valid 1×1 pixel PNG image suitable for testing uploads.
+func MinimalPNG() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
+// buildMultipart creates a multipart/form-data body with a "data" JSON field
+// and an optional "image" file part. Returns the body buffer and the Content-Type
+// header value (including multipart boundary).
+func buildMultipart(t *testing.T, data any, imageBytes []byte, imageFilename string) (*bytes.Buffer, string) {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	if data != nil {
+		jsonBytes, err := json.Marshal(data)
+		require.NoError(t, err)
+		require.NoError(t, writer.WriteField("data", string(jsonBytes)))
+	}
+
+	if imageBytes != nil {
+		part, err := writer.CreateFormFile("image", imageFilename)
+		require.NoError(t, err)
+		_, err = part.Write(imageBytes)
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, writer.Close())
+	return &body, writer.FormDataContentType()
+}
+
+// PostMultipart sends a POST multipart/form-data request (no auth).
+func PostMultipart(t *testing.T, url string, data any, imageBytes []byte, imageFilename string) *http.Response {
+	t.Helper()
+	body, contentType := buildMultipart(t, data, imageBytes, imageFilename)
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// AuthPostMultipart sends a POST multipart/form-data request with Authorization: Bearer <token>.
+func AuthPostMultipart(t *testing.T, url, token string, data any, imageBytes []byte, imageFilename string) *http.Response {
+	t.Helper()
+	body, contentType := buildMultipart(t, data, imageBytes, imageFilename)
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// AuthPutMultipart sends a PUT multipart/form-data request with Authorization: Bearer <token>.
+func AuthPutMultipart(t *testing.T, url, token string, data any, imageBytes []byte, imageFilename string) *http.Response {
+	t.Helper()
+	body, contentType := buildMultipart(t, data, imageBytes, imageFilename)
+	req, err := http.NewRequest(http.MethodPut, url, body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
 }

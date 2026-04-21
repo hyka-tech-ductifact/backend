@@ -19,13 +19,13 @@ func pieceDefURL(extra ...string) string {
 	return url(base)
 }
 
-// createPieceDef is a helper that creates a piece definition and returns its ID.
+// createPieceDef is a helper that creates a piece definition (no image) and returns its ID.
 func createPieceDef(t *testing.T, token string, name string, schema []string) string {
 	t.Helper()
-	resp := helpers.AuthPostJSON(t, pieceDefURL(), token, map[string]any{
+	resp := helpers.AuthPostMultipart(t, pieceDefURL(), token, map[string]any{
 		"name":             name,
 		"dimension_schema": schema,
-	})
+	}, nil, "")
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	return body["id"].(string)
@@ -37,18 +37,18 @@ func TestE2E_CreatePieceDefinition_Success(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Juan", "juan@example.com")
 
-	resp := helpers.AuthPostJSON(t, pieceDefURL(), token, map[string]any{
+	resp := helpers.AuthPostMultipart(t, pieceDefURL(), token, map[string]any{
 		"name":             "Rectangle",
-		"image_url":        "https://example.com/rect.png",
 		"dimension_schema": []string{"Length", "Width"},
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 
 	assert.NotEmpty(t, body["id"])
 	assert.Equal(t, "Rectangle", body["name"])
-	assert.Equal(t, "https://example.com/rect.png", body["image_url"])
+	assert.Empty(t, body["image_url"])
+	assert.Empty(t, body["thumbnail_url"])
 	assert.False(t, body["predefined"].(bool))
 
 	schema := body["dimension_schema"].([]any)
@@ -61,9 +61,9 @@ func TestE2E_CreatePieceDefinition_MissingName_Returns400(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Juan", "juan@example.com")
 
-	resp := helpers.AuthPostJSON(t, pieceDefURL(), token, map[string]any{
+	resp := helpers.AuthPostMultipart(t, pieceDefURL(), token, map[string]any{
 		"dimension_schema": []string{"Length"},
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -72,10 +72,10 @@ func TestE2E_CreatePieceDefinition_EmptySchema_Returns400(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Juan", "juan@example.com")
 
-	resp := helpers.AuthPostJSON(t, pieceDefURL(), token, map[string]any{
+	resp := helpers.AuthPostMultipart(t, pieceDefURL(), token, map[string]any{
 		"name":             "Bad Def",
 		"dimension_schema": []string{},
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -83,10 +83,10 @@ func TestE2E_CreatePieceDefinition_EmptySchema_Returns400(t *testing.T) {
 func TestE2E_CreatePieceDefinition_NoToken_Returns401(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, pieceDefURL(), map[string]any{
+	resp := helpers.PostMultipart(t, pieceDefURL(), map[string]any{
 		"name":             "Rect",
 		"dimension_schema": []string{"Length"},
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -173,10 +173,10 @@ func TestE2E_UpdatePieceDefinition_Success(t *testing.T) {
 
 	defID := createPieceDef(t, token, "Old Name", []string{"Length"})
 
-	resp := helpers.AuthPutJSON(t, pieceDefURL(defID), token, map[string]any{
+	resp := helpers.AuthPutMultipart(t, pieceDefURL(defID), token, map[string]any{
 		"name":             "New Name",
 		"dimension_schema": []string{"Height", "Radius"},
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
@@ -193,9 +193,9 @@ func TestE2E_UpdatePieceDefinition_NotOwned_Returns404(t *testing.T) {
 
 	defID := createPieceDef(t, token1, "Juan's Def", []string{"Length"})
 
-	resp := helpers.AuthPutJSON(t, pieceDefURL(defID), token2, map[string]any{
+	resp := helpers.AuthPutMultipart(t, pieceDefURL(defID), token2, map[string]any{
 		"name": "Stolen",
-	})
+	}, nil, "")
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
@@ -233,11 +233,10 @@ func TestE2E_PieceDefinition_FullFlow(t *testing.T) {
 	_, token := createUserForClients(t, "Ana", "ana@example.com")
 
 	// 1. Create
-	createResp := helpers.AuthPostJSON(t, pieceDefURL(), token, map[string]any{
+	createResp := helpers.AuthPostMultipart(t, pieceDefURL(), token, map[string]any{
 		"name":             "Rectangle",
-		"image_url":        "https://example.com/rect.png",
 		"dimension_schema": []string{"Length", "Width"},
-	})
+	}, nil, "")
 	require.Equal(t, http.StatusCreated, createResp.StatusCode)
 	created := helpers.ParseBody(t, createResp)
 	defID := created["id"].(string)
@@ -250,10 +249,10 @@ func TestE2E_PieceDefinition_FullFlow(t *testing.T) {
 	assert.Equal(t, "Rectangle", fetched["name"])
 
 	// 3. Update
-	updateResp := helpers.AuthPutJSON(t, pieceDefURL(defID), token, map[string]any{
+	updateResp := helpers.AuthPutMultipart(t, pieceDefURL(defID), token, map[string]any{
 		"name":             "Updated Rectangle",
 		"dimension_schema": []string{"Height", "Radius", "Depth"},
-	})
+	}, nil, "")
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 	updated := helpers.ParseBody(t, updateResp)
 	assert.Equal(t, "Updated Rectangle", updated["name"])
