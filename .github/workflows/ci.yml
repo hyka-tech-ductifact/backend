@@ -44,6 +44,13 @@ env:
   LOGIN_THROTTLE_WINDOW: "1m"
   LOGIN_THROTTLE_LOCKOUT: "1m"
   GIN_MODE: test
+  MINIO_HOST: localhost
+  MINIO_API_PORT: "9000"
+  MINIO_CONSOLE_PORT: "9001"
+  MINIO_ROOT_USER: ci-minio-user
+  MINIO_ROOT_PASSWORD: ci-minio-password
+  MINIO_BUCKET: ci-bucket
+  MINIO_USE_SSL: "false"
 
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
