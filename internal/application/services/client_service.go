@@ -12,13 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- Application-level errors ---
-
-var (
-	ErrClientNotFound = errors.New("client not found")
-	ErrClientNotOwned = errors.New("client does not belong to this user")
-)
-
 // clientService implements usecases.ClientService.
 // Unexported struct: can only be created via NewClientService.
 type clientService struct {
@@ -38,11 +31,11 @@ func NewClientService(clientRepo repositories.ClientRepository, userRepo reposit
 
 // CreateClient orchestrates client creation:
 // 1. Verify the owning user exists.
-// 2. Build the domain entity (which validates name).
+// 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
-func (s *clientService) CreateClient(ctx context.Context, name string, userID uuid.UUID) (*entities.Client, error) {
+func (s *clientService) CreateClient(ctx context.Context, params entities.CreateClientParams) (*entities.Client, error) {
 	// Step 1: Verify the user exists
-	_, err := s.userRepo.GetByID(ctx, userID)
+	_, err := s.userRepo.GetByID(ctx, params.UserID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, ErrUserNotFound
@@ -51,7 +44,7 @@ func (s *clientService) CreateClient(ctx context.Context, name string, userID uu
 	}
 
 	// Step 2: Domain entity validates its own invariants
-	client, err := entities.NewClient(name, userID)
+	client, err := entities.NewClient(params)
 	if err != nil {
 		return nil, err
 	}
@@ -64,26 +57,9 @@ func (s *clientService) CreateClient(ctx context.Context, name string, userID uu
 	return client, nil
 }
 
-// getOwnedClient fetches a client by ID and verifies it belongs to the given user.
-func (s *clientService) getOwnedClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
-	client, err := s.clientRepo.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return nil, ErrClientNotFound
-		}
-		return nil, err
-	}
-
-	if client.UserID != userID {
-		return nil, ErrClientNotOwned
-	}
-
-	return client, nil
-}
-
 // GetClientByID retrieves a client by ID, ensuring it belongs to the given user.
 func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error) {
-	return s.getOwnedClient(ctx, id, userID)
+	return s.clientRepo.GetByIDForOwner(ctx, id, userID)
 }
 
 // ListClientsByUserID retrieves a paginated list of clients belonging to a user.
@@ -97,21 +73,38 @@ func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUI
 }
 
 // UpdateClient applies a partial update to an existing client.
-// Only non-nil fields are updated. Ensures the client belongs to the given user.
-func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, name *string) (*entities.Client, error) {
-	client, err := s.getOwnedClient(ctx, id, userID)
+// Only non-nil fields in params are updated. Ensures the client belongs to the given user.
+func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateClientParams) (*entities.Client, error) {
+	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Nothing to update
-	if name == nil {
+	if !params.HasChanges() {
 		return client, nil
 	}
 
 	// Apply changes
-	if err := client.SetName(*name); err != nil {
-		return nil, err
+	if params.Name != nil {
+		if err := client.SetName(*params.Name); err != nil {
+			return nil, err
+		}
+	}
+	if params.Phone != nil {
+		if err := client.SetPhone(*params.Phone); err != nil {
+			return nil, err
+		}
+	}
+	if params.Email != nil {
+		if err := client.SetEmail(*params.Email); err != nil {
+			return nil, err
+		}
+	}
+	if params.Description != nil {
+		if err := client.SetDescription(*params.Description); err != nil {
+			return nil, err
+		}
 	}
 
 	// Update timestamp and persist
@@ -125,7 +118,7 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 
 // DeleteClient removes a client, ensuring it belongs to the given user.
 func (s *clientService) DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	client, err := s.getOwnedClient(ctx, id, userID)
+	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
 	}

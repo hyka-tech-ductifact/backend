@@ -16,17 +16,26 @@ import (
 // --- DTOs (HTTP-specific, not domain objects) ---
 
 type CreateClientRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Phone       string `json:"phone"`
+	Email       string `json:"email"`
+	Description string `json:"description"`
 }
 
 type UpdateClientRequest struct {
-	Name *string `json:"name" binding:"omitempty"`
+	Name        *string `json:"name" binding:"omitempty"`
+	Phone       *string `json:"phone"`
+	Email       *string `json:"email"`
+	Description *string `json:"description"`
 }
 
 type ClientResponse struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	UserID string `json:"user_id"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Phone       string `json:"phone,omitempty"`
+	Email       string `json:"email,omitempty"`
+	Description string `json:"description,omitempty"`
+	UserID      string `json:"user_id"`
 }
 
 type ListClientResponse struct {
@@ -47,7 +56,7 @@ func NewClientHandler(clientService usecases.ClientService) *ClientHandler {
 	return &ClientHandler{clientService: clientService}
 }
 
-// CreateClient handles POST /users/me/clients
+// CreateClient handles POST /clients
 func (h *ClientHandler) CreateClient(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -60,7 +69,13 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 		return
 	}
 
-	client, err := h.clientService.CreateClient(c.Request.Context(), req.Name, userID)
+	client, err := h.clientService.CreateClient(c.Request.Context(), entities.CreateClientParams{
+		Name:        req.Name,
+		Phone:       req.Phone,
+		Email:       req.Email,
+		Description: req.Description,
+		UserID:      userID,
+	})
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -69,7 +84,7 @@ func (h *ClientHandler) CreateClient(c *gin.Context) {
 	c.JSON(http.StatusCreated, toClientResponse(client))
 }
 
-// ListClients handles GET /users/me/clients?page=1&page_size=20
+// ListClients handles GET /clients?page=1&page_size=20
 func (h *ClientHandler) ListClients(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -110,7 +125,7 @@ func parsePagination(c *gin.Context) (pagination.Pagination, error) {
 	return pagination.NewPagination(page, pageSize)
 }
 
-// GetClient handles GET /users/me/clients/:client_id
+// GetClient handles GET /clients/:client_id
 func (h *ClientHandler) GetClient(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -132,7 +147,7 @@ func (h *ClientHandler) GetClient(c *gin.Context) {
 	c.JSON(http.StatusOK, toClientResponse(client))
 }
 
-// UpdateClient handles PUT /users/me/clients/:client_id
+// UpdateClient handles PUT /clients/:client_id
 func (h *ClientHandler) UpdateClient(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -151,7 +166,12 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 		return
 	}
 
-	client, err := h.clientService.UpdateClient(c.Request.Context(), id, userID, req.Name)
+	client, err := h.clientService.UpdateClient(c.Request.Context(), id, userID, entities.UpdateClientParams{
+		Name:        req.Name,
+		Phone:       req.Phone,
+		Email:       req.Email,
+		Description: req.Description,
+	})
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -160,7 +180,7 @@ func (h *ClientHandler) UpdateClient(c *gin.Context) {
 	c.JSON(http.StatusOK, toClientResponse(client))
 }
 
-// DeleteClient handles DELETE /users/me/clients/:client_id
+// DeleteClient handles DELETE /clients/:client_id
 func (h *ClientHandler) DeleteClient(c *gin.Context) {
 	userID := helpers.MustGetUserID(c)
 	if c.IsAborted() {
@@ -185,8 +205,11 @@ func (h *ClientHandler) DeleteClient(c *gin.Context) {
 
 func toClientResponse(client *entities.Client) *ClientResponse {
 	return &ClientResponse{
-		ID:     client.ID.String(),
-		Name:   client.Name,
-		UserID: client.UserID.String(),
+		ID:          client.ID.String(),
+		Name:        client.Name,
+		Phone:       client.Phone,
+		Email:       client.Email,
+		Description: client.Description,
+		UserID:      client.UserID.String(),
 	}
 }

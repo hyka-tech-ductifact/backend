@@ -12,11 +12,12 @@ import (
 // MockClientRepository implements repositories.ClientRepository for testing.
 // Each method is a function field that you can configure per test.
 type MockClientRepository struct {
-	CreateFn       func(ctx context.Context, client *entities.Client) error
-	GetByIDFn      func(ctx context.Context, id uuid.UUID) (*entities.Client, error)
-	ListByUserIDFn func(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error)
-	UpdateFn       func(ctx context.Context, client *entities.Client) error
-	DeleteFn       func(ctx context.Context, id uuid.UUID) error
+	CreateFn          func(ctx context.Context, client *entities.Client) error
+	GetByIDFn         func(ctx context.Context, id uuid.UUID) (*entities.Client, error)
+	GetByIDForOwnerFn func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error)
+	ListByUserIDFn    func(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error)
+	UpdateFn          func(ctx context.Context, client *entities.Client) error
+	DeleteFn          func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *MockClientRepository) Create(ctx context.Context, client *entities.Client) error {
@@ -29,6 +30,13 @@ func (m *MockClientRepository) Create(ctx context.Context, client *entities.Clie
 func (m *MockClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.Client, error) {
 	if m.GetByIDFn != nil {
 		return m.GetByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+
+func (m *MockClientRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
+	if m.GetByIDForOwnerFn != nil {
+		return m.GetByIDForOwnerFn(ctx, id, ownerID)
 	}
 	return nil, nil
 }

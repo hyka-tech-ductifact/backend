@@ -17,13 +17,13 @@ import (
 // UserModel is the GORM-specific database representation.
 // It is NOT a domain entity. It lives here because only this adapter cares about it.
 type UserModel struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Name         string    `gorm:"not null"`
-	Email        string    `gorm:"uniqueIndex;not null"`
-	PasswordHash string    `gorm:"column:password_hash;not null;default:''"`
+	ID           uuid.UUID `gorm:"primaryKey"`
+	Name         string
+	Email        string
+	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-	DeletedAt    gorm.DeletedAt `gorm:"index"`
+	DeletedAt    gorm.DeletedAt
 }
 
 func (UserModel) TableName() string {

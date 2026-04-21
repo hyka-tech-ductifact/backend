@@ -14,6 +14,7 @@ import (
 type ClientRepository interface {
 	Create(ctx context.Context, client *entities.Client) error
 	GetByID(ctx context.Context, id uuid.UUID) (*entities.Client, error)
+	GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error)
 	Update(ctx context.Context, client *entities.Client) error
 	Delete(ctx context.Context, id uuid.UUID) error
