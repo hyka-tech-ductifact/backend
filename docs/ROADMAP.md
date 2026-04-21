@@ -1,6 +1,6 @@
 # Roadmap — Ductifact Backend
 
-> **Stack**: Go 1.24 · Gin · GORM · PostgreSQL · JWT · Docker · Caddy · GitHub Actions · Prometheus
+> **Stack**: Go 1.26 · Gin · GORM · PostgreSQL · JWT · Docker · Caddy · GitHub Actions · Prometheus
 > **Architecture**: Hexagonal (Ports & Adapters)
 > **Started**: March 2026
 > **Last updated**: April 2026

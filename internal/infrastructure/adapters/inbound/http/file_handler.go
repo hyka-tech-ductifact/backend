@@ -57,5 +57,7 @@ func (h *FileHandler) ServeFile(c *gin.Context) {
 	c.Status(http.StatusOK)
 
 	// Stream directly from storage → client (only a few KB in memory at a time)
-	io.Copy(c.Writer, obj.Reader)
+	if _, err := io.Copy(c.Writer, obj.Reader); err != nil {
+		_ = c.Error(err)
+	}
 }

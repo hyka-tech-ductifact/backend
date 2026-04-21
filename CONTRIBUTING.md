@@ -135,7 +135,7 @@ the PR title format automatically.
 ```
 feat(auth): add refresh token rotation
 fix(client): prevent duplicate client names
-chore: update Go to 1.24
+chore: update Go to 1.26
 feat(api)!: change error response format   ← breaking change
 ```
 

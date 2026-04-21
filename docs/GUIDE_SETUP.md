@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.24+
+- Go 1.26+
 - Docker + Compose plugin v2+ (or Podman)
 - Make
 
@@ -96,4 +96,4 @@ docker compose version
 docker run hello-world
 ```
 
-> **Note:** Image names in `Dockerfile` and `docker-compose*.yml` must be fully qualified (e.g. `docker.io/library/golang:1.24-alpine`) because Podman does not resolve short names by default.
+> **Note:** Image names in `Dockerfile` and `docker-compose*.yml` must be fully qualified (e.g. `docker.io/library/golang:1.26-alpine`) because Podman does not resolve short names by default.
