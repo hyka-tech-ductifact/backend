@@ -73,7 +73,9 @@ func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileOb
 		errResp := minio.ErrorResponse{}
 		if errors.As(err, &errResp) {
 			switch errResp.Code {
-			case "NoSuchKey", "NoSuchBucket", "InvalidObjectName":
+			case "NoSuchKey", "NoSuchBucket", "InvalidObjectName",
+				"XMinioInvalidObjectName", "XAmzInvalidObjectName",
+				"KeyTooLongError", "InvalidArgument":
 				return nil, ports.ErrFileNotFound
 			}
 		}
