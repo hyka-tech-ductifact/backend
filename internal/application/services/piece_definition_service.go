@@ -27,6 +27,7 @@ var (
 	ErrUnsupportedImageType = errors.New("unsupported image type: only JPEG, PNG and WebP are allowed")
 	ErrImageTooLarge        = errors.New("image exceeds the maximum allowed size of 5 MB")
 	ErrImageCorrupt         = errors.New("image is corrupt or cannot be decoded")
+	ErrPieceDefInUse        = errors.New("piece definition is in use by existing pieces")
 )
 
 const (
@@ -40,6 +41,7 @@ type pieceDefinitionService struct {
 	pieceDefRepo   repositories.PieceDefinitionRepository
 	fileStorage    ports.FileStorage
 	imageProcessor ports.ImageProcessor
+	pieceRepo      repositories.PieceRepository
 }
 
 // NewPieceDefinitionService creates a new PieceDefinitionService.
@@ -47,11 +49,13 @@ func NewPieceDefinitionService(
 	pieceDefRepo repositories.PieceDefinitionRepository,
 	fileStorage ports.FileStorage,
 	imageProcessor ports.ImageProcessor,
+	pieceRepo repositories.PieceRepository,
 ) *pieceDefinitionService {
 	return &pieceDefinitionService{
 		pieceDefRepo:   pieceDefRepo,
 		fileStorage:    fileStorage,
 		imageProcessor: imageProcessor,
+		pieceRepo:      pieceRepo,
 	}
 }
 
@@ -172,6 +176,7 @@ func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id u
 
 // DeletePieceDefinition removes a piece definition and its associated images.
 // Only custom (non-predefined) definitions owned by the user can be deleted.
+// Returns ErrPieceDefInUse if any pieces reference this definition.
 func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
@@ -180,6 +185,15 @@ func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id u
 
 	if def.Predefined {
 		return ErrPieceDefPredefined
+	}
+
+	count, err := s.pieceRepo.CountByDefinitionID(ctx, def.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return ErrPieceDefInUse
 	}
 
 	if err := s.pieceDefRepo.Delete(ctx, def.ID); err != nil {

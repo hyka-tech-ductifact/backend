@@ -20,7 +20,7 @@ import (
 // newPieceDefService is a test helper that creates a PieceDefinitionService
 // with no-op file storage and image processor mocks.
 func newPieceDefService(repo *mocks.MockPieceDefinitionRepository) usecases.PieceDefinitionService {
-	return services.NewPieceDefinitionService(repo, &mocks.MockFileStorage{}, &mocks.MockImageProcessor{})
+	return services.NewPieceDefinitionService(repo, &mocks.MockFileStorage{}, &mocks.MockImageProcessor{}, &mocks.MockPieceRepository{})
 }
 
 // =============================================================================
@@ -288,4 +288,20 @@ func TestDeletePieceDefinition_NotFound_ReturnsError(t *testing.T) {
 	err := svc.DeletePieceDefinition(context.Background(), uuid.New(), uuid.New())
 
 	assert.ErrorIs(t, err, repositories.ErrPieceDefNotFound)
+}
+
+func TestDeletePieceDefinition_InUse_ReturnsConflict(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID)
+	pieceRepo := &mocks.MockPieceRepository{
+		CountByDefinitionIDFn: func(ctx context.Context, definitionID uuid.UUID) (int64, error) {
+			return 15, nil
+		},
+	}
+	repo := pieceDefRepoReturning(def)
+	svc := services.NewPieceDefinitionService(repo, &mocks.MockFileStorage{}, &mocks.MockImageProcessor{}, pieceRepo)
+
+	err := svc.DeletePieceDefinition(context.Background(), def.ID, userID)
+
+	assert.ErrorIs(t, err, services.ErrPieceDefInUse)
 }

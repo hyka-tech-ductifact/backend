@@ -79,6 +79,10 @@ func SetupRoutes(
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordTooLong, http.StatusBadRequest, "password must not exceed 72 characters")
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
+	helpers.RegisterDomainError(services.ErrHasAssociatedProjects, http.StatusConflict, "client has associated projects; set cascade=true to delete")
+	helpers.RegisterDomainError(services.ErrHasAssociatedOrders, http.StatusConflict, "project has associated orders; set cascade=true to delete")
+	helpers.RegisterDomainError(services.ErrHasAssociatedPieces, http.StatusConflict, "order has associated pieces; set cascade=true to delete")
+	helpers.RegisterDomainError(services.ErrPieceDefInUse, http.StatusConflict, "piece definition is in use by existing pieces")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---

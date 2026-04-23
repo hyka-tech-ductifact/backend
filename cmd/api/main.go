@@ -46,15 +46,12 @@ func main() {
 
 	// --- Client wiring ---
 	clientRepo := persistence.NewPostgresClientRepository(db)
-	clientService := services.NewClientService(clientRepo, userRepo)
 
 	// --- Project wiring ---
 	projectRepo := persistence.NewPostgresProjectRepository(db)
-	projectService := services.NewProjectService(projectRepo, clientRepo)
 
 	// --- Order wiring ---
 	orderRepo := persistence.NewPostgresOrderRepository(db)
-	orderService := services.NewOrderService(orderRepo, projectRepo)
 
 	// --- Piece Definition wiring ---
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
@@ -72,10 +69,15 @@ func main() {
 	}
 
 	imageProcessor := imageproc.NewImagingProcessor()
-	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo, fileStorage, imageProcessor)
 
 	// --- Piece wiring ---
 	pieceRepo := persistence.NewPostgresPieceRepository(db)
+
+	// --- Services (all repos must be created before services) ---
+	clientService := services.NewClientService(clientRepo, userRepo, projectRepo)
+	projectService := services.NewProjectService(projectRepo, clientRepo, orderRepo)
+	orderService := services.NewOrderService(orderRepo, projectRepo, pieceRepo)
+	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo, fileStorage, imageProcessor, pieceRepo)
 	pieceService := services.NewPieceService(pieceRepo, pieceDefRepo, orderRepo)
 
 	// --- Auth wiring ---
