@@ -16,6 +16,7 @@ type MockProjectRepository struct {
 	GetByIDFn         func(ctx context.Context, id uuid.UUID) (*entities.Project, error)
 	GetByIDForOwnerFn func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error)
 	ListByClientIDFn  func(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error)
+	CountByClientIDFn func(ctx context.Context, clientID uuid.UUID) (int64, error)
 	UpdateFn          func(ctx context.Context, project *entities.Project) error
 	DeleteFn          func(ctx context.Context, id uuid.UUID) error
 }
@@ -60,4 +61,11 @@ func (m *MockProjectRepository) Delete(ctx context.Context, id uuid.UUID) error 
 		return m.DeleteFn(ctx, id)
 	}
 	return nil
+}
+
+func (m *MockProjectRepository) CountByClientID(ctx context.Context, clientID uuid.UUID) (int64, error) {
+	if m.CountByClientIDFn != nil {
+		return m.CountByClientIDFn(ctx, clientID)
+	}
+	return 0, nil
 }
