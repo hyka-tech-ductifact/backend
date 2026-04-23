@@ -83,6 +83,7 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrHasAssociatedOrders, http.StatusConflict, "project has associated orders; set cascade=true to delete")
 	helpers.RegisterDomainError(services.ErrHasAssociatedPieces, http.StatusConflict, "order has associated pieces; set cascade=true to delete")
 	helpers.RegisterDomainError(services.ErrPieceDefInUse, http.StatusConflict, "piece definition is in use by existing pieces")
+	helpers.RegisterDomainError(services.ErrPieceDefArchived, http.StatusConflict, "piece definition is archived")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
@@ -207,6 +208,8 @@ func SetupRoutes(
 		pieceDefRoutes.GET("/:piece_definition_id", pieceDefHandler.GetPieceDefinition)
 		pieceDefRoutes.PUT("/:piece_definition_id", pieceDefHandler.UpdatePieceDefinition)
 		pieceDefRoutes.DELETE("/:piece_definition_id", pieceDefHandler.DeletePieceDefinition)
+		pieceDefRoutes.POST("/:piece_definition_id/archive", pieceDefHandler.ArchivePieceDefinition)
+		pieceDefRoutes.POST("/:piece_definition_id/unarchive", pieceDefHandler.UnarchivePieceDefinition)
 	}
 
 	// Piece routes — always nested under order (weak entity)
