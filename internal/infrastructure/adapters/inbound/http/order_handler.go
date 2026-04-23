@@ -190,7 +190,7 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderService.DeleteOrder(c.Request.Context(), orderID, userID); err != nil {
+	if err := h.orderService.DeleteOrder(c.Request.Context(), orderID, userID, c.Query("cascade") == "true"); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

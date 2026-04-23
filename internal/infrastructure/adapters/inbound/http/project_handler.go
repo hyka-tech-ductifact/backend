@@ -200,7 +200,7 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.projectService.DeleteProject(c.Request.Context(), projectID, userID); err != nil {
+	if err := h.projectService.DeleteProject(c.Request.Context(), projectID, userID, c.Query("cascade") == "true"); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}
