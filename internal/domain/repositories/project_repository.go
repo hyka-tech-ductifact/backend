@@ -16,6 +16,7 @@ type ProjectRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*entities.Project, error)
 	GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error)
 	ListByClientID(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error)
+	CountByClientID(ctx context.Context, clientID uuid.UUID) (int64, error)
 	Update(ctx context.Context, project *entities.Project) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

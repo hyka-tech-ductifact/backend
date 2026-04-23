@@ -163,6 +163,18 @@ func (r *PostgresPieceRepository) Delete(ctx context.Context, id uuid.UUID) erro
 	return r.db.WithContext(ctx).Delete(&PieceModel{}, "id = ?", id).Error
 }
 
+func (r *PostgresPieceRepository) CountByOrderID(ctx context.Context, orderID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&PieceModel{}).Where("order_id = ?", orderID).Count(&count).Error
+	return count, err
+}
+
+func (r *PostgresPieceRepository) CountByDefinitionID(ctx context.Context, definitionID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&PieceModel{}).Where("definition_id = ?", definitionID).Count(&count).Error
+	return count, err
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toPieceModel(piece *entities.Piece) (*PieceModel, error) {

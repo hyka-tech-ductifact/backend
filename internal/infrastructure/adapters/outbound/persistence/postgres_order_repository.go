@@ -142,6 +142,12 @@ func (r *PostgresOrderRepository) Delete(ctx context.Context, id uuid.UUID) erro
 	return r.db.WithContext(ctx).Delete(&OrderModel{}, "id = ?", id).Error
 }
 
+func (r *PostgresOrderRepository) CountByProjectID(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&OrderModel{}).Where("project_id = ?", projectID).Count(&count).Error
+	return count, err
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toOrderModel(order *entities.Order) *OrderModel {
