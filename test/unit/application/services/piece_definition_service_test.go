@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
@@ -139,14 +140,14 @@ func TestListPieceDefinitions_ReturnsDefs(t *testing.T) {
 		{ID: uuid.New(), Name: "Circle", DimensionSchema: []string{"Radius"}},
 	}
 	repo := &mocks.MockPieceDefinitionRepository{
-		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
 			return expected, 2, nil
 		},
 	}
 	svc := newPieceDefService(repo)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPieceDefinitions(context.Background(), userID, pg)
+	result, err := svc.ListPieceDefinitions(context.Background(), userID, false, pg)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
@@ -155,14 +156,14 @@ func TestListPieceDefinitions_ReturnsDefs(t *testing.T) {
 
 func TestListPieceDefinitions_EmptyList(t *testing.T) {
 	repo := &mocks.MockPieceDefinitionRepository{
-		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
 			return []*entities.PieceDefinition{}, 0, nil
 		},
 	}
 	svc := newPieceDefService(repo)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPieceDefinitions(context.Background(), uuid.New(), pg)
+	result, err := svc.ListPieceDefinitions(context.Background(), uuid.New(), false, pg)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)
@@ -322,4 +323,128 @@ func TestDeletePieceDefinition_InUse_ReturnsConflict(t *testing.T) {
 	err := svc.DeletePieceDefinition(context.Background(), def.ID, userID)
 
 	assert.ErrorIs(t, err, services.ErrPieceDefInUse)
+}
+
+// =============================================================================
+// ArchivePieceDefinition
+// =============================================================================
+
+func TestArchivePieceDefinition_CustomDef_Succeeds(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID)
+	archived := false
+	repo := pieceDefRepoReturning(def)
+	repo.ArchiveFn = func(ctx context.Context, id uuid.UUID) error {
+		archived = true
+		return nil
+	}
+	svc := newPieceDefService(repo)
+
+	result, err := svc.ArchivePieceDefinition(context.Background(), def.ID, userID)
+
+	require.NoError(t, err)
+	assert.True(t, archived)
+	assert.NotNil(t, result.ArchivedAt)
+}
+
+func TestArchivePieceDefinition_AlreadyArchived_IsIdempotent(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID)
+	now := time.Now()
+	def.ArchivedAt = &now // already archived
+	repo := pieceDefRepoReturning(def)
+	archiveCalled := false
+	repo.ArchiveFn = func(ctx context.Context, id uuid.UUID) error {
+		archiveCalled = true
+		return nil
+	}
+	svc := newPieceDefService(repo)
+
+	result, err := svc.ArchivePieceDefinition(context.Background(), def.ID, userID)
+
+	require.NoError(t, err)
+	assert.False(t, archiveCalled) // should not call repo
+	assert.NotNil(t, result.ArchivedAt)
+}
+
+func TestArchivePieceDefinition_PredefinedDef_ReturnsError(t *testing.T) {
+	def := newTestPredefinedPieceDef()
+	repo := pieceDefRepoReturning(def)
+	svc := newPieceDefService(repo)
+
+	result, err := svc.ArchivePieceDefinition(context.Background(), def.ID, uuid.New())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, services.ErrPieceDefPredefined)
+}
+
+func TestArchivePieceDefinition_NotFound_ReturnsError(t *testing.T) {
+	svc := newPieceDefService(pieceDefRepoReturning(nil))
+
+	result, err := svc.ArchivePieceDefinition(context.Background(), uuid.New(), uuid.New())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotFound)
+}
+
+// =============================================================================
+// UnarchivePieceDefinition
+// =============================================================================
+
+func TestUnarchivePieceDefinition_ArchivedDef_Succeeds(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID)
+	now := time.Now()
+	def.ArchivedAt = &now // currently archived
+	unarchived := false
+	repo := pieceDefRepoReturning(def)
+	repo.UnarchiveFn = func(ctx context.Context, id uuid.UUID) error {
+		unarchived = true
+		return nil
+	}
+	svc := newPieceDefService(repo)
+
+	result, err := svc.UnarchivePieceDefinition(context.Background(), def.ID, userID)
+
+	require.NoError(t, err)
+	assert.True(t, unarchived)
+	assert.Nil(t, result.ArchivedAt)
+}
+
+func TestUnarchivePieceDefinition_AlreadyActive_IsIdempotent(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID) // ArchivedAt is nil
+	unarchiveCalled := false
+	repo := pieceDefRepoReturning(def)
+	repo.UnarchiveFn = func(ctx context.Context, id uuid.UUID) error {
+		unarchiveCalled = true
+		return nil
+	}
+	svc := newPieceDefService(repo)
+
+	result, err := svc.UnarchivePieceDefinition(context.Background(), def.ID, userID)
+
+	require.NoError(t, err)
+	assert.False(t, unarchiveCalled)
+	assert.Nil(t, result.ArchivedAt)
+}
+
+func TestUnarchivePieceDefinition_PredefinedDef_ReturnsError(t *testing.T) {
+	def := newTestPredefinedPieceDef()
+	repo := pieceDefRepoReturning(def)
+	svc := newPieceDefService(repo)
+
+	result, err := svc.UnarchivePieceDefinition(context.Background(), def.ID, uuid.New())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, services.ErrPieceDefPredefined)
+}
+
+func TestUnarchivePieceDefinition_NotFound_ReturnsError(t *testing.T) {
+	svc := newPieceDefService(pieceDefRepoReturning(nil))
+
+	result, err := svc.UnarchivePieceDefinition(context.Background(), uuid.New(), uuid.New())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, repositories.ErrPieceDefNotFound)
 }

@@ -28,6 +28,7 @@ var (
 	ErrImageTooLarge        = errors.New("image exceeds the maximum allowed size of 5 MB")
 	ErrImageCorrupt         = errors.New("image is corrupt or cannot be decoded")
 	ErrPieceDefInUse        = errors.New("piece definition is in use by existing pieces")
+	ErrPieceDefArchived     = errors.New("piece definition is archived")
 )
 
 const (
@@ -103,8 +104,9 @@ func (s *pieceDefinitionService) GetPieceDefinitionByID(ctx context.Context, id 
 
 // ListPieceDefinitions retrieves a paginated list of piece definitions visible to the user.
 // This includes all predefined definitions + the user's custom definitions.
-func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.PieceDefinition], error) {
-	defs, totalItems, err := s.pieceDefRepo.ListByUserID(ctx, userID, pg)
+// When includeArchived is false, archived definitions are excluded.
+func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userID uuid.UUID, includeArchived bool, pg pagination.Pagination) (pagination.Result[*entities.PieceDefinition], error) {
+	defs, totalItems, err := s.pieceDefRepo.ListByUserID(ctx, userID, includeArchived, pg)
 	if err != nil {
 		return pagination.Result[*entities.PieceDefinition]{}, err
 	}
@@ -217,6 +219,56 @@ func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id u
 	}
 
 	return nil
+}
+
+// ArchivePieceDefinition sets the archived_at timestamp on a piece definition.
+// Only custom (non-predefined) definitions owned by the user can be archived.
+func (s *pieceDefinitionService) ArchivePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if def.Predefined {
+		return nil, ErrPieceDefPredefined
+	}
+
+	if def.IsArchived() {
+		return def, nil // already archived, idempotent
+	}
+
+	if err := s.pieceDefRepo.Archive(ctx, def.ID); err != nil {
+		return nil, err
+	}
+
+	// Reflect the change in the returned entity
+	now := time.Now()
+	def.ArchivedAt = &now
+	return def, nil
+}
+
+// UnarchivePieceDefinition clears the archived_at timestamp on a piece definition.
+// Only custom (non-predefined) definitions owned by the user can be unarchived.
+func (s *pieceDefinitionService) UnarchivePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if def.Predefined {
+		return nil, ErrPieceDefPredefined
+	}
+
+	if !def.IsArchived() {
+		return def, nil // already active, idempotent
+	}
+
+	if err := s.pieceDefRepo.Unarchive(ctx, def.ID); err != nil {
+		return nil, err
+	}
+
+	def.ArchivedAt = nil
+	return def, nil
 }
 
 // --- helpers ---

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
@@ -514,4 +515,29 @@ func TestDeletePiece_WithWrongUser_ReturnsError(t *testing.T) {
 	err := svc.DeletePiece(context.Background(), uuid.New(), uuid.New())
 
 	assert.ErrorIs(t, err, repositories.ErrPieceNotOwned)
+}
+
+func TestCreatePiece_WithArchivedDefinition_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	order := newTestOrder(uuid.New())
+	def := newTestPieceDef(userID)
+	now := time.Now()
+	def.ArchivedAt = &now // archived
+
+	svc := services.NewPieceService(
+		&mocks.MockPieceRepository{},
+		pieceDefRepoReturning(def),
+		orderRepoReturning(order),
+	)
+
+	piece, err := svc.CreatePiece(context.Background(), userID, entities.CreatePieceParams{
+		Title:        "Panel",
+		OrderID:      order.ID,
+		DefinitionID: def.ID,
+		Dimensions:   map[string]float64{"Length": 100, "Width": 50},
+		Quantity:     1,
+	})
+
+	assert.Nil(t, piece)
+	assert.ErrorIs(t, err, services.ErrPieceDefArchived)
 }
