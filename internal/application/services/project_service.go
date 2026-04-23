@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -11,19 +12,24 @@ import (
 	"github.com/google/uuid"
 )
 
+var ErrHasAssociatedOrders = errors.New("project has associated orders")
+
 // projectService implements usecases.ProjectService.
 // Unexported struct: can only be created via NewProjectService.
 type projectService struct {
 	projectRepo repositories.ProjectRepository
 	clientRepo  repositories.ClientRepository
+	orderRepo   repositories.OrderRepository
 }
 
 // NewProjectService creates a new ProjectService.
 // The client repository is needed to verify ownership during Create and List.
-func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo repositories.ClientRepository) *projectService {
+// The order repository is needed to check for associated orders before deletion.
+func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo repositories.ClientRepository, orderRepo repositories.OrderRepository) *projectService {
 	return &projectService{
 		projectRepo: projectRepo,
 		clientRepo:  clientRepo,
+		orderRepo:   orderRepo,
 	}
 }
 
@@ -122,10 +128,20 @@ func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, userID
 }
 
 // DeleteProject removes a project, ensuring it belongs to the given user.
-func (s *projectService) DeleteProject(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+// If cascade is false and the project has associated orders, it returns ErrHasAssociatedOrders.
+func (s *projectService) DeleteProject(ctx context.Context, id uuid.UUID, userID uuid.UUID, cascade bool) error {
 	project, err := s.projectRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
+	}
+
+	count, err := s.orderRepo.CountByProjectID(ctx, project.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 && !cascade {
+		return ErrHasAssociatedOrders
 	}
 
 	return s.projectRepo.Delete(ctx, project.ID)

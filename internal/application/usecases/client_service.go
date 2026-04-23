@@ -16,5 +16,5 @@ type ClientService interface {
 	GetClientByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Client, error)
 	ListClientsByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Client], error)
 	UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateClientParams) (*entities.Client, error)
-	DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
+	DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, cascade bool) error
 }
