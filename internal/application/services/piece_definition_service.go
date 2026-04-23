@@ -125,6 +125,15 @@ func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id u
 		return nil, ErrPieceDefPredefined
 	}
 
+	// Prevent editing a definition that has pieces referencing it
+	count, err := s.pieceRepo.CountByDefinitionID(ctx, def.ID)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return nil, ErrPieceDefInUse
+	}
+
 	// --- Upload new image if provided ---
 	var keys *uploadedKeys
 	oldImageURL := def.ImageURL

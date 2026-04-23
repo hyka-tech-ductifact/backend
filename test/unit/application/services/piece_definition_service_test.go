@@ -242,6 +242,24 @@ func TestUpdatePieceDefinition_NotOwned_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, repositories.ErrPieceDefNotOwned)
 }
 
+func TestUpdatePieceDefinition_InUse_ReturnsConflict(t *testing.T) {
+	userID := uuid.New()
+	def := newTestPieceDef(userID)
+	pieceRepo := &mocks.MockPieceRepository{
+		CountByDefinitionIDFn: func(ctx context.Context, definitionID uuid.UUID) (int64, error) {
+			return 5, nil
+		},
+	}
+	svc := services.NewPieceDefinitionService(pieceDefRepoReturning(def), &mocks.MockFileStorage{}, &mocks.MockImageProcessor{}, pieceRepo)
+
+	result, err := svc.UpdatePieceDefinition(context.Background(), def.ID, userID, entities.UpdatePieceDefParams{
+		Name: strPtr("New Name"),
+	}, nil)
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, services.ErrPieceDefInUse)
+}
+
 // =============================================================================
 // DeletePieceDefinition
 // =============================================================================
