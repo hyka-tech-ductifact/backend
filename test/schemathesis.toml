@@ -44,13 +44,6 @@ max_response_time = 10.0
 # real effect as phase-only, since this check is inherently stateful).
 use_after_free.enabled = false
 
-# ─── Filtering ───────────────────────────────────────────────
-# Exclude /health: it uses a different server prefix (no /v1) in the OpenAPI spec,
-# which conflicts with our base-url. Health is tested separately via smoke tests.
-[[operations]]
-include-path = "/health"
-enabled = false
-
 # ─── Data Generation ────────────────────────────────────────
 [generation]
 max-examples = 50       # fallback when run outside Makefile (Makefile: local=20, CI=100)
