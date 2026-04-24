@@ -67,6 +67,7 @@ help:
 	@echo "        Formats: pkgname (default), testdox, testname, dots, dots-v2,"
 	@echo "                 standard-quiet, standard-verbose, pkgname-and-test-fails"
 	@echo "      ST_MAX_EXAMPLES   - Override examples per operation:     make test-contract ST_MAX_EXAMPLES=200"
+	@echo "      ST_SEED           - Reproduce a test run with a seed:     make test-contract ST_SEED=<seed>"
 	@echo ""
 	@echo "  Contracts:"
 	@echo "    ensure-contract  - Ensure bundled.yaml is present"
@@ -187,6 +188,7 @@ test-e2e:
 # Runs via Docker — config lives in test/schemathesis.toml
 ST_IMAGE         ?= schemathesis/schemathesis:latest
 ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
+_ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
@@ -219,7 +221,8 @@ test-contract: ensure-contract
 		$(ST_IMAGE) \
 		run bundled.yaml \
 		-H "Authorization: Bearer $$TOKEN" \
-		--max-examples $(ST_MAX_EXAMPLES)
+		--max-examples $(ST_MAX_EXAMPLES) \
+		$(_ST_SEED_FLAG)
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache

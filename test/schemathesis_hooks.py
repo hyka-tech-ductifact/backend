@@ -73,6 +73,8 @@ schemathesis.openapi.media_type("image/*", _image_strategy)
 
 @schemathesis.serializer("image/png", "image/jpeg", "image/webp")
 def _image_serializer(ctx, value):
+    if value is None:
+        return None
     if isinstance(value, bytes):
         return value
     return bytes(value)
