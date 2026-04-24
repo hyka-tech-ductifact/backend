@@ -97,3 +97,12 @@ func (s *MinIOStorage) Delete(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+// Ping checks whether MinIO is reachable by verifying the bucket exists.
+func (s *MinIOStorage) Ping(ctx context.Context) error {
+	_, err := s.client.BucketExists(ctx, s.bucket)
+	if err != nil {
+		return fmt.Errorf("minio ping: %w", err)
+	}
+	return nil
+}

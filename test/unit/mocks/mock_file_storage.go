@@ -12,6 +12,7 @@ type MockFileStorage struct {
 	UploadFn    func(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error
 	GetObjectFn func(ctx context.Context, key string) (*ports.FileObject, error)
 	DeleteFn    func(ctx context.Context, key string) error
+	PingFn      func(ctx context.Context) error
 }
 
 func (m *MockFileStorage) Upload(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
@@ -31,6 +32,13 @@ func (m *MockFileStorage) GetObject(ctx context.Context, key string) (*ports.Fil
 func (m *MockFileStorage) Delete(ctx context.Context, key string) error {
 	if m.DeleteFn != nil {
 		return m.DeleteFn(ctx, key)
+	}
+	return nil
+}
+
+func (m *MockFileStorage) Ping(ctx context.Context) error {
+	if m.PingFn != nil {
+		return m.PingFn(ctx)
 	}
 	return nil
 }

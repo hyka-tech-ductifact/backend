@@ -29,6 +29,10 @@ type FileStorage interface {
 	// Delete removes a file by its object key.
 	// Returns nil if the file doesn't exist (idempotent).
 	Delete(ctx context.Context, key string) error
+
+	// Ping checks whether the storage backend is reachable.
+	// Used by the readiness probe to verify storage health.
+	Ping(ctx context.Context) error
 }
 
 var ErrFileNotFound = errors.New("file not found")

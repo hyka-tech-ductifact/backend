@@ -102,7 +102,12 @@ const swaggerHTML = `<!DOCTYPE html>
       deepLinking: true,
       docExpansion: 'list',
       defaultModelsExpandDepth: -1,
-      operationsSorter: 'method',
+      operationsSorter: function(a, b) {
+        const order = { get: 0, post: 1, put: 2, patch: 3, delete: 4 };
+        var am = a.get('method').toLowerCase();
+        var bm = b.get('method').toLowerCase();
+        return (order[am] !== undefined ? order[am] : 9) - (order[bm] !== undefined ? order[bm] : 9);
+      },
       presets: [SwaggerUIBundle.presets.apis],
       layout: 'BaseLayout',
       onComplete() {

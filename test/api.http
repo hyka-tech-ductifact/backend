@@ -15,8 +15,11 @@
 # HEALTH, METRICS & DOCS (public)
 # =============================================================================
 
-### Health Check
-GET http://localhost:8080/health
+### Liveness Probe
+GET http://localhost:8080/healthz
+
+### Readiness Probe
+GET http://localhost:8080/readyz
 
 ### Prometheus Metrics
 GET http://localhost:8080/metrics
