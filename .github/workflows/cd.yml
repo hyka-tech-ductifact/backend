@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       # ── Build & push Docker image ─────────────────────────
       - name: Log in to GHCR
@@ -102,6 +104,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       # ── Build & push Docker image ─────────────────────────
       - name: Log in to GHCR
