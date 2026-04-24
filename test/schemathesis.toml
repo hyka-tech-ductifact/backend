@@ -4,8 +4,8 @@
 # Docs: https://schemathesis.readthedocs.io/en/stable/reference/configuration/
 #
 # Usage:
-#   make test-contract                       (default: 50 examples)
-#   make test-contract ST_MAX_EXAMPLES=200   (deeper fuzzing)
+#   make test-contract                       (local: 20 examples, CI: 100)
+#   make test-contract ST_MAX_EXAMPLES=200   (manual override)
 #
 # Auth header (-H) is the only flag injected by the Makefile.
 # Everything else lives here.
@@ -39,7 +39,7 @@ enabled = false
 
 # ─── Data Generation ────────────────────────────────────────
 [generation]
-max-examples = 50       # per operation (override: make test-contract ST_MAX_EXAMPLES=200)
+max-examples = 50       # fallback when run outside Makefile (Makefile: local=20, CI=100)
 mode = "all"            # positive + negative data
 allow-x00 = false       # avoid NULL bytes that trip up Go handlers
 codec = "utf-8"

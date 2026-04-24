@@ -57,14 +57,16 @@ help:
 	@echo "    test-integration - Run integration tests (requires DB)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-contract    - Run contract tests with Schemathesis (config: test/schemathesis.toml)"
+	@echo "                       Local: 20 examples/op. CI: 100 examples/op."
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
-	@echo "      CI=1         - CI mode (race detector + JUnit XML): make test-unit CI=1"
-	@echo "      COVERAGE=1   - Generate coverage:                   make test-unit COVERAGE=1"
-	@echo "      TEST_FORMAT  - Change output format:                make test-unit TEST_FORMAT=dots"
+	@echo "      CI=1              - CI mode (race detector + JUnit XML): make test-unit CI=1"
+	@echo "      COVERAGE=1        - Generate coverage:                   make test-unit COVERAGE=1"
+	@echo "      TEST_FORMAT       - Change output format:                make test-unit TEST_FORMAT=dots"
 	@echo "        Formats: pkgname (default), testdox, testname, dots, dots-v2,"
 	@echo "                 standard-quiet, standard-verbose, pkgname-and-test-fails"
+	@echo "      ST_MAX_EXAMPLES   - Override examples per operation:     make test-contract ST_MAX_EXAMPLES=200"
 	@echo ""
 	@echo "  Contracts:"
 	@echo "    ensure-contract  - Ensure bundled.yaml is present"
@@ -183,7 +185,8 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE ?= schemathesis/schemathesis:latest
+ST_IMAGE         ?= schemathesis/schemathesis:latest
+ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
@@ -214,7 +217,7 @@ test-contract: ensure-contract
 		$(ST_IMAGE) \
 		run bundled.yaml \
 		-H "Authorization: Bearer $$TOKEN" \
-		$(if $(ST_MAX_EXAMPLES),--max-examples $(ST_MAX_EXAMPLES),)
+		--max-examples $(ST_MAX_EXAMPLES)
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache
