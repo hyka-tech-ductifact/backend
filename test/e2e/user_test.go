@@ -10,16 +10,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ─── Health ──────────────────────────────────────────────────────────────────
+// ─── Liveness & Readiness ────────────────────────────────────────────────────
 
-func TestE2E_Health(t *testing.T) {
+func TestE2E_Livez(t *testing.T) {
 	clean(t)
 
-	resp := helpers.GetJSON(t, rootURL("/health"))
+	resp := helpers.GetJSON(t, rootURL("/healthz"))
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Equal(t, "healthy", body["status"])
+	assert.Equal(t, "alive", body["status"])
+}
+
+func TestE2E_Readyz(t *testing.T) {
+	clean(t)
+
+	resp := helpers.GetJSON(t, rootURL("/readyz"))
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Equal(t, "ready", body["status"])
 }
 
 // registerUser is a helper that registers a user and returns (id, token).

@@ -122,7 +122,8 @@ func SetupRoutes(
 	// --- Infrastructure routes (unversioned) ---
 
 	healthHandler := NewHealthHandler(healthChecker, time.Now(), config.ContractVersion)
-	r.GET("/health", healthHandler.Check)
+	r.GET("/healthz", healthHandler.Healthz)
+	r.GET("/readyz", healthHandler.Readyz)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	docsHandler := NewDocsHandler()

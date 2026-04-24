@@ -8,7 +8,7 @@ package config
 // constant and run `make fetch-contract` to download the new spec.
 //
 // Used by:
-//   - /health endpoint (reported as "contract_version")
+//   - /readyz endpoint (reported as "contract_version")
 //   - Makefile fetch-contract (extracted via grep)
 //   - CI pipeline (extracted via grep)
 const ContractVersion = "0.8.3"

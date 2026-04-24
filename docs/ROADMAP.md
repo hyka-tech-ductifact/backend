@@ -102,7 +102,7 @@
 | 9.3 | `docker-compose` (dev + prod) | ✅ |
 | 9.4 | Automated deploy to Hetzner VPS | ✅ |
 | 9.5 | Caddy reverse proxy + HTTPS (Let's Encrypt) | ✅ |
-| 9.6 | Block `/metrics`, `/health`, `/docs` from internet | ✅ |
+| 9.6 | Block `/metrics`, `/healthz`, `/readyz`, `/docs` from internet | ✅ |
 
 ---
 
