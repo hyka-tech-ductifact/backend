@@ -192,7 +192,7 @@
 | 16.1 | Redis adapter for token blacklist | ⬜ | 🔴 Now |
 | 16.2 | Redis adapter for rate limiter (IP + user) | ⬜ | 🔴 Now |
 | 16.3 | Redis adapter for login throttler | ⬜ | 🔴 Now |
-| 16.4 | Redis health check in `/health` endpoint | ⬜ | 🔴 Now |
+| 16.4 | Redis health check in `/readyz` endpoint | ⬜ | 🔴 Now |
 | 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🟡 Soon |
 | 16.6 | Configurable adapter selection (memory vs Redis via env) | ⬜ | 🟡 Soon |
 
