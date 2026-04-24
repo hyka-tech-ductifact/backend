@@ -57,6 +57,7 @@ allow-x00 = false       # avoid NULL bytes that trip up Go handlers
 codec = "utf-8"
 database = ":memory:"   # don't persist hypothesis DB between runs
 with-security-parameters = false  # don't fuzz auth tokens; use static header
+allow-extra-parameters = false    # don't generate unknown query/header params (our API ignores them per REST standard)
 
 # ─── Phases ─────────────────────────────────────────────────
 # All enabled here; the Makefile may restrict via --phases for local runs.
@@ -71,6 +72,12 @@ enabled = true
 
 [phases.stateful]
 enabled = true
+
+# Predefined piece definitions return 403 on DELETE (cannot delete system defs)
+# but Schemathesis treats any non-404 as successful deletion, then flags the
+# subsequent GET 200 as "use after free". Only affects stateful phase.
+[phases.stateful.checks]
+use_after_free.enabled = false
 
 # ─── Reports ────────────────────────────────────────────────
 [reports]
