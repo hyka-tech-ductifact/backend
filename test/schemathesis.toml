@@ -44,18 +44,6 @@ use_after_free.enabled = false
 include-path = "/health"
 enabled = false
 
-# Exclude multipart endpoints: Schemathesis cannot serialize binary image uploads
-# (image/png, image/jpeg, image/webp). These are covered by E2E tests instead.
-[[operations]]
-include-path = "/piece-definitions$"
-include-method = "POST"
-enabled = false
-
-[[operations]]
-include-path = "/piece-definitions/"
-include-method = "PUT"
-enabled = false
-
 # ─── Data Generation ────────────────────────────────────────
 [generation]
 max-examples = 50       # fallback when run outside Makefile (Makefile: local=20, CI=100)
