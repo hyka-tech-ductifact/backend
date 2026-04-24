@@ -73,8 +73,15 @@ schemathesis.openapi.media_type("image/*", _image_strategy)
 
 @schemathesis.serializer("image/png", "image/jpeg", "image/webp")
 def _image_serializer(ctx, value):
+    """Serialize image data for multipart uploads.
+
+    In negative-testing mode Schemathesis may pass dicts, floats, negative ints,
+    None, etc.  We convert anything non-bytes to its string representation so the
+    request can still be sent (the API should reject it with 4xx).
+    """
     if value is None:
         return None
     if isinstance(value, bytes):
         return value
-    return bytes(value)
+    # Fallback: coerce arbitrary fuzz values to bytes via their repr.
+    return str(value).encode("utf-8")
