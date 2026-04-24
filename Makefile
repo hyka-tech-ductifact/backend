@@ -212,6 +212,7 @@ test-contract: ensure-contract
 		--user 0:0 \
 		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
 		-v $(CURDIR)/test/schemathesis.toml:/spec/schemathesis.toml:ro \
+		-v $(CURDIR)/test/schemathesis_hooks.py:/spec/schemathesis_hooks.py:ro \
 		-v $(CURDIR)/schemathesis-report:/spec/schemathesis-report \
 		-w /spec \
 		$(ST_IMAGE) \
