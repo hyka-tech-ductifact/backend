@@ -66,3 +66,13 @@ _image_strategy = st.sampled_from([_MINIMAL_PNG, _MINIMAL_JPEG, _MINIMAL_WEBP])
 
 # Register for all image/* media types (covers image/png, image/jpeg, image/webp)
 schemathesis.openapi.media_type("image/*", _image_strategy)
+
+# ── Serializers ──────────────────────────────────────────────
+# Schemathesis 4.x requires serializers in addition to media-type strategies.
+# For binary image data the serializer is a pass-through: just return the bytes.
+
+@schemathesis.serializer("image/png", "image/jpeg", "image/webp")
+def _image_serializer(ctx, value):
+    if isinstance(value, bytes):
+        return value
+    return bytes(value)
