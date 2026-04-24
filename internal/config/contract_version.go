@@ -11,4 +11,4 @@ package config
 //   - /health endpoint (reported as "contract_version")
 //   - Makefile fetch-contract (extracted via grep)
 //   - CI pipeline (extracted via grep)
-const ContractVersion = "0.8.1"
+const ContractVersion = "0.8.2"

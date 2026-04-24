@@ -125,7 +125,18 @@ func (h *PieceDefinitionHandler) ListPieceDefinitions(c *gin.Context) {
 		return
 	}
 
-	includeArchived := c.Query("include_archived") == "true"
+	var includeArchived bool
+	if raw, exists := c.GetQuery("include_archived"); exists {
+		switch strings.ToLower(raw) {
+		case "true":
+			includeArchived = true
+		case "false":
+			includeArchived = false
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "include_archived must be a boolean (true/false)"})
+			return
+		}
+	}
 
 	result, err := h.pieceDefService.ListPieceDefinitions(c.Request.Context(), userID, includeArchived, pg)
 	if err != nil {
