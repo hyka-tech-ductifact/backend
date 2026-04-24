@@ -50,6 +50,8 @@ func TestNewEmail_WithInvalidEmails_ReturnsError(t *testing.T) {
 		{"domain label ends with hyphen", "user@example-.com"},
 		{"domain label starts with hyphen", "user@-example.com"},
 		{"domain label with only hyphen", "_0AncD@9nkNy0.Q-.Lf"},
+		{"domain label too long (>63 chars)", "user@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"},
+		{"total length exceeds 254", "a@" + string(make([]byte, 253))},
 	}
 
 	for _, tt := range invalidEmails {
