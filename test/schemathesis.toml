@@ -25,7 +25,9 @@ continue-on-failure = true
 # ─── Hooks ───────────────────────────────────────────────────
 # Custom media-type strategies for image uploads (image/png, jpeg, webp).
 # The Python module is mounted into the Docker container by the Makefile.
-hooks = "schemathesis_hooks"
+# Loaded via SCHEMATHESIS_HOOKS env var (see Makefile) to avoid conflicts
+# with the tracecov plugin bundled in Schemathesis 4.x.
+# hooks = "schemathesis_hooks"
 
 # ─── Authentication ──────────────────────────────────────────
 # JWT obtained by the Makefile (curl → /auth/register|login) and

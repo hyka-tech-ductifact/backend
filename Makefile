@@ -210,6 +210,7 @@ test-contract: ensure-contract
 	echo "  Auth token obtained ✅"; \
 	docker run --rm --network host \
 		--user 0:0 \
+		-e SCHEMATHESIS_HOOKS=schemathesis_hooks \
 		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
 		-v $(CURDIR)/test/schemathesis.toml:/spec/schemathesis.toml:ro \
 		-v $(CURDIR)/test/schemathesis_hooks.py:/spec/schemathesis_hooks.py:ro \
