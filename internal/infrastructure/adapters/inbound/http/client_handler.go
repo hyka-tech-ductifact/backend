@@ -193,7 +193,7 @@ func (h *ClientHandler) DeleteClient(c *gin.Context) {
 		return
 	}
 
-	if err := h.clientService.DeleteClient(c.Request.Context(), id, userID); err != nil {
+	if err := h.clientService.DeleteClient(c.Request.Context(), id, userID, c.Query("cascade") == "true"); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

@@ -25,6 +25,7 @@ type PieceDefinitionModel struct {
 	DimensionSchema string // JSON string of []string
 	Predefined      bool
 	UserID          *uuid.UUID
+	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt
@@ -95,11 +96,16 @@ func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.
 }
 
 // ListByUserID returns all predefined definitions + custom definitions created by the user.
-func (r *PostgresPieceDefinitionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+// When includeArchived is false, archived definitions are excluded.
+func (r *PostgresPieceDefinitionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
 	var totalItems int64
 
 	query := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).
 		Where("predefined = ? OR user_id = ?", true, userID)
+
+	if !includeArchived {
+		query = query.Where("archived_at IS NULL")
+	}
 
 	if err := query.Count(&totalItems).Error; err != nil {
 		return nil, 0, err
@@ -138,6 +144,21 @@ func (r *PostgresPieceDefinitionRepository) Delete(ctx context.Context, id uuid.
 	return r.db.WithContext(ctx).Delete(&PieceDefinitionModel{}, "id = ?", id).Error
 }
 
+// Archive sets archived_at to the current time, effectively disabling the definition.
+func (r *PostgresPieceDefinitionRepository) Archive(ctx context.Context, id uuid.UUID) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).
+		Where("id = ?", id).
+		Update("archived_at", now).Error
+}
+
+// Unarchive clears archived_at, re-enabling the definition.
+func (r *PostgresPieceDefinitionRepository) Unarchive(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).
+		Where("id = ?", id).
+		Update("archived_at", nil).Error
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toPieceDefModel(def *entities.PieceDefinition) (*PieceDefinitionModel, error) {
@@ -153,6 +174,7 @@ func toPieceDefModel(def *entities.PieceDefinition) (*PieceDefinitionModel, erro
 		DimensionSchema: string(schemaJSON),
 		Predefined:      def.Predefined,
 		UserID:          def.UserID,
+		ArchivedAt:      def.ArchivedAt,
 		CreatedAt:       def.CreatedAt,
 		UpdatedAt:       def.UpdatedAt,
 	}
@@ -175,6 +197,7 @@ func toPieceDefEntity(model *PieceDefinitionModel) (*entities.PieceDefinition, e
 		DimensionSchema: schema,
 		Predefined:      model.Predefined,
 		UserID:          model.UserID,
+		ArchivedAt:      model.ArchivedAt,
 		CreatedAt:       model.CreatedAt,
 		UpdatedAt:       model.UpdatedAt,
 	}

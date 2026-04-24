@@ -53,6 +53,11 @@ func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, params
 		return nil, err
 	}
 
+	// Step 2b: Block creation with archived definitions
+	if def.IsArchived() {
+		return nil, ErrPieceDefArchived
+	}
+
 	// Step 3: Domain entity validates its own invariants
 	piece, err := entities.NewPiece(params)
 	if err != nil {

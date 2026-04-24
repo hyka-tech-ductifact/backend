@@ -25,7 +25,7 @@ func newPieceDefServiceCustom(
 	storage *mocks.MockFileStorage,
 	imgProc *mocks.MockImageProcessor,
 ) usecases.PieceDefinitionService {
-	return services.NewPieceDefinitionService(repo, storage, imgProc)
+	return services.NewPieceDefinitionService(repo, storage, imgProc, &mocks.MockPieceRepository{})
 }
 
 // fakeFileInput creates a FileInput suitable for testing.

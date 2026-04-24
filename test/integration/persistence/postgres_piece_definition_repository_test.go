@@ -84,7 +84,7 @@ func TestPostgresPieceDefRepository_ListByUserID(t *testing.T) {
 	createTestPieceDef(t, defRepo, user.ID)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pg)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
 	require.NoError(t, err)
 	assert.Len(t, defs, 2)
 	assert.Equal(t, int64(2), total)
@@ -97,7 +97,7 @@ func TestPostgresPieceDefRepository_ListByUserID_Empty(t *testing.T) {
 	user := createTestUser(t, userRepo)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pg)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
 	require.NoError(t, err)
 	assert.Empty(t, defs)
 	assert.Equal(t, int64(0), total)
@@ -113,7 +113,7 @@ func TestPostgresPieceDefRepository_ListByUserID_DoesNotReturnOtherUsersCustomDe
 	createTestPieceDef(t, defRepo, user2.ID)
 
 	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user1.ID, pg)
+	defs, total, err := defRepo.ListByUserID(ctx, user1.ID, false, pg)
 	require.NoError(t, err)
 	assert.Len(t, defs, 1)
 	assert.Equal(t, int64(1), total)
@@ -206,4 +206,101 @@ func TestPostgresPieceDefRepository_Mapper_PreservesAllFields(t *testing.T) {
 	assert.Equal(t, original.UserID, found.UserID)
 	assert.WithinDuration(t, original.CreatedAt, found.CreatedAt, 1_000_000_000)
 	assert.WithinDuration(t, original.UpdatedAt, found.UpdatedAt, 1_000_000_000)
+}
+
+// =============================================================================
+// Archive / Unarchive
+// =============================================================================
+
+func TestPostgresPieceDefRepository_Archive_SetsArchivedAt(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	def := createTestPieceDef(t, defRepo, user.ID)
+	assert.Nil(t, def.ArchivedAt)
+
+	err := defRepo.Archive(ctx, def.ID)
+	require.NoError(t, err)
+
+	found, err := defRepo.GetByID(ctx, def.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, found.ArchivedAt, "ArchivedAt should be set after Archive")
+}
+
+func TestPostgresPieceDefRepository_Unarchive_ClearsArchivedAt(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	def := createTestPieceDef(t, defRepo, user.ID)
+
+	// Archive first
+	require.NoError(t, defRepo.Archive(ctx, def.ID))
+
+	// Unarchive
+	err := defRepo.Unarchive(ctx, def.ID)
+	require.NoError(t, err)
+
+	found, err := defRepo.GetByID(ctx, def.ID)
+	require.NoError(t, err)
+	assert.Nil(t, found.ArchivedAt, "ArchivedAt should be nil after Unarchive")
+}
+
+func TestPostgresPieceDefRepository_ListByUserID_ExcludesArchivedByDefault(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	activeDef := createTestPieceDef(t, defRepo, user.ID)
+	archivedDef := createTestPieceDef(t, defRepo, user.ID)
+
+	require.NoError(t, defRepo.Archive(ctx, archivedDef.ID))
+
+	pg, _ := pagination.NewPagination(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(1), total)
+	assert.Len(t, defs, 1)
+	assert.Equal(t, activeDef.ID, defs[0].ID)
+}
+
+func TestPostgresPieceDefRepository_ListByUserID_IncludesArchivedWhenRequested(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	createTestPieceDef(t, defRepo, user.ID)
+	archivedDef := createTestPieceDef(t, defRepo, user.ID)
+
+	require.NoError(t, defRepo.Archive(ctx, archivedDef.ID))
+
+	pg, _ := pagination.NewPagination(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, true, pg)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, defs, 2)
+}
+
+func TestPostgresPieceDefRepository_Mapper_PreservesArchivedAt(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, userRepo)
+	def := createTestPieceDef(t, defRepo, user.ID)
+
+	require.NoError(t, defRepo.Archive(ctx, def.ID))
+
+	found, err := defRepo.GetByID(ctx, def.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, found.ArchivedAt)
+
+	// Unarchive and verify round-trip
+	require.NoError(t, defRepo.Unarchive(ctx, def.ID))
+
+	found2, err := defRepo.GetByID(ctx, def.ID)
+	require.NoError(t, err)
+	assert.Nil(t, found2.ArchivedAt)
 }

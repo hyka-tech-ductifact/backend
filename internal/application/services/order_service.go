@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"ductifact/internal/domain/entities"
@@ -11,22 +12,28 @@ import (
 	"github.com/google/uuid"
 )
 
+var ErrHasAssociatedPieces = errors.New("order has associated pieces")
+
 // orderService implements usecases.OrderService.
 // Unexported struct: can only be created via NewOrderService.
 type orderService struct {
 	orderRepo   repositories.OrderRepository
 	projectRepo repositories.ProjectRepository
+	pieceRepo   repositories.PieceRepository
 }
 
 // NewOrderService creates a new OrderService.
 // The project repository is needed to verify ownership during Create and List.
+// The piece repository is needed to check for associated pieces before deletion.
 func NewOrderService(
 	orderRepo repositories.OrderRepository,
 	projectRepo repositories.ProjectRepository,
+	pieceRepo repositories.PieceRepository,
 ) *orderService {
 	return &orderService{
 		orderRepo:   orderRepo,
 		projectRepo: projectRepo,
+		pieceRepo:   pieceRepo,
 	}
 }
 
@@ -113,10 +120,20 @@ func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, userID uui
 }
 
 // DeleteOrder removes an order, ensuring it belongs to the given user.
-func (s *orderService) DeleteOrder(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+// If cascade is false and the order has associated pieces, it returns ErrHasAssociatedPieces.
+func (s *orderService) DeleteOrder(ctx context.Context, id uuid.UUID, userID uuid.UUID, cascade bool) error {
 	order, err := s.orderRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
+	}
+
+	count, err := s.pieceRepo.CountByOrderID(ctx, order.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 && !cascade {
+		return ErrHasAssociatedPieces
 	}
 
 	return s.orderRepo.Delete(ctx, order.ID)

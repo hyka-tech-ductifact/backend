@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
@@ -36,6 +37,7 @@ type PieceDefinitionResponse struct {
 	ThumbnailURL    string   `json:"thumbnail_url"`
 	DimensionSchema []string `json:"dimension_schema"`
 	Predefined      bool     `json:"predefined"`
+	ArchivedAt      *string  `json:"archived_at"`
 }
 
 type ListPieceDefinitionResponse struct {
@@ -123,7 +125,20 @@ func (h *PieceDefinitionHandler) ListPieceDefinitions(c *gin.Context) {
 		return
 	}
 
-	result, err := h.pieceDefService.ListPieceDefinitions(c.Request.Context(), userID, pg)
+	var includeArchived bool
+	if raw, exists := c.GetQuery("include_archived"); exists {
+		switch strings.ToLower(raw) {
+		case "true":
+			includeArchived = true
+		case "false":
+			includeArchived = false
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "include_archived must be a boolean (true/false)"})
+			return
+		}
+	}
+
+	result, err := h.pieceDefService.ListPieceDefinitions(c.Request.Context(), userID, includeArchived, pg)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -235,6 +250,50 @@ func (h *PieceDefinitionHandler) DeletePieceDefinition(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
+// ArchivePieceDefinition handles POST /piece-definitions/:piece_definition_id/archive
+func (h *PieceDefinitionHandler) ArchivePieceDefinition(c *gin.Context) {
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
+		return
+	}
+
+	defID, err := uuid.Parse(c.Param("piece_definition_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid piece definition ID format"})
+		return
+	}
+
+	def, err := h.pieceDefService.ArchivePieceDefinition(c.Request.Context(), defID, userID)
+	if err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toPieceDefResponse(def))
+}
+
+// UnarchivePieceDefinition handles POST /piece-definitions/:piece_definition_id/unarchive
+func (h *PieceDefinitionHandler) UnarchivePieceDefinition(c *gin.Context) {
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
+		return
+	}
+
+	defID, err := uuid.Parse(c.Param("piece_definition_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid piece definition ID format"})
+		return
+	}
+
+	def, err := h.pieceDefService.UnarchivePieceDefinition(c.Request.Context(), defID, userID)
+	if err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toPieceDefResponse(def))
+}
+
 // --- Mappers ---
 
 // toFileURL converts a storage key to a public URL served by the file proxy.
@@ -258,6 +317,12 @@ func deriveThumbnailURL(imageURL string) string {
 }
 
 func toPieceDefResponse(def *entities.PieceDefinition) *PieceDefinitionResponse {
+	var archivedAt *string
+	if def.ArchivedAt != nil {
+		formatted := def.ArchivedAt.Format(time.RFC3339)
+		archivedAt = &formatted
+	}
+
 	return &PieceDefinitionResponse{
 		ID:              def.ID.String(),
 		Name:            def.Name,
@@ -265,6 +330,7 @@ func toPieceDefResponse(def *entities.PieceDefinition) *PieceDefinitionResponse 
 		ThumbnailURL:    deriveThumbnailURL(def.ImageURL),
 		DimensionSchema: def.DimensionSchema,
 		Predefined:      def.Predefined,
+		ArchivedAt:      archivedAt,
 	}
 }
 

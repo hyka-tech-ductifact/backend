@@ -12,20 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
+var ErrHasAssociatedProjects = errors.New("client has associated projects")
+
 // clientService implements usecases.ClientService.
 // Unexported struct: can only be created via NewClientService.
 type clientService struct {
-	clientRepo repositories.ClientRepository
-	userRepo   repositories.UserRepository
+	clientRepo  repositories.ClientRepository
+	userRepo    repositories.UserRepository
+	projectRepo repositories.ProjectRepository
 }
 
 // NewClientService creates a new ClientService.
 // It receives both the client and user repositories (outbound ports).
 // The user repository is needed to verify that the owning user exists.
-func NewClientService(clientRepo repositories.ClientRepository, userRepo repositories.UserRepository) *clientService {
+// The project repository is needed to check for associated projects before deletion.
+func NewClientService(clientRepo repositories.ClientRepository, userRepo repositories.UserRepository, projectRepo repositories.ProjectRepository) *clientService {
 	return &clientService{
-		clientRepo: clientRepo,
-		userRepo:   userRepo,
+		clientRepo:  clientRepo,
+		userRepo:    userRepo,
+		projectRepo: projectRepo,
 	}
 }
 
@@ -117,10 +122,19 @@ func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID u
 }
 
 // DeleteClient removes a client, ensuring it belongs to the given user.
-func (s *clientService) DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+func (s *clientService) DeleteClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, cascade bool) error {
 	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return err
+	}
+
+	count, err := s.projectRepo.CountByClientID(ctx, client.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 && !cascade {
+		return ErrHasAssociatedProjects
 	}
 
 	return s.clientRepo.Delete(ctx, client.ID)

@@ -57,14 +57,17 @@ help:
 	@echo "    test-integration - Run integration tests (requires DB)"
 	@echo "    test-e2e         - Run E2E tests (requires running server)"
 	@echo "    test-contract    - Run contract tests with Schemathesis (config: test/schemathesis.toml)"
+	@echo "                       Local: 20 examples/op. CI: 100 examples/op."
 	@echo "    test-clean       - Clear Go test cache"
 	@echo ""
 	@echo "    Flags:"
-	@echo "      CI=1         - CI mode (race detector + JUnit XML): make test-unit CI=1"
-	@echo "      COVERAGE=1   - Generate coverage:                   make test-unit COVERAGE=1"
-	@echo "      TEST_FORMAT  - Change output format:                make test-unit TEST_FORMAT=dots"
+	@echo "      CI=1              - CI mode (race detector + JUnit XML): make test-unit CI=1"
+	@echo "      COVERAGE=1        - Generate coverage:                   make test-unit COVERAGE=1"
+	@echo "      TEST_FORMAT       - Change output format:                make test-unit TEST_FORMAT=dots"
 	@echo "        Formats: pkgname (default), testdox, testname, dots, dots-v2,"
 	@echo "                 standard-quiet, standard-verbose, pkgname-and-test-fails"
+	@echo "      ST_MAX_EXAMPLES   - Override examples per operation:     make test-contract ST_MAX_EXAMPLES=200"
+	@echo "      ST_SEED           - Reproduce a test run with a seed:     make test-contract ST_SEED=<seed>"
 	@echo ""
 	@echo "  Contracts:"
 	@echo "    ensure-contract  - Ensure bundled.yaml is present"
@@ -183,7 +186,9 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE ?= schemathesis/schemathesis:latest
+ST_IMAGE         ?= schemathesis/schemathesis:latest
+ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
+_ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
@@ -207,14 +212,17 @@ test-contract: ensure-contract
 	echo "  Auth token obtained ✅"; \
 	docker run --rm --network host \
 		--user 0:0 \
+		-e SCHEMATHESIS_HOOKS=schemathesis_hooks \
 		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
 		-v $(CURDIR)/test/schemathesis.toml:/spec/schemathesis.toml:ro \
+		-v $(CURDIR)/test/schemathesis_hooks.py:/spec/schemathesis_hooks.py:ro \
 		-v $(CURDIR)/schemathesis-report:/spec/schemathesis-report \
 		-w /spec \
 		$(ST_IMAGE) \
 		run bundled.yaml \
 		-H "Authorization: Bearer $$TOKEN" \
-		$(if $(ST_MAX_EXAMPLES),--max-examples $(ST_MAX_EXAMPLES),)
+		--max-examples $(ST_MAX_EXAMPLES) \
+		$(_ST_SEED_FLAG)
 	@echo "✅ Contract tests passed"
 
 # Clear Go test cache

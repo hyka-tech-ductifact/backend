@@ -22,7 +22,7 @@ import (
 
 func TestCreateClient_WithValidData_ReturnsClient(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user), &mocks.MockProjectRepository{})
 
 	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
 		Name:        "Acme Corp",
@@ -42,7 +42,7 @@ func TestCreateClient_WithValidData_ReturnsClient(t *testing.T) {
 
 func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user))
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(user), &mocks.MockProjectRepository{})
 
 	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
 		UserID: user.ID,
@@ -53,7 +53,7 @@ func TestCreateClient_WithEmptyName_ReturnsError(t *testing.T) {
 }
 
 func TestCreateClient_WithNonExistingUser_ReturnsError(t *testing.T) {
-	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(nil))
+	svc := services.NewClientService(&mocks.MockClientRepository{}, userRepoReturning(nil), &mocks.MockProjectRepository{})
 
 	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
 		Name:   "Acme Corp",
@@ -71,7 +71,7 @@ func TestCreateClient_WhenRepoFails_ReturnsError(t *testing.T) {
 			return errors.New("db connection lost")
 		},
 	}
-	svc := services.NewClientService(clientRepo, userRepoReturning(user))
+	svc := services.NewClientService(clientRepo, userRepoReturning(user), &mocks.MockProjectRepository{})
 
 	client, err := svc.CreateClient(context.Background(), entities.CreateClientParams{
 		Name:   "Acme Corp",
@@ -89,7 +89,7 @@ func TestCreateClient_WhenRepoFails_ReturnsError(t *testing.T) {
 func TestGetClientByID_WithExistingClient_ReturnsClient(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.GetClientByID(context.Background(), client.ID, userID)
 
@@ -99,7 +99,7 @@ func TestGetClientByID_WithExistingClient_ReturnsClient(t *testing.T) {
 }
 
 func TestGetClientByID_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.GetClientByID(context.Background(), uuid.New(), uuid.New())
 
@@ -110,7 +110,7 @@ func TestGetClientByID_WithNonExistingClient_ReturnsError(t *testing.T) {
 func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
 	client := newTestClient(ownerID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.GetClientByID(context.Background(), client.ID, uuid.New())
 
@@ -133,7 +133,7 @@ func TestListClientsByUserID_ReturnsClients(t *testing.T) {
 			return expected, 2, nil
 		},
 	}
-	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	pg, _ := pagination.NewPagination(1, 20)
 	result, err := svc.ListClientsByUserID(context.Background(), userID, pg)
@@ -150,7 +150,7 @@ func TestListClientsByUserID_EmptyList(t *testing.T) {
 			return []*entities.Client{}, 0, nil
 		},
 	}
-	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	pg, _ := pagination.NewPagination(1, 20)
 	result, err := svc.ListClientsByUserID(context.Background(), uuid.New(), pg)
@@ -167,7 +167,7 @@ func TestListClientsByUserID_EmptyList(t *testing.T) {
 func TestUpdateClient_WithNewName_UpdatesName(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
 		Name: strPtr("New Name"),
@@ -180,7 +180,7 @@ func TestUpdateClient_WithNewName_UpdatesName(t *testing.T) {
 func TestUpdateClient_WithEmptyName_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
 		Name: strPtr(""),
@@ -193,7 +193,7 @@ func TestUpdateClient_WithEmptyName_ReturnsError(t *testing.T) {
 func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
 	client := newTestClient(ownerID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.UpdateClient(context.Background(), client.ID, uuid.New(), entities.UpdateClientParams{
 		Name: strPtr("New Name"),
@@ -204,7 +204,7 @@ func TestUpdateClient_WithWrongUser_ReturnsError(t *testing.T) {
 }
 
 func TestUpdateClient_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.UpdateClient(context.Background(), uuid.New(), uuid.New(), entities.UpdateClientParams{
 		Name: strPtr("New Name"),
@@ -218,7 +218,7 @@ func TestUpdateClient_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
 	oldTime := client.UpdatedAt
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	result, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{
 		Name: strPtr("New Name"),
@@ -237,7 +237,7 @@ func TestUpdateClient_WithNoChanges_SkipsPersistence(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	svc := services.NewClientService(repo, &mocks.MockUserRepository{})
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
 	_, err := svc.UpdateClient(context.Background(), client.ID, userID, entities.UpdateClientParams{})
 
@@ -258,18 +258,18 @@ func TestDeleteClient_WithExistingClient_Succeeds(t *testing.T) {
 		deleteCalled = true
 		return nil
 	}
-	svc := services.NewClientService(repo, &mocks.MockUserRepository{})
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
-	err := svc.DeleteClient(context.Background(), client.ID, userID)
+	err := svc.DeleteClient(context.Background(), client.ID, userID, true)
 
 	assert.NoError(t, err)
 	assert.True(t, deleteCalled)
 }
 
 func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(nil), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
-	err := svc.DeleteClient(context.Background(), uuid.New(), uuid.New())
+	err := svc.DeleteClient(context.Background(), uuid.New(), uuid.New(), true)
 
 	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
@@ -277,9 +277,63 @@ func TestDeleteClient_WithNonExistingClient_ReturnsError(t *testing.T) {
 func TestDeleteClient_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
 	client := newTestClient(ownerID)
-	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{})
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
-	err := svc.DeleteClient(context.Background(), client.ID, uuid.New())
+	err := svc.DeleteClient(context.Background(), client.ID, uuid.New(), true)
 
 	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
+}
+
+func TestDeleteClient_WithProjects_NoCascade_ReturnsConflict(t *testing.T) {
+	userID := uuid.New()
+	client := newTestClient(userID)
+	projectRepo := &mocks.MockProjectRepository{
+		CountByClientIDFn: func(ctx context.Context, clientID uuid.UUID) (int64, error) {
+			return 3, nil
+		},
+	}
+	svc := services.NewClientService(clientRepoReturning(client), &mocks.MockUserRepository{}, projectRepo)
+
+	err := svc.DeleteClient(context.Background(), client.ID, userID, false)
+
+	assert.ErrorIs(t, err, services.ErrHasAssociatedProjects)
+}
+
+func TestDeleteClient_WithProjects_Cascade_Succeeds(t *testing.T) {
+	userID := uuid.New()
+	client := newTestClient(userID)
+	deleteCalled := false
+	repo := clientRepoReturning(client)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		return nil
+	}
+	projectRepo := &mocks.MockProjectRepository{
+		CountByClientIDFn: func(ctx context.Context, clientID uuid.UUID) (int64, error) {
+			return 3, nil
+		},
+	}
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{}, projectRepo)
+
+	err := svc.DeleteClient(context.Background(), client.ID, userID, true)
+
+	assert.NoError(t, err)
+	assert.True(t, deleteCalled)
+}
+
+func TestDeleteClient_WithNoProjects_NoCascade_Succeeds(t *testing.T) {
+	userID := uuid.New()
+	client := newTestClient(userID)
+	deleteCalled := false
+	repo := clientRepoReturning(client)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		return nil
+	}
+	svc := services.NewClientService(repo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
+
+	err := svc.DeleteClient(context.Background(), client.ID, userID, false)
+
+	assert.NoError(t, err)
+	assert.True(t, deleteCalled)
 }

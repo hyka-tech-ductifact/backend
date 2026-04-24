@@ -12,12 +12,13 @@ import (
 // MockOrderRepository implements repositories.OrderRepository for testing.
 // Each method is a function field that you can configure per test.
 type MockOrderRepository struct {
-	CreateFn          func(ctx context.Context, order *entities.Order) error
-	GetByIDFn         func(ctx context.Context, id uuid.UUID) (*entities.Order, error)
-	GetByIDForOwnerFn func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error)
-	ListByProjectIDFn func(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
-	UpdateFn          func(ctx context.Context, order *entities.Order) error
-	DeleteFn          func(ctx context.Context, id uuid.UUID) error
+	CreateFn           func(ctx context.Context, order *entities.Order) error
+	GetByIDFn          func(ctx context.Context, id uuid.UUID) (*entities.Order, error)
+	GetByIDForOwnerFn  func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error)
+	ListByProjectIDFn  func(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
+	CountByProjectIDFn func(ctx context.Context, projectID uuid.UUID) (int64, error)
+	UpdateFn           func(ctx context.Context, order *entities.Order) error
+	DeleteFn           func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *MockOrderRepository) Create(ctx context.Context, order *entities.Order) error {
@@ -60,4 +61,11 @@ func (m *MockOrderRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return m.DeleteFn(ctx, id)
 	}
 	return nil
+}
+
+func (m *MockOrderRepository) CountByProjectID(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	if m.CountByProjectIDFn != nil {
+		return m.CountByProjectIDFn(ctx, projectID)
+	}
+	return 0, nil
 }

@@ -23,7 +23,7 @@ import (
 func TestCreateOrder_WithValidData_ReturnsOrder(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project))
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
 	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		Title:       "Steel beams – lot 3",
@@ -41,7 +41,7 @@ func TestCreateOrder_WithValidData_ReturnsOrder(t *testing.T) {
 func TestCreateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project))
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
 	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		ProjectID: project.ID,
@@ -52,7 +52,7 @@ func TestCreateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 }
 
 func TestCreateOrder_WithNonExistingProject_ReturnsError(t *testing.T) {
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(nil))
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepoReturning(nil), &mocks.MockPieceRepository{})
 
 	order, err := svc.CreateOrder(context.Background(), uuid.New(), entities.CreateOrderParams{
 		Title:     "Steel beams",
@@ -69,7 +69,7 @@ func TestCreateOrder_WithProjectNotOwned_ReturnsError(t *testing.T) {
 			return nil, repositories.ErrProjectNotOwned
 		},
 	}
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo)
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo, &mocks.MockPieceRepository{})
 
 	order, err := svc.CreateOrder(context.Background(), uuid.New(), entities.CreateOrderParams{
 		Title:     "Steel beams",
@@ -88,7 +88,7 @@ func TestCreateOrder_WhenRepoFails_ReturnsError(t *testing.T) {
 			return errors.New("db connection lost")
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
 	order, err := svc.CreateOrder(context.Background(), userID, entities.CreateOrderParams{
 		Title:     "Steel beams",
@@ -106,7 +106,7 @@ func TestCreateOrder_WhenRepoFails_ReturnsError(t *testing.T) {
 func TestGetOrderByID_WithExistingOrder_ReturnsOrder(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.GetOrderByID(context.Background(), order.ID, userID)
 
@@ -116,7 +116,7 @@ func TestGetOrderByID_WithExistingOrder_ReturnsOrder(t *testing.T) {
 }
 
 func TestGetOrderByID_WithNonExistingOrder_ReturnsError(t *testing.T) {
-	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.GetOrderByID(context.Background(), uuid.New(), uuid.New())
 
@@ -130,7 +130,7 @@ func TestGetOrderByID_WithNotOwned_ReturnsError(t *testing.T) {
 			return nil, repositories.ErrOrderNotOwned
 		},
 	}
-	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.GetOrderByID(context.Background(), uuid.New(), uuid.New())
 
@@ -154,7 +154,7 @@ func TestListOrdersByProjectID_ReturnsOrders(t *testing.T) {
 			return expected, 2, nil
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
 	pg, _ := pagination.NewPagination(1, 20)
 	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
@@ -172,7 +172,7 @@ func TestListOrdersByProjectID_EmptyList(t *testing.T) {
 			return []*entities.Order{}, 0, nil
 		},
 	}
-	svc := services.NewOrderService(orderRepo, projectRepoReturning(project))
+	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
 	pg, _ := pagination.NewPagination(1, 20)
 	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
@@ -188,7 +188,7 @@ func TestListOrdersByProjectID_WithProjectNotOwned_ReturnsError(t *testing.T) {
 			return nil, repositories.ErrProjectNotOwned
 		},
 	}
-	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo)
+	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo, &mocks.MockPieceRepository{})
 
 	pg, _ := pagination.NewPagination(1, 20)
 	_, err := svc.ListOrdersByProjectID(context.Background(), uuid.New(), uuid.New(), pg)
@@ -203,7 +203,7 @@ func TestListOrdersByProjectID_WithProjectNotOwned_ReturnsError(t *testing.T) {
 func TestUpdateOrder_WithNewTitle_UpdatesTitle(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr("New Title"),
@@ -216,7 +216,7 @@ func TestUpdateOrder_WithNewTitle_UpdatesTitle(t *testing.T) {
 func TestUpdateOrder_WithStatus_UpdatesStatus(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	completed := "completed"
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
@@ -230,7 +230,7 @@ func TestUpdateOrder_WithStatus_UpdatesStatus(t *testing.T) {
 func TestUpdateOrder_WithDescription_UpdatesDescription(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Description: strPtr("Updated description"),
@@ -243,7 +243,7 @@ func TestUpdateOrder_WithDescription_UpdatesDescription(t *testing.T) {
 func TestUpdateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr(""),
@@ -256,7 +256,7 @@ func TestUpdateOrder_WithEmptyTitle_ReturnsError(t *testing.T) {
 func TestUpdateOrder_WithInvalidStatus_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	invalid := "invalid"
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
@@ -276,7 +276,7 @@ func TestUpdateOrder_WithNoChanges_SkipsPersistence(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	_, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{})
 
@@ -288,7 +288,7 @@ func TestUpdateOrder_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
 	oldTime := order.UpdatedAt
-	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
 	result, err := svc.UpdateOrder(context.Background(), order.ID, userID, entities.UpdateOrderParams{
 		Title: strPtr("New Title"),
@@ -311,18 +311,18 @@ func TestDeleteOrder_WithExistingOrder_Succeeds(t *testing.T) {
 		deleteCalled = true
 		return nil
 	}
-	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
-	err := svc.DeleteOrder(context.Background(), order.ID, userID)
+	err := svc.DeleteOrder(context.Background(), order.ID, userID, true)
 
 	assert.NoError(t, err)
 	assert.True(t, deleteCalled)
 }
 
 func TestDeleteOrder_WithNonExistingOrder_ReturnsError(t *testing.T) {
-	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepoReturning(nil), &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
-	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New())
+	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New(), true)
 
 	assert.ErrorIs(t, err, repositories.ErrOrderNotFound)
 }
@@ -333,9 +333,46 @@ func TestDeleteOrder_WithNotOwned_ReturnsError(t *testing.T) {
 			return nil, repositories.ErrOrderNotOwned
 		},
 	}
-	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{})
+	svc := services.NewOrderService(orderRepo, &mocks.MockProjectRepository{}, &mocks.MockPieceRepository{})
 
-	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New())
+	err := svc.DeleteOrder(context.Background(), uuid.New(), uuid.New(), true)
 
 	assert.ErrorIs(t, err, repositories.ErrOrderNotOwned)
+}
+
+func TestDeleteOrder_WithPieces_NoCascade_ReturnsConflict(t *testing.T) {
+	userID := uuid.New()
+	order := newTestOrder(uuid.New())
+	pieceRepo := &mocks.MockPieceRepository{
+		CountByOrderIDFn: func(ctx context.Context, orderID uuid.UUID) (int64, error) {
+			return 10, nil
+		},
+	}
+	svc := services.NewOrderService(orderRepoReturning(order), &mocks.MockProjectRepository{}, pieceRepo)
+
+	err := svc.DeleteOrder(context.Background(), order.ID, userID, false)
+
+	assert.ErrorIs(t, err, services.ErrHasAssociatedPieces)
+}
+
+func TestDeleteOrder_WithPieces_Cascade_Succeeds(t *testing.T) {
+	userID := uuid.New()
+	order := newTestOrder(uuid.New())
+	deleteCalled := false
+	repo := orderRepoReturning(order)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		return nil
+	}
+	pieceRepo := &mocks.MockPieceRepository{
+		CountByOrderIDFn: func(ctx context.Context, orderID uuid.UUID) (int64, error) {
+			return 10, nil
+		},
+	}
+	svc := services.NewOrderService(repo, &mocks.MockProjectRepository{}, pieceRepo)
+
+	err := svc.DeleteOrder(context.Background(), order.ID, userID, true)
+
+	assert.NoError(t, err)
+	assert.True(t, deleteCalled)
 }

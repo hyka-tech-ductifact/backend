@@ -28,9 +28,15 @@ type PieceDefinition struct {
 	DimensionSchema []string
 	Predefined      bool
 	UserID          *uuid.UUID // nil if predefined
+	ArchivedAt      *time.Time // nil = active, non-nil = archived (soft-disabled)
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time // nil = active, non-nil = soft-deleted
+}
+
+// IsArchived returns true if the piece definition has been archived.
+func (pd *PieceDefinition) IsArchived() bool {
+	return pd.ArchivedAt != nil
 }
 
 // CreatePieceDefParams groups all parameters needed to create a PieceDefinition.

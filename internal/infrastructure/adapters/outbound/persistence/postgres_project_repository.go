@@ -136,6 +136,12 @@ func (r *PostgresProjectRepository) Delete(ctx context.Context, id uuid.UUID) er
 	return r.db.WithContext(ctx).Delete(&ProjectModel{}, "id = ?", id).Error
 }
 
+func (r *PostgresProjectRepository) CountByClientID(ctx context.Context, clientID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&ProjectModel{}).Where("client_id = ?", clientID).Count(&count).Error
+	return count, err
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toProjectModel(project *entities.Project) *ProjectModel {
