@@ -27,6 +27,7 @@ type Config struct {
 	RateLimit     RateLimit
 	LoginThrottle LoginThrottle
 	MinIO         MinIO
+	SMTP          SMTP
 }
 
 // MinIO holds S3-compatible object storage settings.
@@ -36,6 +37,17 @@ type MinIO struct {
 	SecretKey string
 	Bucket    string // e.g. "ductifact"
 	UseSSL    bool
+}
+
+// SMTP holds email delivery settings.
+// In development, point to MailPit (localhost:1025) which captures all emails.
+// In production, point to a real provider (SendGrid, SES, etc.).
+type SMTP struct {
+	Host     string // SMTP server hostname (e.g. "smtp.sendgrid.net", "localhost" for MailPit)
+	Port     int    // SMTP server port (e.g. 587 for TLS, 1025 for MailPit)
+	Username string // AUTH username (empty for MailPit, "apikey" for SendGrid)
+	Password string // AUTH password / API key (empty for MailPit)
+	From     string // sender address (e.g. "noreply@ductifact.com")
 }
 
 // App holds general application settings.
@@ -139,6 +151,13 @@ func Load() Config {
 			SecretKey: required("MINIO_ROOT_PASSWORD"),
 			Bucket:    required("MINIO_BUCKET"),
 			UseSSL:    parseBool(required("MINIO_USE_SSL")),
+		},
+		SMTP: SMTP{
+			Host:     required("SMTP_HOST"),
+			Port:     parseInt(required("SMTP_PORT")),
+			Username: required("SMTP_USERNAME"),
+			Password: required("SMTP_PASSWORD"),
+			From:     required("SMTP_FROM"),
 		},
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/config"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
+	"ductifact/internal/infrastructure/adapters/outbound/email"
 	"ductifact/internal/infrastructure/adapters/outbound/imageproc"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/internal/infrastructure/adapters/outbound/storage"
@@ -79,6 +80,15 @@ func main() {
 	orderService := services.NewOrderService(orderRepo, projectRepo, pieceRepo)
 	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo, fileStorage, imageProcessor, pieceRepo)
 	pieceService := services.NewPieceService(pieceRepo, pieceDefRepo, orderRepo)
+
+	// --- Email wiring ---
+	emailSender := email.NewSMTPSender(
+		cfg.SMTP.Host, cfg.SMTP.Port,
+		cfg.SMTP.Username, cfg.SMTP.Password,
+		cfg.SMTP.From,
+	)
+	slog.Info("email sender ready", "host", cfg.SMTP.Host, "port", cfg.SMTP.Port)
+	_ = emailSender // will be injected into services in upcoming sections
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
