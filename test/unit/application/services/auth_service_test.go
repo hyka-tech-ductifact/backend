@@ -74,7 +74,7 @@ func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
 	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT
 	assert.Nil(t, user)
@@ -122,7 +122,7 @@ func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
 
 	svc := newTestAuthService(mockRepo, mockToken)
 
-	user, tokens, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123", "")
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
@@ -139,7 +139,7 @@ func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
 
 	svc := newTestAuthService(mockRepo, mockToken)
 
-	user, tokens, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123", "")
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
@@ -156,7 +156,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 
 	svc := newTestAuthService(mockRepo, mockToken)
 
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short", "")
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
@@ -178,7 +178,7 @@ func TestRegister_WhenRepoCreateFails_ReturnsError(t *testing.T) {
 	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT
 	assert.Nil(t, user)
@@ -202,7 +202,7 @@ func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT
 	assert.Nil(t, user)
@@ -227,7 +227,7 @@ func TestRegister_SendsWelcomeEmail(t *testing.T) {
 	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
 
 	// ACT
-	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT
 	require.NoError(t, err)
@@ -259,12 +259,106 @@ func TestRegister_SucceedsEvenIfEmailFails(t *testing.T) {
 	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT: registration succeeds despite email failure
 	require.NoError(t, err)
 	assert.NotNil(t, user)
 	assert.NotNil(t, tokens)
+}
+
+func TestRegister_WithLocale_SetsUserLocale(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+
+	svc := newTestAuthService(mockRepo, mockToken)
+
+	// ACT
+	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "es")
+
+	// ASSERT
+	require.NoError(t, err)
+	assert.Equal(t, "es", user.Locale)
+}
+
+func TestRegister_WithoutLocale_DefaultsToEnglish(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+
+	svc := newTestAuthService(mockRepo, mockToken)
+
+	// ACT
+	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
+
+	// ASSERT
+	require.NoError(t, err)
+	assert.Equal(t, "en", user.Locale)
+}
+
+func TestRegister_WithInvalidLocale_ReturnsError(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{}
+
+	svc := newTestAuthService(mockRepo, mockToken)
+
+	// ACT
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "fr")
+
+	// ASSERT
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid locale")
+}
+
+func TestRegister_WithSpanishLocale_SendsSpanishWelcomeEmail(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+	mockEmail := &mocks.MockEmailSender{}
+
+	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
+
+	// ACT
+	_, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "es")
+
+	// ASSERT
+	require.NoError(t, err)
+	require.Len(t, mockEmail.Sent, 1)
+	assert.Equal(t, "Bienvenido a Ductifact", mockEmail.Sent[0].Subject)
+	assert.Contains(t, mockEmail.Sent[0].HTML, "Bienvenido")
+	assert.Contains(t, mockEmail.Sent[0].Text, "Bienvenido")
 }
 
 // =============================================================================
@@ -407,7 +501,7 @@ func TestRegister_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	svc := newTestAuthService(mockRepo, mockToken)
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
 
 	// ASSERT: DB error is propagated instead of silently ignored
 	assert.Nil(t, user)
@@ -637,7 +731,9 @@ func TestLogin_WithWrongPassword_RecordsFailure(t *testing.T) {
 		},
 	}
 
-	existingUser, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	existingUser, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return existingUser, nil
@@ -686,7 +782,9 @@ func TestLogin_WithCorrectPassword_ResetsThrottler(t *testing.T) {
 		},
 	}
 
-	existingUser, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	existingUser, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return existingUser, nil

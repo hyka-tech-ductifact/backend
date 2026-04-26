@@ -54,11 +54,22 @@ func NewAuthService(
 }
 
 // Register creates a new user with a hashed password and returns a token pair.
-func (s *authService) Register(ctx context.Context, name, email, password string) (*entities.User, *ports.TokenPair, error) {
-	// Step 1: Create user entity (validates name + email + password, hashes password)
+// If locale is empty, the default ("en") is used.
+func (s *authService) Register(ctx context.Context, name, email, password, locale string) (*entities.User, *ports.TokenPair, error) {
+	// Apply default locale (application policy, not a domain concern).
+	if locale == "" {
+		locale = valueobjects.DefaultLocale.String()
+	}
+
+	// Step 1: Create user entity (validates name + email + password + locale, hashes password)
 	// Done BEFORE the duplicate-email check so that invalid input always
 	// returns 400, regardless of whether the email is already taken.
-	user, err := entities.NewUser(name, email, password)
+	user, err := entities.NewUser(entities.CreateUserParams{
+		Name:     name,
+		Email:    email,
+		Password: password,
+		Locale:   locale,
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -84,11 +95,16 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 	}
 
 	// Step 5: Send welcome email (non-blocking — registration succeeds even if email fails)
-	html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: user.Name})
+	emailLocale, err := valueobjects.NewLocale(user.Locale)
+	if err != nil {
+		slog.Error("unexpected invalid locale in user record", "locale", user.Locale, "userID", user.ID, "error", err)
+		emailLocale = valueobjects.DefaultLocale
+	}
+	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: user.Name}, emailLocale)
 	if err == nil {
 		if err := s.emailSender.Send(ctx, ports.Email{
 			To:      user.Email,
-			Subject: "Welcome to Ductifact",
+			Subject: subject,
 			HTML:    html,
 			Text:    text,
 		}); err != nil {
