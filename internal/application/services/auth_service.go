@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ductifact/internal/application/ports"
+	"ductifact/internal/application/services/templates"
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
@@ -25,6 +27,7 @@ type authService struct {
 	tokenProvider        ports.TokenProvider
 	blacklist            ports.TokenBlacklist
 	loginThrottler       ports.LoginThrottler
+	emailSender          ports.EmailSender
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 }
@@ -35,6 +38,7 @@ func NewAuthService(
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
 	loginThrottler ports.LoginThrottler,
+	emailSender ports.EmailSender,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 ) *authService {
@@ -43,6 +47,7 @@ func NewAuthService(
 		tokenProvider:        tokenProvider,
 		blacklist:            blacklist,
 		loginThrottler:       loginThrottler,
+		emailSender:          emailSender,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 	}
@@ -76,6 +81,19 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 	tokens, err := s.tokenProvider.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Step 5: Send welcome email (non-blocking — registration succeeds even if email fails)
+	html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: user.Name})
+	if err == nil {
+		if err := s.emailSender.Send(ctx, ports.Email{
+			To:      user.Email,
+			Subject: "Welcome to Ductifact",
+			HTML:    html,
+			Text:    text,
+		}); err != nil {
+			slog.Warn("failed to send welcome email", "to", user.Email, "error", err)
+		}
 	}
 
 	return user, tokens, nil

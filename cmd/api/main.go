@@ -88,7 +88,6 @@ func main() {
 		cfg.SMTP.From,
 	)
 	slog.Info("email sender ready", "host", cfg.SMTP.Host, "port", cfg.SMTP.Port)
-	_ = emailSender // will be injected into services in upcoming sections
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
@@ -104,7 +103,7 @@ func main() {
 	)
 	defer loginThrottler.Stop()
 
-	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
+	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)

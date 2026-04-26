@@ -21,7 +21,16 @@ import (
 
 // newTestAuthService creates an AuthService with a no-op blacklist, no-op throttler and test durations.
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
+}
+
+// newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
+func newTestAuthServiceWithEmail(
+	repo *mocks.MockUserRepository,
+	token *mocks.MockTokenProvider,
+	emailSender *mocks.MockEmailSender,
+) usecases.AuthService {
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour)
 }
 
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
@@ -30,7 +39,7 @@ func newTestAuthServiceWithBlacklist(
 	token *mocks.MockTokenProvider,
 	blacklist *mocks.MockTokenBlacklist,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, blacklist, &mocks.MockLoginThrottler{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
 }
 
 // newTestAuthServiceWithThrottler creates an AuthService with a custom login throttler.
@@ -39,7 +48,7 @@ func newTestAuthServiceWithThrottler(
 	token *mocks.MockTokenProvider,
 	throttler *mocks.MockLoginThrottler,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, throttler, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
 }
 
 // =============================================================================
@@ -199,6 +208,63 @@ func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
 	assert.EqualError(t, err, "token generation failed")
+}
+
+func TestRegister_SendsWelcomeEmail(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+	mockEmail := &mocks.MockEmailSender{}
+
+	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
+
+	// ACT
+	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+
+	// ASSERT
+	require.NoError(t, err)
+	require.Len(t, mockEmail.Sent, 1)
+	assert.Equal(t, user.Email, mockEmail.Sent[0].To)
+	assert.Equal(t, "Welcome to Ductifact", mockEmail.Sent[0].Subject)
+	assert.Contains(t, mockEmail.Sent[0].HTML, "Juan")
+	assert.Contains(t, mockEmail.Sent[0].Text, "Juan")
+}
+
+func TestRegister_SucceedsEvenIfEmailFails(t *testing.T) {
+	// ARRANGE
+	mockRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	mockToken := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+	mockEmail := &mocks.MockEmailSender{
+		SendFn: func(ctx context.Context, email ports.Email) error {
+			return errors.New("smtp down")
+		},
+	}
+
+	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
+
+	// ACT
+	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123")
+
+	// ASSERT: registration succeeds despite email failure
+	require.NoError(t, err)
+	assert.NotNil(t, user)
+	assert.NotNil(t, tokens)
 }
 
 // =============================================================================
