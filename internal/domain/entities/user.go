@@ -17,17 +17,27 @@ type User struct {
 	Name         string
 	Email        string
 	PasswordHash string
+	Locale       string // BCP 47 language tag (e.g. "en", "es")
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time // nil = active, non-nil = soft-deleted
 }
 
+// CreateUserParams groups all parameters needed to create a User.
+// Required: Name, Email, Password, Locale.
+type CreateUserParams struct {
+	Name     string
+	Email    string
+	Password string
+	Locale   string
+}
+
 // NewUser is the only way to create a valid User.
-// It validates name and email via setters (single source of truth),
-// then hashes the password via the Value Object.
-func NewUser(name, email, password string) (*User, error) {
+// It validates name, email, password and locale via their respective Value Objects.
+// All fields are required — the caller must supply a valid locale.
+func NewUser(params CreateUserParams) (*User, error) {
 	// Validate and hash the password via the Value Object
-	pwd, err := valueobjects.NewPassword(password)
+	pwd, err := valueobjects.NewPassword(params.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -41,10 +51,13 @@ func NewUser(name, email, password string) (*User, error) {
 	}
 
 	// Validate through setters — each setter is the single source of truth.
-	if err := u.SetName(name); err != nil {
+	if err := u.SetName(params.Name); err != nil {
 		return nil, err
 	}
-	if err := u.SetEmail(email); err != nil {
+	if err := u.SetEmail(params.Email); err != nil {
+		return nil, err
+	}
+	if err := u.SetLocale(params.Locale); err != nil {
 		return nil, err
 	}
 
@@ -67,5 +80,15 @@ func (u *User) SetEmail(email string) error {
 		return err
 	}
 	u.Email = valid.String()
+	return nil
+}
+
+// SetLocale validates and updates the user's preferred locale.
+func (u *User) SetLocale(locale string) error {
+	valid, err := valueobjects.NewLocale(locale)
+	if err != nil {
+		return err
+	}
+	u.Locale = valid.String()
 	return nil
 }
