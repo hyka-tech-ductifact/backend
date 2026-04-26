@@ -29,7 +29,9 @@ func TestPostgresUserRepository_Create_And_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a valid user using the domain constructor
-	user, err := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	user, err := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
 	require.NoError(t, err)
 
 	// CREATE
@@ -55,7 +57,9 @@ func TestPostgresUserRepository_GetByEmail(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	user, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
 
@@ -79,7 +83,9 @@ func TestPostgresUserRepository_Update(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
+	user, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
 	err := repo.Create(ctx, user)
 	require.NoError(t, err)
 
@@ -119,11 +125,15 @@ func TestPostgresUserRepository_Create_DuplicateEmail_Fails(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user1, _ := entities.NewUser("Juan", "same@example.com", "securepass123")
+	user1, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "same@example.com", Password: "securepass123", Locale: "en",
+	})
 	err := repo.Create(ctx, user1)
 	require.NoError(t, err)
 
-	user2, _ := entities.NewUser("Pedro", "same@example.com", "securepass123")
+	user2, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Pedro", Email: "same@example.com", Password: "securepass123", Locale: "en",
+	})
 	err = repo.Create(ctx, user2)
 
 	// The DB must reject the duplicate email via UNIQUE constraint
@@ -138,9 +148,15 @@ func TestPostgresUserRepository_Create_MultipleUsers(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	user1, _ := entities.NewUser("Juan", "juan@example.com", "securepass123")
-	user2, _ := entities.NewUser("Pedro", "pedro@example.com", "securepass123")
-	user3, _ := entities.NewUser("Maria", "maria@example.com", "securepass123")
+	user1, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
+	user2, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Pedro", Email: "pedro@example.com", Password: "securepass123", Locale: "en",
+	})
+	user3, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Maria", Email: "maria@example.com", Password: "securepass123", Locale: "en",
+	})
 
 	require.NoError(t, repo.Create(ctx, user1))
 	require.NoError(t, repo.Create(ctx, user2))
@@ -168,7 +184,9 @@ func TestPostgresUserRepository_Mapper_PreservesAllFields(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
 
-	original, _ := entities.NewUser("Juan García", "juan.garcia@example.com", "securepass123")
+	original, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan García", Email: "juan.garcia@example.com", Password: "securepass123", Locale: "en",
+	})
 	err := repo.Create(ctx, original)
 	require.NoError(t, err)
 
@@ -195,7 +213,9 @@ func TestPostgresUserRepository_Create_SameEmail_AfterSoftDelete_Succeeds(t *tes
 	ctx := context.Background()
 
 	// 1. Create a user
-	user1, _ := entities.NewUser("Juan", "reuse@example.com", "securepass123")
+	user1, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "reuse@example.com", Password: "securepass123", Locale: "en",
+	})
 	err := repo.Create(ctx, user1)
 	require.NoError(t, err)
 
@@ -204,7 +224,9 @@ func TestPostgresUserRepository_Create_SameEmail_AfterSoftDelete_Succeeds(t *tes
 	require.NoError(t, err)
 
 	// 3. Create a new user with the SAME email — must succeed thanks to partial unique index
-	user2, _ := entities.NewUser("Juan Nuevo", "reuse@example.com", "securepass123")
+	user2, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan Nuevo", Email: "reuse@example.com", Password: "securepass123", Locale: "en",
+	})
 	err = repo.Create(ctx, user2)
 	require.NoError(t, err, "should allow re-registration after soft delete")
 

@@ -21,6 +21,7 @@ type UserModel struct {
 	Name         string
 	Email        string
 	PasswordHash string
+	Locale       string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    gorm.DeletedAt
@@ -81,6 +82,7 @@ func toUserModel(user *entities.User) *UserModel {
 		Name:         user.Name,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
+		Locale:       user.Locale,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	}
@@ -96,6 +98,7 @@ func toUserEntity(model *UserModel) *entities.User {
 		Name:         model.Name,
 		Email:        model.Email,
 		PasswordHash: model.PasswordHash,
+		Locale:       model.Locale,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}

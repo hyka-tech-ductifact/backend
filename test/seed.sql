@@ -11,9 +11,9 @@
 -- ─── Users ──────────────────────────────────────────────────
 -- Two users to test ownership isolation (user A cannot see user B's clients).
 
-INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Alice Dev',   'alice@ductifact.dev', '$2a$10$eypcHfvBhsY2MfQov.1mxulMaHdiKiBgv7U9z.ISiCyYoibAksegq', NOW(), NOW()),
-  ('b0000000-0000-0000-0000-000000000002', 'Bob Tester',  'bob@ductifact.dev',   '$2a$10$eypcHfvBhsY2MfQov.1mxulMaHdiKiBgv7U9z.ISiCyYoibAksegq', NOW(), NOW());
+INSERT INTO users (id, name, email, password_hash, locale, created_at, updated_at) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'Alice Dev',   'alice@ductifact.dev', '$2a$10$eypcHfvBhsY2MfQov.1mxulMaHdiKiBgv7U9z.ISiCyYoibAksegq', 'en', NOW(), NOW()),
+  ('b0000000-0000-0000-0000-000000000002', 'Bob Tester',  'bob@ductifact.dev',   '$2a$10$eypcHfvBhsY2MfQov.1mxulMaHdiKiBgv7U9z.ISiCyYoibAksegq', 'es', NOW(), NOW());
 
 -- ─── Clients (Alice) ────────────────────────────────────────
 -- 8 clients for Alice — enough to test pagination (default page size is usually 10).
