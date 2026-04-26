@@ -28,6 +28,7 @@ const fileProxyPrefix = "/v1/files/"
 func SetupRoutes(
 	healthChecker ports.HealthChecker,
 	fileStorage ports.FileStorage,
+	emailSender ports.EmailSender,
 	userService usecases.UserService,
 	clientService usecases.ClientService,
 	projectService usecases.ProjectService,
@@ -121,7 +122,7 @@ func SetupRoutes(
 
 	// --- Infrastructure routes (unversioned) ---
 
-	healthHandler := NewHealthHandler(healthChecker, fileStorage, time.Now(), config.ContractVersion, config.Version, config.Commit)
+	healthHandler := NewHealthHandler(healthChecker, fileStorage, emailSender, time.Now(), config.ContractVersion, config.Version, config.Commit)
 	r.GET("/healthz", healthHandler.Healthz)
 	r.GET("/readyz", healthHandler.Readyz)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))

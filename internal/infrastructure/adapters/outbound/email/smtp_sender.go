@@ -44,3 +44,13 @@ func (s *SMTPSender) Send(ctx context.Context, email ports.Email) error {
 	}
 	return nil
 }
+
+// Ping checks that the SMTP server is reachable by opening a TCP connection.
+func (s *SMTPSender) Ping(ctx context.Context) error {
+	addr := fmt.Sprintf("%s:%d", s.host, s.port)
+	client, err := smtp.Dial(addr)
+	if err != nil {
+		return fmt.Errorf("smtp ping %s: %w", addr, err)
+	}
+	return client.Close()
+}

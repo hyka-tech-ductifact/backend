@@ -16,4 +16,8 @@ type EmailSender interface {
 	// Send delivers a transactional email to the recipient.
 	// Returns an error if the delivery fails.
 	Send(ctx context.Context, email Email) error
+
+	// Ping checks whether the email backend is reachable.
+	// Used by the readiness probe to verify email health.
+	Ping(ctx context.Context) error
 }
