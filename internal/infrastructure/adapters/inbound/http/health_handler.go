@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -23,6 +24,7 @@ type HealthHandler struct {
 	contractVersion string
 	version         string
 	commit          string
+	logLevel        string
 }
 
 // storagePinger is a minimal interface for checking storage health.
@@ -47,6 +49,7 @@ func NewHealthHandler(
 	contractVersion string,
 	version string,
 	commit string,
+	logLevel string,
 ) *HealthHandler {
 	return &HealthHandler{
 		healthChecker:   healthChecker,
@@ -56,6 +59,7 @@ func NewHealthHandler(
 		contractVersion: contractVersion,
 		version:         version,
 		commit:          commit,
+		logLevel:        logLevel,
 	}
 }
 
@@ -71,9 +75,15 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 	})
 }
 
-// Readyz checks that the API and its dependencies are healthy.
+// Readyz checks that the API and its critical dependencies are healthy.
 // Used as a Kubernetes readiness probe — a failure removes the pod from the
 // load balancer but does NOT restart it.
+//
+// Critical dependencies (cause 503): database, storage.
+// Non-critical dependencies (cause "degraded" status but still 200): email.
+//
+// In production, error details are not exposed in the response; they are
+// logged internally instead.
 //
 // Response 200 (ready):
 //
@@ -88,15 +98,29 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "contract_version": "1.0.0"
 //	}
 //
-// Response 503 (not ready):
+// Response 200 (degraded — non-critical dependency down):
+//
+//	{
+//	  "status": "degraded",
+//	  "uptime": "2h35m10s",
+//	  "database": "connected",
+//	  "storage": "connected",
+//	  "email": "unavailable",
+//	  "warnings": ["email: unavailable"],
+//	  "version": "v1.0.0",
+//	  "commit": "abc1234",
+//	  "contract_version": "1.0.0"
+//	}
+//
+// Response 503 (not ready — critical dependency down):
 //
 //	{
 //	  "status": "not_ready",
 //	  "uptime": "2h35m10s",
 //	  "database": "disconnected",
 //	  "storage": "connected",
-//	  "email": "disconnected",
-//	  "errors": ["database: connection refused", "email: smtp unreachable"],
+//	  "email": "connected",
+//	  "errors": ["database: unavailable"],
 //	  "version": "v1.0.0",
 //	  "commit": "abc1234",
 //	  "contract_version": "1.0.0"
@@ -113,6 +137,7 @@ type readyzResponse struct {
 	Commit          string   `json:"commit"`
 	ContractVersion string   `json:"contract_version"`
 	Errors          []string `json:"errors,omitempty"`
+	Warnings        []string `json:"warnings,omitempty"`
 }
 
 func (h *HealthHandler) Readyz(c *gin.Context) {
@@ -123,20 +148,38 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	storageStatus := "connected"
 	emailStatus := "connected"
 	var errs []string
+	var warnings []string
 
+	// Critical checks — failure causes 503
 	if err := h.healthChecker.Ping(ctx); err != nil {
 		dbStatus = "disconnected"
-		errs = append(errs, "database: "+err.Error())
+		if h.logLevel == "debug" {
+			errs = append(errs, "database: "+err.Error())
+		} else {
+			slog.Error("readyz: database ping failed", "error", err.Error())
+			errs = append(errs, "database: unavailable")
+		}
 	}
 
 	if err := h.storageChecker.Ping(ctx); err != nil {
 		storageStatus = "disconnected"
-		errs = append(errs, "storage: "+err.Error())
+		if h.logLevel == "debug" {
+			errs = append(errs, "storage: "+err.Error())
+		} else {
+			slog.Error("readyz: storage ping failed", "error", err.Error())
+			errs = append(errs, "storage: unavailable")
+		}
 	}
 
+	// Non-critical check — failure causes "degraded" but NOT 503
 	if err := h.emailChecker.Ping(ctx); err != nil {
-		emailStatus = "disconnected"
-		errs = append(errs, "email: "+err.Error())
+		emailStatus = "unavailable"
+		if h.logLevel == "debug" {
+			warnings = append(warnings, "email: "+err.Error())
+		} else {
+			slog.Warn("readyz: email ping failed", "error", err.Error())
+			warnings = append(warnings, "email: unavailable")
+		}
 	}
 
 	status := "ready"
@@ -144,6 +187,8 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	if len(errs) > 0 {
 		status = "not_ready"
 		code = http.StatusServiceUnavailable
+	} else if len(warnings) > 0 {
+		status = "degraded"
 	}
 
 	body := readyzResponse{
@@ -158,6 +203,9 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	}
 	if len(errs) > 0 {
 		body.Errors = errs
+	}
+	if len(warnings) > 0 {
+		body.Warnings = warnings
 	}
 
 	c.JSON(code, body)
