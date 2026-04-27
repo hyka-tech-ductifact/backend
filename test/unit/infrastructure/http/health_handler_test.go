@@ -23,14 +23,21 @@ func init() {
 
 func setupLivezRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, time.Now(), config.ContractVersion, "test-version", "abc1234")
+	h := handler.NewHealthHandler(healthMock, storageMock, &mocks.MockEmailSender{}, time.Now(), config.ContractVersion, "test-version", "abc1234")
 	r.GET("/healthz", h.Healthz)
 	return r
 }
 
 func setupReadyzRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, time.Now(), config.ContractVersion, "test-version", "abc1234")
+	h := handler.NewHealthHandler(healthMock, storageMock, &mocks.MockEmailSender{}, time.Now(), config.ContractVersion, "test-version", "abc1234")
+	r.GET("/readyz", h.Readyz)
+	return r
+}
+
+func setupReadyzRouterWithEmail(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage, emailMock *mocks.MockEmailSender) *gin.Engine {
+	r := gin.New()
+	h := handler.NewHealthHandler(healthMock, storageMock, emailMock, time.Now(), config.ContractVersion, "test-version", "abc1234")
 	r.GET("/readyz", h.Readyz)
 	return r
 }
@@ -71,6 +78,7 @@ func TestHealthHandler_Readyz_Ready(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"ready"`)
 	assert.Contains(t, w.Body.String(), `"database":"connected"`)
 	assert.Contains(t, w.Body.String(), `"storage":"connected"`)
+	assert.Contains(t, w.Body.String(), `"email":"connected"`)
 	assert.Contains(t, w.Body.String(), `"version":"test-version"`)
 	assert.Contains(t, w.Body.String(), `"commit":"abc1234"`)
 	assert.Contains(t, w.Body.String(), `"uptime"`)
@@ -139,8 +147,13 @@ func TestHealthHandler_Readyz_AllDown(t *testing.T) {
 			return errors.New("minio unreachable")
 		},
 	}
+	emailMock := &mocks.MockEmailSender{
+		PingFn: func(ctx context.Context) error {
+			return errors.New("smtp unreachable")
+		},
+	}
 
-	router := setupReadyzRouter(healthMock, storageMock)
+	router := setupReadyzRouterWithEmail(healthMock, storageMock, emailMock)
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	w := httptest.NewRecorder()
 
@@ -150,4 +163,36 @@ func TestHealthHandler_Readyz_AllDown(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"not_ready"`)
 	assert.Contains(t, w.Body.String(), `"database":"disconnected"`)
 	assert.Contains(t, w.Body.String(), `"storage":"disconnected"`)
+	assert.Contains(t, w.Body.String(), `"email":"disconnected"`)
+}
+
+func TestHealthHandler_Readyz_EmailDown(t *testing.T) {
+	healthMock := &mocks.MockHealthChecker{
+		PingFn: func(ctx context.Context) error {
+			return nil
+		},
+	}
+	storageMock := &mocks.MockFileStorage{
+		PingFn: func(ctx context.Context) error {
+			return nil
+		},
+	}
+	emailMock := &mocks.MockEmailSender{
+		PingFn: func(ctx context.Context) error {
+			return errors.New("smtp unreachable")
+		},
+	}
+
+	router := setupReadyzRouterWithEmail(healthMock, storageMock, emailMock)
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Contains(t, w.Body.String(), `"status":"not_ready"`)
+	assert.Contains(t, w.Body.String(), `"database":"connected"`)
+	assert.Contains(t, w.Body.String(), `"storage":"connected"`)
+	assert.Contains(t, w.Body.String(), `"email":"disconnected"`)
+	assert.Contains(t, w.Body.String(), `email: smtp unreachable`)
 }

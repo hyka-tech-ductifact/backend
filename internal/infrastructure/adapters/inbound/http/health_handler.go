@@ -18,6 +18,7 @@ import (
 type HealthHandler struct {
 	healthChecker   ports.HealthChecker
 	storageChecker  storagePinger
+	emailChecker    emailPinger
 	startTime       time.Time
 	contractVersion string
 	version         string
@@ -30,11 +31,18 @@ type storagePinger interface {
 	Ping(ctx context.Context) error
 }
 
+// emailPinger is a minimal interface for checking email backend health.
+// ports.EmailSender satisfies it (via its Ping method).
+type emailPinger interface {
+	Ping(ctx context.Context) error
+}
+
 // NewHealthHandler creates a new HealthHandler.
 // Call this at application startup and pass the time the app started.
 func NewHealthHandler(
 	healthChecker ports.HealthChecker,
 	storageChecker ports.FileStorage,
+	emailChecker ports.EmailSender,
 	startTime time.Time,
 	contractVersion string,
 	version string,
@@ -43,6 +51,7 @@ func NewHealthHandler(
 	return &HealthHandler{
 		healthChecker:   healthChecker,
 		storageChecker:  storageChecker,
+		emailChecker:    emailChecker,
 		startTime:       startTime,
 		contractVersion: contractVersion,
 		version:         version,
@@ -73,6 +82,7 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "uptime": "2h35m10s",
 //	  "database": "connected",
 //	  "storage": "connected",
+//	  "email": "connected",
 //	  "version": "v1.0.0",
 //	  "commit": "abc1234",
 //	  "contract_version": "1.0.0"
@@ -85,17 +95,33 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "uptime": "2h35m10s",
 //	  "database": "disconnected",
 //	  "storage": "connected",
-//	  "errors": ["database: connection refused"],
+//	  "email": "disconnected",
+//	  "errors": ["database: connection refused", "email: smtp unreachable"],
 //	  "version": "v1.0.0",
 //	  "commit": "abc1234",
 //	  "contract_version": "1.0.0"
 //	}
+//
+// readyzResponse defines the JSON field order for the readiness endpoint.
+type readyzResponse struct {
+	Status          string   `json:"status"`
+	Uptime          string   `json:"uptime"`
+	Database        string   `json:"database"`
+	Storage         string   `json:"storage"`
+	Email           string   `json:"email"`
+	Version         string   `json:"version"`
+	Commit          string   `json:"commit"`
+	ContractVersion string   `json:"contract_version"`
+	Errors          []string `json:"errors,omitempty"`
+}
+
 func (h *HealthHandler) Readyz(c *gin.Context) {
 	ctx := c.Request.Context()
 	uptime := time.Since(h.startTime).Round(time.Second).String()
 
 	dbStatus := "connected"
 	storageStatus := "connected"
+	emailStatus := "connected"
 	var errs []string
 
 	if err := h.healthChecker.Ping(ctx); err != nil {
@@ -108,6 +134,11 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		errs = append(errs, "storage: "+err.Error())
 	}
 
+	if err := h.emailChecker.Ping(ctx); err != nil {
+		emailStatus = "disconnected"
+		errs = append(errs, "email: "+err.Error())
+	}
+
 	status := "ready"
 	code := http.StatusOK
 	if len(errs) > 0 {
@@ -115,17 +146,18 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		code = http.StatusServiceUnavailable
 	}
 
-	body := gin.H{
-		"status":           status,
-		"uptime":           uptime,
-		"database":         dbStatus,
-		"storage":          storageStatus,
-		"version":          h.version,
-		"commit":           h.commit,
-		"contract_version": h.contractVersion,
+	body := readyzResponse{
+		Status:          status,
+		Uptime:          uptime,
+		Database:        dbStatus,
+		Storage:         storageStatus,
+		Email:           emailStatus,
+		Version:         h.version,
+		Commit:          h.commit,
+		ContractVersion: h.contractVersion,
 	}
 	if len(errs) > 0 {
-		body["errors"] = errs
+		body.Errors = errs
 	}
 
 	c.JSON(code, body)

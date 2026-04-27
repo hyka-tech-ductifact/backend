@@ -12,6 +12,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/config"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
+	"ductifact/internal/infrastructure/adapters/outbound/email"
 	"ductifact/internal/infrastructure/adapters/outbound/imageproc"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/internal/infrastructure/adapters/outbound/storage"
@@ -80,6 +81,15 @@ func main() {
 	pieceDefService := services.NewPieceDefinitionService(pieceDefRepo, fileStorage, imageProcessor, pieceRepo)
 	pieceService := services.NewPieceService(pieceRepo, pieceDefRepo, orderRepo)
 
+	// --- Email wiring ---
+	emailSender := email.NewSMTPSender(
+		cfg.SMTP.Host, cfg.SMTP.Port,
+		cfg.SMTP.UseAuth,
+		cfg.SMTP.Username, cfg.SMTP.Password,
+		cfg.SMTP.From,
+	)
+	slog.Info("email sender ready", "host", cfg.SMTP.Host, "port", cfg.SMTP.Port)
+
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
 	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
@@ -94,7 +104,7 @@ func main() {
 	)
 	defer loginThrottler.Stop()
 
-	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
+	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
@@ -115,7 +125,7 @@ func main() {
 	defer userLimiter.Stop()
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, fileStorage, userService, clientService, projectService, orderService, pieceDefService, pieceService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
+	router := httpAdapter.SetupRoutes(healthChecker, fileStorage, emailSender, userService, clientService, projectService, orderService, pieceDefService, pieceService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS)
 
 	port := cfg.App.Port
 	srv := &http.Server{

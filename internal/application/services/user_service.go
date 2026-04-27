@@ -46,7 +46,7 @@ func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*entities.
 
 // UpdateUser applies a partial update to an existing user.
 // Only non-nil fields are updated.
-func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email *string) (*entities.User, error) {
+func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email, locale *string) (*entities.User, error) {
 	// Step 1: Fetch existing
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 	}
 
 	// Step 2: Nothing to update
-	if name == nil && email == nil {
+	if name == nil && email == nil && locale == nil {
 		return user, nil
 	}
 
@@ -80,6 +80,11 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email 
 		}
 		// Validate format and apply via entity (which uses the VO internally)
 		if err := user.SetEmail(*email); err != nil {
+			return nil, err
+		}
+	}
+	if locale != nil {
+		if err := user.SetLocale(*locale); err != nil {
 			return nil, err
 		}
 	}

@@ -13,5 +13,5 @@ import (
 // Note: User creation is handled by AuthService.Register (authentication flow).
 type UserService interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*entities.User, error)
-	UpdateUser(ctx context.Context, id uuid.UUID, name, email *string) (*entities.User, error)
+	UpdateUser(ctx context.Context, id uuid.UUID, name, email, locale *string) (*entities.User, error)
 }

@@ -13,14 +13,16 @@ import (
 // --- DTOs (HTTP-specific, not domain objects) ---
 
 type UpdateUserRequest struct {
-	Name  *string `json:"name" binding:"omitempty"`
-	Email *string `json:"email" binding:"omitempty,email"`
+	Name   *string `json:"name" binding:"omitempty"`
+	Email  *string `json:"email" binding:"omitempty,email"`
+	Locale *string `json:"locale" binding:"omitempty,oneof=en es"`
 }
 
 type UserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Locale string `json:"locale"`
 }
 
 // --- Handler ---
@@ -62,7 +64,7 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.UpdateUser(c.Request.Context(), userID, req.Name, req.Email)
+	user, err := h.userService.UpdateUser(c.Request.Context(), userID, req.Name, req.Email, req.Locale)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -75,8 +77,9 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 
 func toUserResponse(user *entities.User) *UserResponse {
 	return &UserResponse{
-		ID:    user.ID.String(),
-		Name:  user.Name,
-		Email: user.Email,
+		ID:     user.ID.String(),
+		Name:   user.Name,
+		Email:  user.Email,
+		Locale: user.Locale,
 	}
 }

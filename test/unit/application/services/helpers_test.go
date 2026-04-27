@@ -19,6 +19,7 @@ func newTestUser() *entities.User {
 		ID:        uuid.New(),
 		Name:      "Juan",
 		Email:     "juan@example.com",
+		Locale:    "en",
 		CreatedAt: time.Now().Add(-time.Hour),
 		UpdatedAt: time.Now().Add(-time.Hour),
 	}

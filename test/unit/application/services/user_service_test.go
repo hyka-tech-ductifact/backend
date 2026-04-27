@@ -47,7 +47,7 @@ func TestUpdateUser_WithNewName_UpdatesOnlyName(t *testing.T) {
 	user := newTestUser()
 	svc := services.NewUserService(userRepoReturning(user))
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Pedro", result.Name)
@@ -62,7 +62,7 @@ func TestUpdateUser_WithNewEmail_UpdatesOnlyEmail(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"))
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"), nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Juan", result.Name)
@@ -77,7 +77,7 @@ func TestUpdateUser_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("taken@example.com"))
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("taken@example.com"), nil)
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
@@ -93,7 +93,7 @@ func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr(user.Email))
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr(user.Email), nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, user.Email, result.Email)
@@ -103,7 +103,7 @@ func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
 func TestUpdateUser_WithNonExistingUser_ReturnsError(t *testing.T) {
 	svc := services.NewUserService(userRepoReturning(nil))
 
-	result, err := svc.UpdateUser(context.Background(), uuid.New(), strPtr("Pedro"), nil)
+	result, err := svc.UpdateUser(context.Background(), uuid.New(), strPtr("Pedro"), nil, nil)
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
@@ -117,7 +117,7 @@ func TestUpdateUser_WhenRepoFails_ReturnsError(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
 	assert.Nil(t, result)
 	assert.EqualError(t, err, "db write failed")
@@ -128,7 +128,7 @@ func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
 	oldTime := user.UpdatedAt
 	svc := services.NewUserService(userRepoReturning(user))
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
 	require.NoError(t, err)
 	assert.True(t, result.UpdatedAt.After(oldTime), "UpdatedAt must be newer than the original")
@@ -144,7 +144,7 @@ func TestUpdateUser_WithNoChanges_SkipsPersistence(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	_, err := svc.UpdateUser(context.Background(), user.ID, nil, nil)
+	_, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, nil)
 
 	require.NoError(t, err)
 	assert.False(t, updateCalled, "Update should not be called when no fields change")
@@ -154,7 +154,7 @@ func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
 	user := newTestUser()
 	svc := services.NewUserService(userRepoReturning(user))
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr(""), nil)
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr(""), nil, nil)
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
@@ -164,7 +164,7 @@ func TestUpdateUser_WithInvalidEmailFormat_ReturnsError(t *testing.T) {
 	user := newTestUser()
 	svc := services.NewUserService(userRepoReturning(user))
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("not-an-email"))
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("not-an-email"), nil)
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, valueobjects.ErrInvalidEmail)
@@ -178,8 +178,33 @@ func TestUpdateUser_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	}
 	svc := services.NewUserService(repo)
 
-	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"))
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"), nil)
 
 	assert.Nil(t, result)
 	assert.EqualError(t, err, "db connection lost")
+}
+
+// =============================================================================
+// UpdateUser — Locale
+// =============================================================================
+
+func TestUpdateUser_WithValidLocale_UpdatesLocale(t *testing.T) {
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
+
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, strPtr("es"))
+
+	require.NoError(t, err)
+	assert.Equal(t, "es", result.Locale)
+}
+
+func TestUpdateUser_WithInvalidLocale_ReturnsError(t *testing.T) {
+	user := newTestUser()
+	svc := services.NewUserService(userRepoReturning(user))
+
+	result, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, strPtr("fr"))
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid locale")
 }
