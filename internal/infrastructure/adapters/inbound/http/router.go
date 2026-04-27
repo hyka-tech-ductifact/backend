@@ -41,6 +41,7 @@ func SetupRoutes(
 	ipLimiter ports.RateLimiter,
 	userLimiter ports.RateLimiter,
 	corsCfg config.CORS,
+	logLevel string,
 ) *gin.Engine {
 	// --- Register domain error → HTTP status mappings ---
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
@@ -122,7 +123,7 @@ func SetupRoutes(
 
 	// --- Infrastructure routes (unversioned) ---
 
-	healthHandler := NewHealthHandler(healthChecker, fileStorage, emailSender, time.Now(), config.ContractVersion, config.Version, config.Commit)
+	healthHandler := NewHealthHandler(healthChecker, fileStorage, emailSender, time.Now(), config.ContractVersion, config.Version, config.Commit, logLevel)
 	r.GET("/healthz", healthHandler.Healthz)
 	r.GET("/readyz", healthHandler.Readyz)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
