@@ -51,7 +51,12 @@ env:
   MINIO_ROOT_PASSWORD: ci-minio-password
   MINIO_BUCKET: ci-bucket
   MINIO_USE_SSL: "false"
-
+  SMTP_HOST: localhost
+  SMTP_PORT: "1025"
+  SMTP_AUTH: "false"
+  SMTP_USERNAME: noop
+  SMTP_PASSWORD: noop
+  SMTP_FROM: noreply@ductifact.com
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
 
