@@ -84,6 +84,7 @@ func main() {
 	// --- Email wiring ---
 	emailSender := email.NewSMTPSender(
 		cfg.SMTP.Host, cfg.SMTP.Port,
+		cfg.SMTP.UseAuth,
 		cfg.SMTP.Username, cfg.SMTP.Password,
 		cfg.SMTP.From,
 	)
