@@ -182,11 +182,6 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		}
 	}
 
-	if err := h.emailChecker.Ping(ctx); err != nil {
-		emailStatus = "disconnected"
-		errs = append(errs, "email: "+err.Error())
-	}
-
 	status := "ready"
 	code := http.StatusOK
 	if len(errs) > 0 {
