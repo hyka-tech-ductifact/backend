@@ -101,6 +101,20 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "commit": "abc1234",
 //	  "contract_version": "1.0.0"
 //	}
+//
+// readyzResponse defines the JSON field order for the readiness endpoint.
+type readyzResponse struct {
+	Status          string   `json:"status"`
+	Uptime          string   `json:"uptime"`
+	Database        string   `json:"database"`
+	Storage         string   `json:"storage"`
+	Email           string   `json:"email"`
+	Version         string   `json:"version"`
+	Commit          string   `json:"commit"`
+	ContractVersion string   `json:"contract_version"`
+	Errors          []string `json:"errors,omitempty"`
+}
+
 func (h *HealthHandler) Readyz(c *gin.Context) {
 	ctx := c.Request.Context()
 	uptime := time.Since(h.startTime).Round(time.Second).String()
@@ -132,18 +146,18 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		code = http.StatusServiceUnavailable
 	}
 
-	body := gin.H{
-		"status":           status,
-		"uptime":           uptime,
-		"database":         dbStatus,
-		"storage":          storageStatus,
-		"email":            emailStatus,
-		"version":          h.version,
-		"commit":           h.commit,
-		"contract_version": h.contractVersion,
+	body := readyzResponse{
+		Status:          status,
+		Uptime:          uptime,
+		Database:        dbStatus,
+		Storage:         storageStatus,
+		Email:           emailStatus,
+		Version:         h.version,
+		Commit:          h.commit,
+		ContractVersion: h.contractVersion,
 	}
 	if len(errs) > 0 {
-		body["errors"] = errs
+		body.Errors = errs
 	}
 
 	c.JSON(code, body)
