@@ -13,10 +13,10 @@ import (
 // --- DTOs ---
 
 type RegisterRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Locale   string `json:"locale" binding:"omitempty,oneof=en es"`
+	Name     string       `json:"name" binding:"required"`
+	Email    string       `json:"email" binding:"required,email"`
+	Password string       `json:"password" binding:"required,min=8"`
+	Locale   StrictString `json:"locale" binding:"omitempty,oneof=en es"`
 }
 
 type LoginRequest struct {
@@ -60,7 +60,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, tokens, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Locale)
+	user, tokens, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Locale.String())
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
