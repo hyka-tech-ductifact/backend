@@ -37,6 +37,11 @@ type VerifyEmailRequest struct {
 	Token string `json:"token" binding:"required"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
+
 type AuthResponse struct {
 	User         UserResponse `json:"user"`
 	AccessToken  string       `json:"access_token"`
@@ -163,4 +168,21 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "verification email sent"})
+}
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	uid := c.MustGet("userID").(uuid.UUID)
+
+	if err := h.authService.ChangePassword(c.Request.Context(), uid, req.CurrentPassword, req.NewPassword); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
 }

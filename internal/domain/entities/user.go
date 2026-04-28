@@ -94,6 +94,16 @@ func (u *User) SetLocale(locale string) error {
 	return nil
 }
 
+// SetPassword validates the raw password and updates the user's password hash.
+func (u *User) SetPassword(raw string) error {
+	pwd, err := valueobjects.NewPassword(raw)
+	if err != nil {
+		return err
+	}
+	u.PasswordHash = pwd.Hash()
+	return nil
+}
+
 // IsEmailVerified returns true if the user has verified their email address.
 func (u *User) IsEmailVerified() bool {
 	return u.EmailVerifiedAt != nil

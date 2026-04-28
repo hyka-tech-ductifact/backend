@@ -150,7 +150,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 13.1 | `PUT /auth/password` (change password, requires current) | ⬜ | 🔴 Now |
+| 13.1 | `PUT /auth/password` (change password, requires current) | ✅ | 
 | 13.2 | `DELETE /users/me` (account self-deletion, GDPR) | ⬜ | 🔴 Now |
 | 13.3 | Email verification on registration (token-based) | ⬜ | 🟡 Soon |
 | 13.4 | `POST /auth/forgot-password` (reset via email token) | ⬜ | 🟡 Soon |

@@ -15,6 +15,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (*entities.User, *ports.TokenPair, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*ports.TokenPair, error)
 	Logout(ctx context.Context, accessToken, refreshToken string) error
+	ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error
 	VerifyEmail(ctx context.Context, token string) error
 	ResendVerificationEmail(ctx context.Context, userID uuid.UUID) error
 }

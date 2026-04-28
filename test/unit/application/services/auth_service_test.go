@@ -1079,3 +1079,98 @@ func TestResendVerification_WhenNotVerified_DeletesOldTokensAndCreatesNew(t *tes
 	assert.True(t, deleteCalled, "should delete old tokens before creating new one")
 	assert.Len(t, tokenRepo.Created, 1, "should create a new verification token")
 }
+
+// =============================================================================
+// ChangePassword
+// =============================================================================
+
+func TestChangePassword_WithValidData_UpdatesPassword(t *testing.T) {
+	// ARRANGE — create a user with a known password hash
+	pwd, _ := valueobjects.NewPassword("oldpass123")
+	user := &entities.User{
+		ID:           uuid.New(),
+		Name:         "Juan",
+		Email:        "juan@example.com",
+		PasswordHash: pwd.Hash(),
+		Locale:       "en",
+	}
+	var updatedUser *entities.User
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+		UpdateFn: func(ctx context.Context, u *entities.User) error {
+			updatedUser = u
+			return nil
+		},
+	}
+	svc := newTestAuthService(mockRepo, &mocks.MockTokenProvider{})
+
+	// ACT
+	err := svc.ChangePassword(context.Background(), user.ID, "oldpass123", "newpass456")
+
+	// ASSERT
+	require.NoError(t, err)
+	require.NotNil(t, updatedUser)
+	// Verify the new password works
+	newPwd := valueobjects.NewPasswordFromHash(updatedUser.PasswordHash)
+	assert.NoError(t, newPwd.Compare("newpass456"))
+	// Verify the old password no longer works
+	assert.Error(t, newPwd.Compare("oldpass123"))
+}
+
+func TestChangePassword_WithWrongCurrentPassword_ReturnsError(t *testing.T) {
+	pwd, _ := valueobjects.NewPassword("oldpass123")
+	user := &entities.User{
+		ID:           uuid.New(),
+		Name:         "Juan",
+		Email:        "juan@example.com",
+		PasswordHash: pwd.Hash(),
+		Locale:       "en",
+	}
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+	svc := newTestAuthService(mockRepo, &mocks.MockTokenProvider{})
+
+	err := svc.ChangePassword(context.Background(), user.ID, "wrongpassword", "newpass456")
+
+	assert.ErrorIs(t, err, services.ErrInvalidCurrentPassword)
+}
+
+func TestChangePassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
+	pwd, _ := valueobjects.NewPassword("oldpass123")
+	user := &entities.User{
+		ID:           uuid.New(),
+		Name:         "Juan",
+		Email:        "juan@example.com",
+		PasswordHash: pwd.Hash(),
+		Locale:       "en",
+	}
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+	svc := newTestAuthService(mockRepo, &mocks.MockTokenProvider{})
+
+	// New password too short (less than 8 chars)
+	err := svc.ChangePassword(context.Background(), user.ID, "oldpass123", "short")
+
+	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
+}
+
+func TestChangePassword_WithNonExistentUser_ReturnsError(t *testing.T) {
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthService(mockRepo, &mocks.MockTokenProvider{})
+
+	err := svc.ChangePassword(context.Background(), uuid.New(), "oldpass123", "newpass456")
+
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}

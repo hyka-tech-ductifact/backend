@@ -89,6 +89,7 @@ func SetupRoutes(
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 	helpers.RegisterDomainError(services.ErrInvalidVerificationToken, http.StatusBadRequest, "invalid or expired verification token")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyVerified, http.StatusConflict, "email already verified")
+	helpers.RegisterDomainError(services.ErrInvalidCurrentPassword, http.StatusUnauthorized, "current password is incorrect")
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
 	// Makes ShouldBindJSON return 400 for bodies with extra properties.
@@ -163,6 +164,7 @@ func SetupRoutes(
 	{
 		protectedAuth.POST("/logout", authHandler.Logout)
 		protectedAuth.POST("/resend-verification", authHandler.ResendVerification)
+		protectedAuth.PUT("/password", authHandler.ChangePassword)
 	}
 
 	// User routes — userID comes from the JWT token, not the URL

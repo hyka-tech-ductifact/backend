@@ -23,6 +23,7 @@ var (
 	ErrAccountLocked            = errors.New("account temporarily locked due to too many failed login attempts")
 	ErrInvalidVerificationToken = errors.New("invalid or expired verification token")
 	ErrEmailAlreadyVerified     = errors.New("email already verified")
+	ErrInvalidCurrentPassword   = errors.New("current password is incorrect")
 )
 
 // authService implements usecases.AuthService.
@@ -36,7 +37,7 @@ type authService struct {
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 	emailVerificationTTL time.Duration
-	verificationBaseURL          string
+	verificationBaseURL  string
 }
 
 // NewAuthService creates a new AuthService.
@@ -62,7 +63,7 @@ func NewAuthService(
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 		emailVerificationTTL: emailVerificationTTL,
-		verificationBaseURL:          verificationBaseURL,
+		verificationBaseURL:  verificationBaseURL,
 	}
 }
 
@@ -187,6 +188,34 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*p
 func (s *authService) Logout(_ context.Context, accessToken, refreshToken string) error {
 	s.blacklist.Add(accessToken, s.accessTokenDuration)
 	s.blacklist.Add(refreshToken, s.refreshTokenDuration)
+	return nil
+}
+
+// ChangePassword verifies the current password and updates it to the new one.
+// The caller must provide the correct current password for security.
+func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
+	// Step 1: Find user by ID
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	// Step 2: Verify current password
+	pwd := valueobjects.NewPasswordFromHash(user.PasswordHash)
+	if err := pwd.Compare(currentPassword); err != nil {
+		return ErrInvalidCurrentPassword
+	}
+
+	// Step 3: Validate and hash new password (via entity setter)
+	if err := user.SetPassword(newPassword); err != nil {
+		return err
+	}
+
+	// Step 4: Persist updated user
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
 	return nil
 }
 
