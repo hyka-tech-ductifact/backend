@@ -91,6 +91,7 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrInvalidVerificationToken, http.StatusBadRequest, "invalid or expired verification token")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyVerified, http.StatusConflict, "email already verified")
 	helpers.RegisterDomainError(services.ErrInvalidCurrentPassword, http.StatusUnauthorized, "current password is incorrect")
+	helpers.RegisterDomainError(services.ErrInvalidResetToken, http.StatusBadRequest, "invalid or expired password reset token")
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
 	// Makes ShouldBindJSON return 400 for bodies with extra properties.
@@ -144,7 +145,7 @@ func SetupRoutes(
 	fileHandler := NewFileHandler(fileStorage)
 	v1.GET("/files/*filepath", fileHandler.ServeFile)
 
-	// Auth routes
+	// Auth routes without authentication
 	authHandler := NewAuthHandler(authService)
 	authRoutes := v1.Group("/auth")
 	{
@@ -152,6 +153,8 @@ func SetupRoutes(
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/refresh", authHandler.Refresh)
 		authRoutes.POST("/verify-email", authHandler.VerifyEmail)
+		authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
+		authRoutes.POST("/reset-password", authHandler.ResetPassword)
 	}
 
 	// --- Protected routes (auth required) ---

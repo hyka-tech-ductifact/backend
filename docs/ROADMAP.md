@@ -152,9 +152,9 @@
 |---|------|--------|----------|
 | 13.1 | `PUT /auth/password` (change password, requires current) | ✅ | 
 | 13.2 | `DELETE /users/me` (account self-deletion, GDPR) | ✅ |
-| 13.3 | Email verification on registration (token-based) | ⬜ | 🟡 Soon |
-| 13.4 | `POST /auth/forgot-password` (reset via email token) | ⬜ | 🟡 Soon |
-| 13.5 | `POST /auth/reset-password` (confirm reset with token) | ⬜ | 🟡 Soon |
+| 13.3 | Email verification on registration (token-based) | ✅ |
+| 13.4 | `POST /auth/forgot-password` (reset via email token) | ✅ |
+| 13.5 | `POST /auth/reset-password` (confirm reset with token) | ✅ |
 
 ### 14. Advanced API
 
@@ -231,7 +231,7 @@
 | 19.1 | Email service port (adapter-agnostic) | ✅ |
 | 19.2 | SMTP adapter (SendGrid / Mailgun / SES) | ✅ |
 | 19.3 | Welcome email on registration | ✅ |
-| 19.4 | Password reset email with secure token | ⬜ | 🟡 Soon |
+| 19.4 | Password reset email with secure token | ✅ |
 | 19.5 | Email verification link | ✅ |
 | 19.6 | Notification preferences (opt-in/out per type) | ⬜ | 🔵 Later |
 

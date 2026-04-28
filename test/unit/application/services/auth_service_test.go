@@ -21,7 +21,7 @@ import (
 
 // newTestAuthService creates an AuthService with a no-op blacklist, no-op throttler and test durations.
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
@@ -30,7 +30,7 @@ func newTestAuthServiceWithEmail(
 	token *mocks.MockTokenProvider,
 	emailSender *mocks.MockEmailSender,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
@@ -39,7 +39,7 @@ func newTestAuthServiceWithBlacklist(
 	token *mocks.MockTokenProvider,
 	blacklist *mocks.MockTokenBlacklist,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithThrottler creates an AuthService with a custom login throttler.
@@ -48,7 +48,7 @@ func newTestAuthServiceWithThrottler(
 	token *mocks.MockTokenProvider,
 	throttler *mocks.MockLoginThrottler,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
 }
 
 // =============================================================================
@@ -839,7 +839,7 @@ func newTestAuthServiceWithTokenRepo(
 	repo *mocks.MockUserRepository,
 	tokenRepo *mocks.MockOneTimeTokenRepository,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(repo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
 }
 
 func TestVerifyEmail_WithValidToken_VerifiesUser(t *testing.T) {
@@ -1173,4 +1173,180 @@ func TestChangePassword_WithNonExistentUser_ReturnsError(t *testing.T) {
 	err := svc.ChangePassword(context.Background(), uuid.New(), "oldpass123", "newpass456")
 
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
+// =============================================================================
+// ForgotPassword
+// =============================================================================
+
+func TestForgotPassword_WithExistingEmail_SendsResetEmail(t *testing.T) {
+	userID := uuid.New()
+	user := &entities.User{
+		ID:     userID,
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return user, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+	tokenRepo := &mocks.MockOneTimeTokenRepository{}
+
+	svc := services.NewAuthService(
+		userRepo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{}, emailSender,
+		15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000",
+	)
+
+	err := svc.ForgotPassword(context.Background(), "juan@example.com")
+
+	require.NoError(t, err)
+	// Verify a token was created
+	require.Len(t, tokenRepo.Created, 1)
+	assert.Equal(t, entities.TokenTypePasswordReset, tokenRepo.Created[0].Type)
+	assert.Equal(t, userID, tokenRepo.Created[0].UserID)
+	// Verify an email was sent
+	require.Len(t, emailSender.Sent, 1)
+	assert.Equal(t, "juan@example.com", emailSender.Sent[0].To)
+}
+
+func TestForgotPassword_WithNonExistingEmail_ReturnsNilSilently(t *testing.T) {
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+
+	svc := services.NewAuthService(
+		userRepo, &mocks.MockOneTimeTokenRepository{}, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{}, emailSender,
+		15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000",
+	)
+
+	err := svc.ForgotPassword(context.Background(), "notfound@example.com")
+
+	require.NoError(t, err)
+	// No email should be sent
+	assert.Empty(t, emailSender.Sent)
+}
+
+// =============================================================================
+// ResetPassword
+// =============================================================================
+
+func TestResetPassword_WithValidToken_ResetsPassword(t *testing.T) {
+	userID := uuid.New()
+	pwd, _ := valueobjects.NewPassword("oldpass123")
+	user := &entities.User{
+		ID:           userID,
+		Name:         "Juan",
+		Email:        "juan@example.com",
+		PasswordHash: pwd.Hash(),
+		Locale:       "en",
+	}
+
+	var updatedUser *entities.User
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypePasswordReset,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+		UpdateFn: func(ctx context.Context, u *entities.User) error {
+			updatedUser = u
+			return nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.ResetPassword(context.Background(), "valid-reset-token", "newpass456")
+
+	require.NoError(t, err)
+	require.NotNil(t, updatedUser)
+	newPwd := valueobjects.NewPasswordFromHash(updatedUser.PasswordHash)
+	assert.NoError(t, newPwd.Compare("newpass456"))
+	assert.Error(t, newPwd.Compare("oldpass123"))
+}
+
+func TestResetPassword_WithInvalidToken_ReturnsError(t *testing.T) {
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+
+	err := svc.ResetPassword(context.Background(), "invalid-token", "newpass456")
+
+	assert.ErrorIs(t, err, services.ErrInvalidResetToken)
+}
+
+func TestResetPassword_WithExpiredToken_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypePasswordReset,
+				ExpiresAt: time.Now().Add(-time.Hour), // Already expired
+			}, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+
+	err := svc.ResetPassword(context.Background(), "expired-token", "newpass456")
+
+	assert.ErrorIs(t, err, services.ErrInvalidResetToken)
+}
+
+func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	user := &entities.User{
+		ID:     userID,
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypePasswordReset,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.ResetPassword(context.Background(), "valid-token", "short")
+
+	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
 }
