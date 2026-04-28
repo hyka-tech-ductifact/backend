@@ -36,7 +36,7 @@ type authService struct {
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 	emailVerificationTTL time.Duration
-	clientURL          string
+	verificationBaseURL          string
 }
 
 // NewAuthService creates a new AuthService.
@@ -50,7 +50,7 @@ func NewAuthService(
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 	emailVerificationTTL time.Duration,
-	clientURL string,
+	verificationBaseURL string,
 ) *authService {
 	return &authService{
 		userRepo:             userRepo,
@@ -62,7 +62,7 @@ func NewAuthService(
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 		emailVerificationTTL: emailVerificationTTL,
-		clientURL:          clientURL,
+		verificationBaseURL:          verificationBaseURL,
 	}
 }
 
@@ -271,7 +271,7 @@ func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *ent
 		return
 	}
 
-	verificationURL := s.clientURL + "/verify-email?token=" + vt.Token
+	verificationURL := s.verificationBaseURL + "/verify-email?token=" + vt.Token
 	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
 		Name:            user.Name,
 		VerificationURL: verificationURL,
@@ -305,7 +305,7 @@ func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.
 		return
 	}
 
-	verificationURL := s.clientURL + "/verify-email?token=" + vt.Token
+	verificationURL := s.verificationBaseURL + "/verify-email?token=" + vt.Token
 	subject, html, text, err := templates.RenderVerification(templates.VerificationData{
 		Name:            user.Name,
 		VerificationURL: verificationURL,

@@ -19,21 +19,23 @@ import (
 
 // Config holds all application configuration, grouped by concern.
 type Config struct {
-	App               App
-	Database          Database
-	JWT               JWT
-	Log               Log
-	CORS              CORS
-	RateLimit         RateLimit
-	LoginThrottle     LoginThrottle
-	MinIO             MinIO
-	SMTP              SMTP
-	EmailVerification EmailVerification
+	App           App
+	Database      Database
+	JWT           JWT
+	Log           Log
+	CORS          CORS
+	RateLimit     RateLimit
+	LoginThrottle LoginThrottle
+	MinIO         MinIO
+	SMTP          SMTP
+	OneTimeTokens OneTimeTokens
 }
 
-// EmailVerification holds email verification settings.
-type EmailVerification struct {
-	TokenDuration time.Duration // How long verification tokens remain valid (e.g. "24h")
+// OneTimeTokens holds TTL configuration for one-time-use tokens.
+type OneTimeTokens struct {
+	EmailVerificationTTL time.Duration // How long email verification tokens remain valid (e.g. "24h")
+	PasswordResetTTL     time.Duration // How long password reset tokens remain valid (e.g. "1h")
+	VerificationBaseURL  string        // Base URL for verification links (e.g. "https://app.ductifact.com")
 }
 
 // MinIO holds S3-compatible object storage settings.
@@ -59,9 +61,8 @@ type SMTP struct {
 
 // App holds general application settings.
 type App struct {
-	Host      string // Hostname/IP the API is reachable on (used by tests)
-	Port      string // TCP port the HTTP server listens on
-	ClientURL string // Base URL of the client app — used for action links in emails (web or mobile via Universal Links)
+	Host string // Hostname/IP the API is reachable on (used by tests)
+	Port string // TCP port the HTTP server listens on
 }
 
 // Database holds PostgreSQL connection settings.
@@ -120,9 +121,8 @@ type LoginThrottle struct {
 func Load() Config {
 	return Config{
 		App: App{
-			Host:      required("APP_HOST"),
-			Port:      required("APP_PORT"),
-			ClientURL: required("CLIENT_URL"),
+			Host: required("APP_HOST"),
+			Port: required("APP_PORT"),
 		},
 		Database: Database{
 			Host:     required("DB_HOST"),
@@ -169,8 +169,10 @@ func Load() Config {
 			Password: required("SMTP_PASSWORD"),
 			From:     required("SMTP_FROM"),
 		},
-		EmailVerification: EmailVerification{
-			TokenDuration: parseDuration(required("VERIFICATION_TOKEN_DURATION")),
+		OneTimeTokens: OneTimeTokens{
+			EmailVerificationTTL: parseDuration(required("VERIFICATION_EMAIL_TOKEN_TTL")),
+			PasswordResetTTL:     parseDuration(required("VERIFICATION_PASSWORD_RESET_TOKEN_TTL")),
+			VerificationBaseURL:  required("VERIFICATION_BASE_URL"),
 		},
 	}
 }
