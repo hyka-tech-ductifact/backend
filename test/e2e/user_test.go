@@ -264,6 +264,6 @@ func TestE2E_DeleteMe_CascadesClientDeletion(t *testing.T) {
 	clientsResp := helpers.AuthGetJSON(t, url("/clients"), newToken)
 	assert.Equal(t, http.StatusOK, clientsResp.StatusCode)
 	clientsBody := helpers.ParseBody(t, clientsResp)
-	items := clientsBody["items"].([]any)
+	items, _ := clientsBody["items"].([]any)
 	assert.Empty(t, items)
 }
