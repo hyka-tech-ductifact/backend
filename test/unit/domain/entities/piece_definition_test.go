@@ -105,8 +105,12 @@ func TestNewPieceDefinition_WithEmptyLabel_ReturnsError(t *testing.T) {
 
 func TestNewPieceDefinition_GeneratesUniqueIDs(t *testing.T) {
 	userID := uuid.New()
-	d1, err1 := entities.NewPieceDefinition(entities.CreatePieceDefParams{Name: "A", DimensionSchema: []string{"X"}, UserID: userID})
-	d2, err2 := entities.NewPieceDefinition(entities.CreatePieceDefParams{Name: "B", DimensionSchema: []string{"Y"}, UserID: userID})
+	d1, err1 := entities.NewPieceDefinition(
+		entities.CreatePieceDefParams{Name: "A", DimensionSchema: []string{"X"}, UserID: userID},
+	)
+	d2, err2 := entities.NewPieceDefinition(
+		entities.CreatePieceDefParams{Name: "B", DimensionSchema: []string{"Y"}, UserID: userID},
+	)
 
 	require.NoError(t, err1)
 	require.NoError(t, err2)

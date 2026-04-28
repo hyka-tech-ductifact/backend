@@ -76,6 +76,14 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User
 	return r.db.WithContext(ctx).Save(model).Error
 }
 
+// Delete permanently removes a user from the database (hard delete).
+// This bypasses GORM's soft-delete to trigger ON DELETE CASCADE at the DB level,
+// which removes all associated data (clients, projects, orders, pieces).
+// Used for GDPR account self-deletion.
+func (r *PostgresUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Unscoped().Delete(&UserModel{}, "id = ?", id).Error
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toUserModel(user *entities.User) *UserModel {

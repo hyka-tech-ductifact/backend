@@ -23,28 +23,72 @@ func init() {
 
 func setupLivezRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, &mocks.MockEmailSender{}, time.Now(), config.ContractVersion, "test-version", "abc1234", "debug")
+	h := handler.NewHealthHandler(
+		healthMock,
+		storageMock,
+		&mocks.MockEmailSender{},
+		time.Now(),
+		config.ContractVersion,
+		"test-version",
+		"abc1234",
+		"debug",
+	)
 	r.GET("/healthz", h.Healthz)
 	return r
 }
 
 func setupReadyzRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, &mocks.MockEmailSender{}, time.Now(), config.ContractVersion, "test-version", "abc1234", "debug")
+	h := handler.NewHealthHandler(
+		healthMock,
+		storageMock,
+		&mocks.MockEmailSender{},
+		time.Now(),
+		config.ContractVersion,
+		"test-version",
+		"abc1234",
+		"debug",
+	)
 	r.GET("/readyz", h.Readyz)
 	return r
 }
 
-func setupReadyzRouterWithEmail(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage, emailMock *mocks.MockEmailSender) *gin.Engine {
+func setupReadyzRouterWithEmail(
+	healthMock *mocks.MockHealthChecker,
+	storageMock *mocks.MockFileStorage,
+	emailMock *mocks.MockEmailSender,
+) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, emailMock, time.Now(), config.ContractVersion, "test-version", "abc1234", "debug")
+	h := handler.NewHealthHandler(
+		healthMock,
+		storageMock,
+		emailMock,
+		time.Now(),
+		config.ContractVersion,
+		"test-version",
+		"abc1234",
+		"debug",
+	)
 	r.GET("/readyz", h.Readyz)
 	return r
 }
 
-func setupReadyzRouterProd(healthMock *mocks.MockHealthChecker, storageMock *mocks.MockFileStorage, emailMock *mocks.MockEmailSender) *gin.Engine {
+func setupReadyzRouterProd(
+	healthMock *mocks.MockHealthChecker,
+	storageMock *mocks.MockFileStorage,
+	emailMock *mocks.MockEmailSender,
+) *gin.Engine {
 	r := gin.New()
-	h := handler.NewHealthHandler(healthMock, storageMock, emailMock, time.Now(), config.ContractVersion, "test-version", "abc1234", "info")
+	h := handler.NewHealthHandler(
+		healthMock,
+		storageMock,
+		emailMock,
+		time.Now(),
+		config.ContractVersion,
+		"test-version",
+		"abc1234",
+		"info",
+	)
 	r.GET("/readyz", h.Readyz)
 	return r
 }
@@ -222,7 +266,9 @@ func TestHealthHandler_Readyz_NonDebug_SanitizesErrors(t *testing.T) {
 	}
 	emailMock := &mocks.MockEmailSender{
 		PingFn: func(ctx context.Context) error {
-			return errors.New("smtp ping smtp.sendgrid.net:587: dial tcp: lookup smtp.sendgrid.net on 127.0.0.11:53: no such host")
+			return errors.New(
+				"smtp ping smtp.sendgrid.net:587: dial tcp: lookup smtp.sendgrid.net on 127.0.0.11:53: no such host",
+			)
 		},
 	}
 

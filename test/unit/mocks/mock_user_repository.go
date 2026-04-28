@@ -15,6 +15,7 @@ type MockUserRepository struct {
 	GetByIDFn    func(ctx context.Context, id uuid.UUID) (*entities.User, error)
 	GetByEmailFn func(ctx context.Context, email string) (*entities.User, error)
 	UpdateFn     func(ctx context.Context, user *entities.User) error
+	DeleteFn     func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *MockUserRepository) Create(ctx context.Context, user *entities.User) error {
@@ -41,6 +42,13 @@ func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*ent
 func (m *MockUserRepository) Update(ctx context.Context, user *entities.User) error {
 	if m.UpdateFn != nil {
 		return m.UpdateFn(ctx, user)
+	}
+	return nil
+}
+
+func (m *MockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.DeleteFn != nil {
+		return m.DeleteFn(ctx, id)
 	}
 	return nil
 }

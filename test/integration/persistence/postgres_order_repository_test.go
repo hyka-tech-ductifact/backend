@@ -30,7 +30,11 @@ func setupOrderRepo(t *testing.T) (
 }
 
 // createTestProject is a helper that creates and persists a project for FK tests.
-func createTestProjectForOrder(t *testing.T, projectRepo *persistence.PostgresProjectRepository, clientID uuid.UUID) *entities.Project {
+func createTestProjectForOrder(
+	t *testing.T,
+	projectRepo *persistence.PostgresProjectRepository,
+	clientID uuid.UUID,
+) *entities.Project {
 	project, err := entities.NewProject(entities.CreateProjectParams{
 		Name:     "Test Project " + uuid.New().String()[:8],
 		ClientID: clientID,
@@ -173,7 +177,9 @@ func TestPostgresOrderRepository_Update(t *testing.T) {
 	user := createTestUser(t, userRepo)
 	client := createTestClient(t, clientRepo, user.ID)
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
-	order, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Old Title", Description: "Old desc", ProjectID: project.ID})
+	order, _ := entities.NewOrder(
+		entities.CreateOrderParams{Title: "Old Title", Description: "Old desc", ProjectID: project.ID},
+	)
 	require.NoError(t, orderRepo.Create(ctx, order))
 
 	require.NoError(t, order.SetTitle("New Title"))
@@ -282,7 +288,9 @@ func TestPostgresOrderRepository_Mapper_PreservesAllFields(t *testing.T) {
 	user := createTestUser(t, userRepo)
 	client := createTestClient(t, clientRepo, user.ID)
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
-	original, _ := entities.NewOrder(entities.CreateOrderParams{Title: "Full Data Order", Description: "Full description", ProjectID: project.ID})
+	original, _ := entities.NewOrder(
+		entities.CreateOrderParams{Title: "Full Data Order", Description: "Full description", ProjectID: project.ID},
+	)
 	require.NoError(t, orderRepo.Create(ctx, original))
 
 	found, err := orderRepo.GetByID(ctx, original.ID)

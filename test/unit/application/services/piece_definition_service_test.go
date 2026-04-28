@@ -21,7 +21,12 @@ import (
 // newPieceDefService is a test helper that creates a PieceDefinitionService
 // with no-op file storage and image processor mocks.
 func newPieceDefService(repo *mocks.MockPieceDefinitionRepository) usecases.PieceDefinitionService {
-	return services.NewPieceDefinitionService(repo, &mocks.MockFileStorage{}, &mocks.MockImageProcessor{}, &mocks.MockPieceRepository{})
+	return services.NewPieceDefinitionService(
+		repo,
+		&mocks.MockFileStorage{},
+		&mocks.MockImageProcessor{},
+		&mocks.MockPieceRepository{},
+	)
 }
 
 // =============================================================================
@@ -251,7 +256,12 @@ func TestUpdatePieceDefinition_InUse_ReturnsConflict(t *testing.T) {
 			return 5, nil
 		},
 	}
-	svc := services.NewPieceDefinitionService(pieceDefRepoReturning(def), &mocks.MockFileStorage{}, &mocks.MockImageProcessor{}, pieceRepo)
+	svc := services.NewPieceDefinitionService(
+		pieceDefRepoReturning(def),
+		&mocks.MockFileStorage{},
+		&mocks.MockImageProcessor{},
+		pieceRepo,
+	)
 
 	result, err := svc.UpdatePieceDefinition(context.Background(), def.ID, userID, entities.UpdatePieceDefParams{
 		Name: strPtr("New Name"),

@@ -43,7 +43,6 @@ func main() {
 
 	// --- User wiring ---
 	userRepo := persistence.NewPostgresUserRepository(db)
-	userService := services.NewUserService(userRepo)
 
 	// --- Client wiring ---
 	clientRepo := persistence.NewPostgresClientRepository(db)
@@ -75,6 +74,7 @@ func main() {
 	pieceRepo := persistence.NewPostgresPieceRepository(db)
 
 	// --- Services (all repos must be created before services) ---
+	userService := services.NewUserService(userRepo, clientRepo)
 	clientService := services.NewClientService(clientRepo, userRepo, projectRepo)
 	projectService := services.NewProjectService(projectRepo, clientRepo, orderRepo)
 	orderService := services.NewOrderService(orderRepo, projectRepo, pieceRepo)
@@ -107,7 +107,19 @@ func main() {
 	// --- One-time token repository ---
 	oneTimeTokenRepo := persistence.NewPostgresOneTimeTokenRepository(db)
 
-	authService := services.NewAuthService(userRepo, oneTimeTokenRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration, cfg.OneTimeTokens.EmailVerificationTTL, cfg.OneTimeTokens.VerificationBaseURL)
+	authService := services.NewAuthService(
+		userRepo,
+		oneTimeTokenRepo,
+		tokenProvider,
+		blacklist,
+		loginThrottler,
+		emailSender,
+		cfg.JWT.TokenDuration,
+		cfg.JWT.RefreshTokenDuration,
+		cfg.OneTimeTokens.EmailVerificationTTL,
+		cfg.OneTimeTokens.PasswordResetTTL,
+		cfg.OneTimeTokens.VerificationBaseURL,
+	)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
@@ -128,7 +140,24 @@ func main() {
 	defer userLimiter.Stop()
 
 	// --- HTTP server ---
-	router := httpAdapter.SetupRoutes(healthChecker, fileStorage, emailSender, userService, clientService, projectService, orderService, pieceDefService, pieceService, authService, tokenProvider, blacklist, ipLimiter, userLimiter, cfg.CORS, cfg.Log.Level)
+	router := httpAdapter.SetupRoutes(
+		healthChecker,
+		fileStorage,
+		emailSender,
+		userService,
+		clientService,
+		projectService,
+		orderService,
+		pieceDefService,
+		pieceService,
+		authService,
+		tokenProvider,
+		blacklist,
+		ipLimiter,
+		userLimiter,
+		cfg.CORS,
+		cfg.Log.Level,
+	)
 
 	port := cfg.App.Port
 	srv := &http.Server{

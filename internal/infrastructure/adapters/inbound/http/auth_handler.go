@@ -37,6 +37,20 @@ type VerifyEmailRequest struct {
 	Token string `json:"token" binding:"required"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
 type AuthResponse struct {
 	User         UserResponse `json:"user"`
 	AccessToken  string       `json:"access_token"`
@@ -65,7 +79,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, tokens, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Locale.String())
+	user, tokens, err := h.authService.Register(
+		c.Request.Context(),
+		req.Name,
+		req.Email,
+		req.Password,
+		req.Locale.String(),
+	)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return
@@ -163,4 +183,51 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "verification email sent"})
+}
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	uid := c.MustGet("userID").(uuid.UUID)
+
+	if err := h.authService.ChangePassword(c.Request.Context(), uid, req.CurrentPassword, req.NewPassword); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.ForgotPassword(c.Request.Context(), req.Email); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a password reset link has been sent"})
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.ResetPassword(c.Request.Context(), req.Token, req.NewPassword); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password reset successfully"})
 }

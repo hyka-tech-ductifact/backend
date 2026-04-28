@@ -57,7 +57,10 @@ func (r *PostgresPieceDefinitionRepository) Create(ctx context.Context, def *ent
 	return r.db.WithContext(ctx).Create(model).Error
 }
 
-func (r *PostgresPieceDefinitionRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.PieceDefinition, error) {
+func (r *PostgresPieceDefinitionRepository) GetByID(
+	ctx context.Context,
+	id uuid.UUID,
+) (*entities.PieceDefinition, error) {
 	var model PieceDefinitionModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -70,7 +73,11 @@ func (r *PostgresPieceDefinitionRepository) GetByID(ctx context.Context, id uuid
 
 // GetByIDForOwner returns a piece definition that is either predefined (visible
 // to everyone) or owned by the given user. Returns a specific error for diagnostics.
-func (r *PostgresPieceDefinitionRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.PieceDefinition, error) {
+func (r *PostgresPieceDefinitionRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.PieceDefinition, error) {
 	var model PieceDefinitionModel
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND (predefined = ? OR user_id = ?)", id, true, ownerID).
@@ -84,7 +91,11 @@ func (r *PostgresPieceDefinitionRepository) GetByIDForOwner(ctx context.Context,
 	return toPieceDefEntity(&model)
 }
 
-func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) error {
+func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) error {
 	var count int64
 	if err := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).Where("id = ?", id).Count(&count).Error; err != nil {
 		return err
@@ -97,7 +108,12 @@ func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(ctx context.
 
 // ListByUserID returns all predefined definitions + custom definitions created by the user.
 // When includeArchived is false, archived definitions are excluded.
-func (r *PostgresPieceDefinitionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+func (r *PostgresPieceDefinitionRepository) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+	includeArchived bool,
+	pg pagination.Pagination,
+) ([]*entities.PieceDefinition, int64, error) {
 	var totalItems int64
 
 	query := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).

@@ -15,7 +15,13 @@ type MockFileStorage struct {
 	PingFn      func(ctx context.Context) error
 }
 
-func (m *MockFileStorage) Upload(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
+func (m *MockFileStorage) Upload(
+	ctx context.Context,
+	key string,
+	reader io.Reader,
+	contentType string,
+	size int64,
+) error {
 	if m.UploadFn != nil {
 		return m.UploadFn(ctx, key, reader, contentType, size)
 	}

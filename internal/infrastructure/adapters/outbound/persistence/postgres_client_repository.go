@@ -63,7 +63,11 @@ func (r *PostgresClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 	return toClientEntity(&model), nil
 }
 
-func (r *PostgresClientRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
+func (r *PostgresClientRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Client, error) {
 	var model ClientModel
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND user_id = ?", id, ownerID).
@@ -88,7 +92,11 @@ func (r *PostgresClientRepository) diagnoseClientFailure(ctx context.Context, id
 	return repositories.ErrClientNotOwned
 }
 
-func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+func (r *PostgresClientRepository) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Client, int64, error) {
 	var totalItems int64
 
 	// Count total matching rows (before pagination)
@@ -123,6 +131,12 @@ func (r *PostgresClientRepository) Update(ctx context.Context, client *entities.
 
 func (r *PostgresClientRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&ClientModel{}, "id = ?", id).Error
+}
+
+func (r *PostgresClientRepository) CountByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&ClientModel{}).Where("user_id = ?", userID).Count(&count).Error
+	return count, err
 }
 
 // --- Mappers (package-level functions, not methods) ---

@@ -26,7 +26,11 @@ func setupPieceDefRepo(t *testing.T) (
 }
 
 // createTestPieceDef is a helper that creates and persists a custom piece definition.
-func createTestPieceDef(t *testing.T, defRepo *persistence.PostgresPieceDefinitionRepository, userID uuid.UUID) *entities.PieceDefinition {
+func createTestPieceDef(
+	t *testing.T,
+	defRepo *persistence.PostgresPieceDefinitionRepository,
+	userID uuid.UUID,
+) *entities.PieceDefinition {
 	def, err := entities.NewPieceDefinition(entities.CreatePieceDefParams{
 		Name:            "Test Def " + uuid.New().String()[:8],
 		DimensionSchema: []string{"Length", "Width"},

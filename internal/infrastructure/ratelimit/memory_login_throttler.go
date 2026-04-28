@@ -36,7 +36,10 @@ type MemoryLoginThrottler struct {
 // NewMemoryLoginThrottler creates a login throttler that allows maxAttempts
 // failed logins per window before locking the account for lockoutDuration.
 // It starts a background goroutine that cleans up expired entries.
-func NewMemoryLoginThrottler(maxAttempts int, window, lockoutDuration, cleanupInterval time.Duration) *MemoryLoginThrottler {
+func NewMemoryLoginThrottler(
+	maxAttempts int,
+	window, lockoutDuration, cleanupInterval time.Duration,
+) *MemoryLoginThrottler {
 	lt := &MemoryLoginThrottler{
 		maxAttempts:     maxAttempts,
 		window:          window,

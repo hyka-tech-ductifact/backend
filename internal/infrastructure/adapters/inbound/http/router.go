@@ -47,8 +47,16 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrUserNotFound, http.StatusNotFound, "user not found")
 	helpers.RegisterDomainError(services.ErrEmailAlreadyInUse, http.StatusConflict, "email already in use")
 	helpers.RegisterDomainError(services.ErrInvalidCredentials, http.StatusUnauthorized, "invalid email or password")
-	helpers.RegisterDomainError(services.ErrInvalidRefreshToken, http.StatusUnauthorized, "invalid or expired refresh token")
-	helpers.RegisterDomainError(services.ErrAccountLocked, http.StatusTooManyRequests, "account temporarily locked, please try again later")
+	helpers.RegisterDomainError(
+		services.ErrInvalidRefreshToken,
+		http.StatusUnauthorized,
+		"invalid or expired refresh token",
+	)
+	helpers.RegisterDomainError(
+		services.ErrAccountLocked,
+		http.StatusTooManyRequests,
+		"account temporarily locked, please try again later",
+	)
 	helpers.RegisterDomainError(repositories.ErrClientNotFound, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(repositories.ErrClientNotOwned, http.StatusNotFound, "client not found")
 	helpers.RegisterDomainError(repositories.ErrProjectNotFound, http.StatusNotFound, "project not found")
@@ -59,36 +67,127 @@ func SetupRoutes(
 	helpers.RegisterDomainError(repositories.ErrOrderNotFound, http.StatusNotFound, "order not found")
 	helpers.RegisterDomainError(repositories.ErrOrderNotOwned, http.StatusNotFound, "order not found")
 	helpers.RegisterDomainError(entities.ErrEmptyOrderTitle, http.StatusBadRequest, "order title cannot be empty")
-	helpers.RegisterDomainError(entities.ErrInvalidOrderStatus, http.StatusBadRequest, "order status must be 'pending' or 'completed'")
+	helpers.RegisterDomainError(
+		entities.ErrInvalidOrderStatus,
+		http.StatusBadRequest,
+		"order status must be 'pending' or 'completed'",
+	)
 	helpers.RegisterDomainError(repositories.ErrPieceDefNotFound, http.StatusNotFound, "piece definition not found")
-	helpers.RegisterDomainError(entities.ErrEmptyPieceDefName, http.StatusBadRequest, "piece definition name cannot be empty")
-	helpers.RegisterDomainError(entities.ErrTooManyDimensionFields, http.StatusBadRequest, "piece definition cannot have more than 10 dimension fields")
-	helpers.RegisterDomainError(entities.ErrNoDimensionFields, http.StatusBadRequest, "piece definition must have at least one dimension field")
-	helpers.RegisterDomainError(entities.ErrDuplicateDimensionLabel, http.StatusBadRequest, "dimension labels must be unique")
-	helpers.RegisterDomainError(entities.ErrEmptyDimensionLabel, http.StatusBadRequest, "dimension label cannot be empty")
-	helpers.RegisterDomainError(services.ErrPieceDefPredefined, http.StatusForbidden, "predefined piece definitions cannot be modified")
-	helpers.RegisterDomainError(services.ErrUnsupportedImageType, http.StatusBadRequest, "unsupported image type: only JPEG, PNG and WebP are allowed")
-	helpers.RegisterDomainError(services.ErrImageTooLarge, http.StatusBadRequest, "image exceeds the maximum allowed size of 5 MB")
-	helpers.RegisterDomainError(services.ErrImageCorrupt, http.StatusBadRequest, "image is corrupt or cannot be decoded")
+	helpers.RegisterDomainError(
+		entities.ErrEmptyPieceDefName,
+		http.StatusBadRequest,
+		"piece definition name cannot be empty",
+	)
+	helpers.RegisterDomainError(
+		entities.ErrTooManyDimensionFields,
+		http.StatusBadRequest,
+		"piece definition cannot have more than 10 dimension fields",
+	)
+	helpers.RegisterDomainError(
+		entities.ErrNoDimensionFields,
+		http.StatusBadRequest,
+		"piece definition must have at least one dimension field",
+	)
+	helpers.RegisterDomainError(
+		entities.ErrDuplicateDimensionLabel,
+		http.StatusBadRequest,
+		"dimension labels must be unique",
+	)
+	helpers.RegisterDomainError(
+		entities.ErrEmptyDimensionLabel,
+		http.StatusBadRequest,
+		"dimension label cannot be empty",
+	)
+	helpers.RegisterDomainError(
+		services.ErrPieceDefPredefined,
+		http.StatusForbidden,
+		"predefined piece definitions cannot be modified",
+	)
+	helpers.RegisterDomainError(
+		services.ErrUnsupportedImageType,
+		http.StatusBadRequest,
+		"unsupported image type: only JPEG, PNG and WebP are allowed",
+	)
+	helpers.RegisterDomainError(
+		services.ErrImageTooLarge,
+		http.StatusBadRequest,
+		"image exceeds the maximum allowed size of 5 MB",
+	)
+	helpers.RegisterDomainError(
+		services.ErrImageCorrupt,
+		http.StatusBadRequest,
+		"image is corrupt or cannot be decoded",
+	)
 	helpers.RegisterDomainError(repositories.ErrPieceDefNotOwned, http.StatusNotFound, "piece definition not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotFound, http.StatusNotFound, "piece not found")
 	helpers.RegisterDomainError(repositories.ErrPieceNotOwned, http.StatusNotFound, "piece not found")
 	helpers.RegisterDomainError(entities.ErrEmptyPieceTitle, http.StatusBadRequest, "piece title cannot be empty")
-	helpers.RegisterDomainError(entities.ErrInvalidPieceQuantity, http.StatusBadRequest, "piece quantity must be at least 1")
+	helpers.RegisterDomainError(
+		entities.ErrInvalidPieceQuantity,
+		http.StatusBadRequest,
+		"piece quantity must be at least 1",
+	)
 	helpers.RegisterDomainError(entities.ErrMissingDimensions, http.StatusBadRequest, "missing required dimensions")
 	helpers.RegisterDomainError(entities.ErrUnexpectedDimensions, http.StatusBadRequest, "unexpected dimensions")
-	helpers.RegisterDomainError(entities.ErrInvalidDimensionValues, http.StatusBadRequest, "dimension values must be positive")
-	helpers.RegisterDomainError(valueobjects.ErrPasswordTooShort, http.StatusBadRequest, "password must be at least 8 characters")
-	helpers.RegisterDomainError(valueobjects.ErrPasswordTooLong, http.StatusBadRequest, "password must not exceed 72 characters")
+	helpers.RegisterDomainError(
+		entities.ErrInvalidDimensionValues,
+		http.StatusBadRequest,
+		"dimension values must be positive",
+	)
+	helpers.RegisterDomainError(
+		valueobjects.ErrPasswordTooShort,
+		http.StatusBadRequest,
+		"password must be at least 8 characters",
+	)
+	helpers.RegisterDomainError(
+		valueobjects.ErrPasswordTooLong,
+		http.StatusBadRequest,
+		"password must not exceed 72 characters",
+	)
 	helpers.RegisterDomainError(valueobjects.ErrPasswordEmpty, http.StatusBadRequest, "password cannot be empty")
-	helpers.RegisterDomainError(services.ErrHasAssociatedProjects, http.StatusConflict, "client has associated projects; set cascade=true to delete")
-	helpers.RegisterDomainError(services.ErrHasAssociatedOrders, http.StatusConflict, "project has associated orders; set cascade=true to delete")
-	helpers.RegisterDomainError(services.ErrHasAssociatedPieces, http.StatusConflict, "order has associated pieces; set cascade=true to delete")
-	helpers.RegisterDomainError(services.ErrPieceDefInUse, http.StatusConflict, "piece definition is in use by existing pieces")
+	helpers.RegisterDomainError(
+		services.ErrHasAssociatedProjects,
+		http.StatusConflict,
+		"client has associated projects; set cascade=true to delete",
+	)
+	helpers.RegisterDomainError(
+		services.ErrHasAssociatedClients,
+		http.StatusConflict,
+		"user has associated clients; set cascade=true to delete",
+	)
+	helpers.RegisterDomainError(
+		services.ErrHasAssociatedOrders,
+		http.StatusConflict,
+		"project has associated orders; set cascade=true to delete",
+	)
+	helpers.RegisterDomainError(
+		services.ErrHasAssociatedPieces,
+		http.StatusConflict,
+		"order has associated pieces; set cascade=true to delete",
+	)
+	helpers.RegisterDomainError(
+		services.ErrPieceDefInUse,
+		http.StatusConflict,
+		"piece definition is in use by existing pieces",
+	)
 	helpers.RegisterDomainError(services.ErrPieceDefArchived, http.StatusConflict, "piece definition is archived")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
-	helpers.RegisterDomainError(services.ErrInvalidVerificationToken, http.StatusBadRequest, "invalid or expired verification token")
+	helpers.RegisterDomainError(
+		services.ErrInvalidVerificationToken,
+		http.StatusBadRequest,
+		"invalid or expired verification token",
+	)
 	helpers.RegisterDomainError(services.ErrEmailAlreadyVerified, http.StatusConflict, "email already verified")
+	helpers.RegisterDomainError(
+		services.ErrInvalidCurrentPassword,
+		http.StatusUnauthorized,
+		"current password is incorrect",
+	)
+	helpers.RegisterDomainError(
+		services.ErrInvalidResetToken,
+		http.StatusBadRequest,
+		"invalid or expired password reset token",
+	)
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
 	// Makes ShouldBindJSON return 400 for bodies with extra properties.
@@ -125,7 +224,16 @@ func SetupRoutes(
 
 	// --- Infrastructure routes (unversioned) ---
 
-	healthHandler := NewHealthHandler(healthChecker, fileStorage, emailSender, time.Now(), config.ContractVersion, config.Version, config.Commit, logLevel)
+	healthHandler := NewHealthHandler(
+		healthChecker,
+		fileStorage,
+		emailSender,
+		time.Now(),
+		config.ContractVersion,
+		config.Version,
+		config.Commit,
+		logLevel,
+	)
 	r.GET("/healthz", healthHandler.Healthz)
 	r.GET("/readyz", healthHandler.Readyz)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -142,7 +250,7 @@ func SetupRoutes(
 	fileHandler := NewFileHandler(fileStorage)
 	v1.GET("/files/*filepath", fileHandler.ServeFile)
 
-	// Auth routes
+	// Auth routes without authentication
 	authHandler := NewAuthHandler(authService)
 	authRoutes := v1.Group("/auth")
 	{
@@ -150,6 +258,8 @@ func SetupRoutes(
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/refresh", authHandler.Refresh)
 		authRoutes.POST("/verify-email", authHandler.VerifyEmail)
+		authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
+		authRoutes.POST("/reset-password", authHandler.ResetPassword)
 	}
 
 	// --- Protected routes (auth required) ---
@@ -163,6 +273,7 @@ func SetupRoutes(
 	{
 		protectedAuth.POST("/logout", authHandler.Logout)
 		protectedAuth.POST("/resend-verification", authHandler.ResendVerification)
+		protectedAuth.PUT("/password", authHandler.ChangePassword)
 	}
 
 	// User routes — userID comes from the JWT token, not the URL
@@ -171,6 +282,7 @@ func SetupRoutes(
 	{
 		userRoutes.GET("/me", userHandler.GetMe)
 		userRoutes.PUT("/me", userHandler.UpdateMe)
+		userRoutes.DELETE("/me", userHandler.DeleteMe)
 	}
 
 	// Client routes — scoped by JWT (userID from token)

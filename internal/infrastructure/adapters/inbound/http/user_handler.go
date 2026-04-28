@@ -74,6 +74,25 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 	c.JSON(http.StatusOK, toUserResponse(user))
 }
 
+// DeleteMe handles DELETE /users/me — permanently deletes the authenticated user's account.
+// This is a GDPR-compliant hard deletion that cascades to all user data.
+// Requires ?cascade=true if the user has associated clients.
+func (h *UserHandler) DeleteMe(c *gin.Context) {
+	userID := helpers.MustGetUserID(c)
+	if c.IsAborted() {
+		return
+	}
+
+	cascade := c.Query("cascade") == "true"
+
+	if err := h.userService.DeleteUser(c.Request.Context(), userID, cascade); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "account deleted successfully"})
+}
+
 // --- Mapper: Domain → HTTP Response ---
 
 func toUserResponse(user *entities.User) *UserResponse {

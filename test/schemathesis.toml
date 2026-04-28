@@ -22,6 +22,11 @@ request-retries = 3
 # ─── Continue after first failure to collect all issues ──────
 continue-on-failure = true
 
+# ─── Warnings ────────────────────────────────────────────────
+# These warnings fire because negative testing intentionally sends bad auth,
+# invalid data, and random path params. The API correctly rejects them.
+warnings = false
+
 # ─── Hooks ───────────────────────────────────────────────────
 # Custom media-type strategies for image uploads (image/png, jpeg, webp).
 # The Python module is mounted into the Docker container by the Makefile.
@@ -76,3 +81,20 @@ directory = "schemathesis-report"
 
 [reports.junit]
 enabled = true
+
+# ─── Excluded Operations ──────────────────────────────────────
+# These endpoints require DB state (one-time tokens) that Schemathesis cannot
+# create, or are destructive (delete authenticated user). They are covered by
+# E2E tests instead.
+
+[[operations]]
+include-operation-id = "verifyEmail"
+enabled = false
+
+[[operations]]
+include-operation-id = "resetPassword"
+enabled = false
+
+[[operations]]
+include-operation-id = "deleteMe"
+enabled = false

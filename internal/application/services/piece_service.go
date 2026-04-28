@@ -40,7 +40,11 @@ func NewPieceService(
 // 3. Build the domain entity (which validates all fields).
 // 4. Validate dimensions against the definition schema.
 // 5. Persist via repository.
-func (s *pieceService) CreatePiece(ctx context.Context, userID uuid.UUID, params entities.CreatePieceParams) (*entities.Piece, error) {
+func (s *pieceService) CreatePiece(
+	ctx context.Context,
+	userID uuid.UUID,
+	params entities.CreatePieceParams,
+) (*entities.Piece, error) {
 	// Step 1: Verify order ownership
 	_, err := s.orderRepo.GetByIDForOwner(ctx, params.OrderID, userID)
 	if err != nil {
@@ -84,7 +88,12 @@ func (s *pieceService) GetPieceByID(ctx context.Context, id uuid.UUID, userID uu
 
 // ListPiecesByOrderID retrieves a paginated list of pieces for an order,
 // ensuring the order belongs to the given user.
-func (s *pieceService) ListPiecesByOrderID(ctx context.Context, orderID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Piece], error) {
+func (s *pieceService) ListPiecesByOrderID(
+	ctx context.Context,
+	orderID uuid.UUID,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) (pagination.Result[*entities.Piece], error) {
 	_, err := s.orderRepo.GetByIDForOwner(ctx, orderID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Piece]{}, err
@@ -101,7 +110,12 @@ func (s *pieceService) ListPiecesByOrderID(ctx context.Context, orderID uuid.UUI
 // UpdatePiece applies a partial update to an existing piece.
 // Only non-nil fields in params are updated. Ensures the piece belongs to the given user.
 // If dimensions change, they are re-validated against the piece definition schema.
-func (s *pieceService) UpdatePiece(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceParams) (*entities.Piece, error) {
+func (s *pieceService) UpdatePiece(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+	params entities.UpdatePieceParams,
+) (*entities.Piece, error) {
 	piece, err := s.pieceRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err

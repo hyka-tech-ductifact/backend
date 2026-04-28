@@ -25,7 +25,11 @@ type projectService struct {
 // NewProjectService creates a new ProjectService.
 // The client repository is needed to verify ownership during Create and List.
 // The order repository is needed to check for associated orders before deletion.
-func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo repositories.ClientRepository, orderRepo repositories.OrderRepository) *projectService {
+func NewProjectService(
+	projectRepo repositories.ProjectRepository,
+	clientRepo repositories.ClientRepository,
+	orderRepo repositories.OrderRepository,
+) *projectService {
 	return &projectService{
 		projectRepo: projectRepo,
 		clientRepo:  clientRepo,
@@ -37,7 +41,11 @@ func NewProjectService(projectRepo repositories.ProjectRepository, clientRepo re
 // 1. Verify the owning client belongs to the user.
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
-func (s *projectService) CreateProject(ctx context.Context, userID uuid.UUID, params entities.CreateProjectParams) (*entities.Project, error) {
+func (s *projectService) CreateProject(
+	ctx context.Context,
+	userID uuid.UUID,
+	params entities.CreateProjectParams,
+) (*entities.Project, error) {
 	// Step 1: Verify client ownership
 	_, err := s.clientRepo.GetByIDForOwner(ctx, params.ClientID, userID)
 	if err != nil {
@@ -59,13 +67,22 @@ func (s *projectService) CreateProject(ctx context.Context, userID uuid.UUID, pa
 }
 
 // GetProjectByID retrieves a project by ID, ensuring it belongs to the given user.
-func (s *projectService) GetProjectByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.Project, error) {
+func (s *projectService) GetProjectByID(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+) (*entities.Project, error) {
 	return s.projectRepo.GetByIDForOwner(ctx, id, userID)
 }
 
 // ListProjectsByClientID retrieves a paginated list of projects for a client,
 // ensuring the client belongs to the given user.
-func (s *projectService) ListProjectsByClientID(ctx context.Context, clientID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Project], error) {
+func (s *projectService) ListProjectsByClientID(
+	ctx context.Context,
+	clientID uuid.UUID,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) (pagination.Result[*entities.Project], error) {
 	_, err := s.clientRepo.GetByIDForOwner(ctx, clientID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Project]{}, err
@@ -81,7 +98,12 @@ func (s *projectService) ListProjectsByClientID(ctx context.Context, clientID uu
 
 // UpdateProject applies a partial update to an existing project.
 // Only non-nil fields in params are updated. Ensures the project belongs to the given user.
-func (s *projectService) UpdateProject(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateProjectParams) (*entities.Project, error) {
+func (s *projectService) UpdateProject(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+	params entities.UpdateProjectParams,
+) (*entities.Project, error) {
 	project, err := s.projectRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err

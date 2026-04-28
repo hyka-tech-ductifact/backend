@@ -12,7 +12,10 @@ import (
 
 // --- Helper: register user, create client, create project → (userID, clientID, projectID, token) ---
 
-func createUserClientAndProject(t *testing.T, userName, email, clientName, projectName string) (string, string, string, string) {
+func createUserClientAndProject(
+	t *testing.T,
+	userName, email, clientName, projectName string,
+) (string, string, string, string) {
 	t.Helper()
 	userID, clientID, token := createUserAndClient(t, userName, email, clientName)
 
