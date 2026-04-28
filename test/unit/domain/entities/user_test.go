@@ -200,3 +200,35 @@ func TestSetLocale_WithUnsupportedLocale_ReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid locale")
 	assert.Equal(t, "en", user.Locale, "locale must not change on error")
 }
+
+// =============================================================================
+// Email Verification
+// =============================================================================
+
+func TestIsEmailVerified_NewUser_ReturnsFalse(t *testing.T) {
+	user, err := entities.NewUser(validUserParams())
+	require.NoError(t, err)
+
+	assert.False(t, user.IsEmailVerified())
+	assert.Nil(t, user.EmailVerifiedAt)
+}
+
+func TestVerifyEmail_SetsEmailVerifiedAt(t *testing.T) {
+	user, err := entities.NewUser(validUserParams())
+	require.NoError(t, err)
+
+	user.VerifyEmail()
+
+	assert.True(t, user.IsEmailVerified())
+	assert.NotNil(t, user.EmailVerifiedAt)
+}
+
+func TestVerifyEmail_UpdatesUpdatedAt(t *testing.T) {
+	user, err := entities.NewUser(validUserParams())
+	require.NoError(t, err)
+	originalUpdatedAt := user.UpdatedAt
+
+	user.VerifyEmail()
+
+	assert.True(t, user.UpdatedAt.After(originalUpdatedAt) || user.UpdatedAt.Equal(originalUpdatedAt))
+}

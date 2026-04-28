@@ -829,3 +829,253 @@ func TestLogin_WhenBlocked_DoesNotQueryDatabase(t *testing.T) {
 
 	assert.False(t, dbQueried, "should not query DB when account is blocked")
 }
+
+// =============================================================================
+// VerifyEmail
+// =============================================================================
+
+// newTestAuthServiceWithTokenRepo creates an AuthService with custom user repo and token repo.
+func newTestAuthServiceWithTokenRepo(
+	repo *mocks.MockUserRepository,
+	tokenRepo *mocks.MockOneTimeTokenRepository,
+) usecases.AuthService {
+	return services.NewAuthService(repo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
+}
+
+func TestVerifyEmail_WithValidToken_VerifiesUser(t *testing.T) {
+	userID := uuid.New()
+	user := &entities.User{
+		ID:     userID,
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypeEmailVerification,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "valid-token")
+
+	require.NoError(t, err)
+	assert.True(t, user.IsEmailVerified())
+}
+
+func TestVerifyEmail_WithInvalidToken_ReturnsError(t *testing.T) {
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "invalid-token")
+
+	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
+}
+
+func TestVerifyEmail_WithExpiredToken_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypeEmailVerification,
+				ExpiresAt: time.Now().Add(-1 * time.Hour), // expired
+			}, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "expired-token")
+
+	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
+}
+
+func TestVerifyEmail_WhenUserNotFound_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypeEmailVerification,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "orphan-token")
+
+	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
+}
+
+func TestVerifyEmail_WhenAlreadyVerified_ReturnsError(t *testing.T) {
+	userID := uuid.New()
+	now := time.Now()
+	user := &entities.User{
+		ID:              userID,
+		Name:            "Juan",
+		Email:           "juan@example.com",
+		Locale:          "en",
+		EmailVerifiedAt: &now, // already verified
+	}
+
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypeEmailVerification,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "some-token")
+
+	assert.ErrorIs(t, err, services.ErrEmailAlreadyVerified)
+}
+
+func TestVerifyEmail_WhenUpdateFails_PropagatesError(t *testing.T) {
+	userID := uuid.New()
+	user := &entities.User{
+		ID:     userID,
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+	updateErr := errors.New("db connection lost")
+
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+			return &entities.OneTimeToken{
+				ID:        uuid.New(),
+				UserID:    userID,
+				Token:     token,
+				Type:      entities.TokenTypeEmailVerification,
+				ExpiresAt: time.Now().Add(time.Hour),
+			}, nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+		UpdateFn: func(ctx context.Context, u *entities.User) error {
+			return updateErr
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.VerifyEmail(context.Background(), "some-token")
+
+	assert.ErrorIs(t, err, updateErr)
+}
+
+// =============================================================================
+// ResendVerificationEmail
+// =============================================================================
+
+func TestResendVerification_WhenUserNotFound_ReturnsError(t *testing.T) {
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, &mocks.MockOneTimeTokenRepository{})
+
+	err := svc.ResendVerificationEmail(context.Background(), uuid.New())
+
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
+func TestResendVerification_WhenAlreadyVerified_ReturnsError(t *testing.T) {
+	now := time.Now()
+	user := &entities.User{
+		ID:              uuid.New(),
+		Name:            "Juan",
+		Email:           "juan@example.com",
+		Locale:          "en",
+		EmailVerifiedAt: &now,
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, &mocks.MockOneTimeTokenRepository{})
+
+	err := svc.ResendVerificationEmail(context.Background(), user.ID)
+
+	assert.ErrorIs(t, err, services.ErrEmailAlreadyVerified)
+}
+
+func TestResendVerification_WhenNotVerified_DeletesOldTokensAndCreatesNew(t *testing.T) {
+	user := &entities.User{
+		ID:     uuid.New(),
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+	deleteCalled := false
+	tokenRepo := &mocks.MockOneTimeTokenRepository{
+		DeleteByUserIDAndTypeFn: func(ctx context.Context, userID uuid.UUID, tokenType entities.TokenType) error {
+			deleteCalled = true
+			assert.Equal(t, user.ID, userID)
+			assert.Equal(t, entities.TokenTypeEmailVerification, tokenType)
+			return nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+	}
+
+	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+
+	err := svc.ResendVerificationEmail(context.Background(), user.ID)
+
+	require.NoError(t, err)
+	assert.True(t, deleteCalled, "should delete old tokens before creating new one")
+	assert.Len(t, tokenRepo.Created, 1, "should create a new verification token")
+}

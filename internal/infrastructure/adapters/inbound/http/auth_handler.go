@@ -155,12 +155,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 }
 
 func (h *AuthHandler) ResendVerification(c *gin.Context) {
-	userID := c.MustGet("userID").(string)
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	uid := c.MustGet("userID").(uuid.UUID)
 
 	if err := h.authService.ResendVerificationEmail(c.Request.Context(), uid); err != nil {
 		helpers.HandleError(c, err)
