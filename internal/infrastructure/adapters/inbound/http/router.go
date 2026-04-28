@@ -87,6 +87,8 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrPieceDefInUse, http.StatusConflict, "piece definition is in use by existing pieces")
 	helpers.RegisterDomainError(services.ErrPieceDefArchived, http.StatusConflict, "piece definition is archived")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
+	helpers.RegisterDomainError(services.ErrInvalidVerificationToken, http.StatusBadRequest, "invalid or expired verification token")
+	helpers.RegisterDomainError(services.ErrEmailAlreadyVerified, http.StatusConflict, "email already verified")
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
 	// Makes ShouldBindJSON return 400 for bodies with extra properties.
@@ -147,6 +149,7 @@ func SetupRoutes(
 		authRoutes.POST("/register", authHandler.Register)
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/refresh", authHandler.Refresh)
+		authRoutes.POST("/verify-email", authHandler.VerifyEmail)
 	}
 
 	// --- Protected routes (auth required) ---
@@ -159,6 +162,7 @@ func SetupRoutes(
 	protectedAuth := protected.Group("/auth")
 	{
 		protectedAuth.POST("/logout", authHandler.Logout)
+		protectedAuth.POST("/resend-verification", authHandler.ResendVerification)
 	}
 
 	// User routes — userID comes from the JWT token, not the URL

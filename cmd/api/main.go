@@ -104,7 +104,10 @@ func main() {
 	)
 	defer loginThrottler.Stop()
 
-	authService := services.NewAuthService(userRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration)
+	// --- One-time token repository ---
+	oneTimeTokenRepo := persistence.NewPostgresOneTimeTokenRepository(db)
+
+	authService := services.NewAuthService(userRepo, oneTimeTokenRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration, cfg.EmailVerification.TokenDuration, cfg.EmailVerification.FrontendURL)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)

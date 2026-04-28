@@ -228,11 +228,11 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 19.1 | Email service port (adapter-agnostic) | ⬜ | 🔴 Now |
-| 19.2 | SMTP adapter (SendGrid / Mailgun / SES) | ⬜ | 🔴 Now |
-| 19.3 | Welcome email on registration | ⬜ | 🟡 Soon |
+| 19.1 | Email service port (adapter-agnostic) | ✅ | 🔴 Now |
+| 19.2 | SMTP adapter (SendGrid / Mailgun / SES) | ✅ | 🔴 Now |
+| 19.3 | Welcome email on registration | ✅ | 🟡 Soon |
 | 19.4 | Password reset email with secure token | ⬜ | 🟡 Soon |
-| 19.5 | Email verification link | ⬜ | 🟡 Soon |
+| 19.5 | Email verification link | ✅ | 🟡 Soon |
 | 19.6 | Notification preferences (opt-in/out per type) | ⬜ | 🔵 Later |
 
 ### 20. Background Processing

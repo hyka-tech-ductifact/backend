@@ -8,6 +8,7 @@ import (
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // --- DTOs ---
@@ -30,6 +31,10 @@ type RefreshRequest struct {
 
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type VerifyEmailRequest struct {
+	Token string `json:"token" binding:"required"`
 }
 
 type AuthResponse struct {
@@ -132,4 +137,35 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}
+
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	var req VerifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.VerifyEmail(c.Request.Context(), req.Token); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "email verified successfully"})
+}
+
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	userID := c.MustGet("userID").(string)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	if err := h.authService.ResendVerificationEmail(c.Request.Context(), uid); err != nil {
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "verification email sent"})
 }

@@ -35,7 +35,7 @@ type authService struct {
 	emailSender          ports.EmailSender
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
-	verificationTTL      time.Duration
+	emailVerificationTTL time.Duration
 	frontendURL          string
 }
 
@@ -49,7 +49,7 @@ func NewAuthService(
 	emailSender ports.EmailSender,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
-	verificationTTL time.Duration,
+	emailVerificationTTL time.Duration,
 	frontendURL string,
 ) *authService {
 	return &authService{
@@ -61,7 +61,7 @@ func NewAuthService(
 		emailSender:          emailSender,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
-		verificationTTL:      verificationTTL,
+		emailVerificationTTL: emailVerificationTTL,
 		frontendURL:          frontendURL,
 	}
 }
@@ -260,7 +260,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, userID uuid.U
 // email that includes both the greeting and the verification link.
 // Non-blocking — failures are logged but registration always succeeds.
 func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
-	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.verificationTTL)
+	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.emailVerificationTTL)
 	if err != nil {
 		slog.Error("failed to generate verification token", "userID", user.ID, "error", err)
 		return
@@ -294,7 +294,7 @@ func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *ent
 // sendVerificationEmail is a helper that creates a token and sends the verification email.
 // Used by resend-verification. Non-blocking — failures are logged but don't break the calling flow.
 func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
-	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.verificationTTL)
+	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.emailVerificationTTL)
 	if err != nil {
 		slog.Error("failed to generate verification token", "userID", user.ID, "error", err)
 		return
