@@ -16,15 +16,25 @@ const welcomeHTMLEn = `<!DOCTYPE html>
     <h1>Welcome to Ductifact, {{.Name}}!</h1>
     <p>Your account has been created successfully.</p>
     <p>You can start by creating your first client and project.</p>
+    <hr>
+    <p><strong>Please verify your email address:</strong></p>
+    <p><a href="{{.VerificationURL}}">Verify my email</a></p>
+    <p>This link will expire in 24 hours.</p>
 </body>
 </html>`
 
 const welcomeTextEn = `Welcome to Ductifact, {{.Name}}!
 
 Your account has been created successfully.
-You can start by creating your first client and project.`
+You can start by creating your first client and project.
 
-const welcomeSubjectEn = "Welcome to Ductifact"
+---
+Please verify your email address by visiting:
+{{.VerificationURL}}
+
+This link will expire in 24 hours.`
+
+const welcomeSubjectEn = "Welcome to Ductifact — please verify your email"
 
 // ── Spanish ─────────────────────────────────────────────────
 
@@ -34,15 +44,25 @@ const welcomeHTMLEs = `<!DOCTYPE html>
     <h1>¡Bienvenido a Ductifact, {{.Name}}!</h1>
     <p>Tu cuenta ha sido creada correctamente.</p>
     <p>Puedes empezar creando tu primer cliente y proyecto.</p>
+    <hr>
+    <p><strong>Por favor, verifica tu dirección de email:</strong></p>
+    <p><a href="{{.VerificationURL}}">Verificar mi email</a></p>
+    <p>Este enlace expirará en 24 horas.</p>
 </body>
 </html>`
 
 const welcomeTextEs = `¡Bienvenido a Ductifact, {{.Name}}!
 
 Tu cuenta ha sido creada correctamente.
-Puedes empezar creando tu primer cliente y proyecto.`
+Puedes empezar creando tu primer cliente y proyecto.
 
-const welcomeSubjectEs = "Bienvenido a Ductifact"
+---
+Por favor, verifica tu dirección de email visitando:
+{{.VerificationURL}}
+
+Este enlace expirará en 24 horas.`
+
+const welcomeSubjectEs = "Bienvenido a Ductifact — verifica tu email"
 
 // ── Template registry ───────────────────────────────────────
 
@@ -59,7 +79,8 @@ var welcomeTemplates = map[valueobjects.Locale]welcomeContent{
 
 // WelcomeData holds the dynamic values for the welcome email template.
 type WelcomeData struct {
-	Name string
+	Name            string
+	VerificationURL string
 }
 
 // RenderWelcome renders the welcome email in the given locale.

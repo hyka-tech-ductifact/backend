@@ -11,45 +11,58 @@ import (
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
+
+	"github.com/google/uuid"
 )
 
 // --- Application-level errors ---
 
 var (
-	ErrInvalidCredentials  = errors.New("invalid email or password")
-	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
-	ErrAccountLocked       = errors.New("account temporarily locked due to too many failed login attempts")
+	ErrInvalidCredentials       = errors.New("invalid email or password")
+	ErrInvalidRefreshToken      = errors.New("invalid or expired refresh token")
+	ErrAccountLocked            = errors.New("account temporarily locked due to too many failed login attempts")
+	ErrInvalidVerificationToken = errors.New("invalid or expired verification token")
+	ErrEmailAlreadyVerified     = errors.New("email already verified")
 )
 
 // authService implements usecases.AuthService.
 type authService struct {
 	userRepo             repositories.UserRepository
+	tokenRepo            repositories.OneTimeTokenRepository
 	tokenProvider        ports.TokenProvider
 	blacklist            ports.TokenBlacklist
 	loginThrottler       ports.LoginThrottler
 	emailSender          ports.EmailSender
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
+	verificationTTL      time.Duration
+	frontendURL          string
 }
 
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	userRepo repositories.UserRepository,
+	tokenRepo repositories.OneTimeTokenRepository,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
 	loginThrottler ports.LoginThrottler,
 	emailSender ports.EmailSender,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
+	verificationTTL time.Duration,
+	frontendURL string,
 ) *authService {
 	return &authService{
 		userRepo:             userRepo,
+		tokenRepo:            tokenRepo,
 		tokenProvider:        tokenProvider,
 		blacklist:            blacklist,
 		loginThrottler:       loginThrottler,
 		emailSender:          emailSender,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
+		verificationTTL:      verificationTTL,
+		frontendURL:          frontendURL,
 	}
 }
 
@@ -94,23 +107,13 @@ func (s *authService) Register(ctx context.Context, name, email, password, local
 		return nil, nil, err
 	}
 
-	// Step 5: Send welcome email (non-blocking — registration succeeds even if email fails)
+	// Step 5: Create verification token and send welcome email with verification link (non-blocking)
 	emailLocale, err := valueobjects.NewLocale(user.Locale)
 	if err != nil {
 		slog.Error("unexpected invalid locale in user record", "locale", user.Locale, "userID", user.ID, "error", err)
 		emailLocale = valueobjects.DefaultLocale
 	}
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: user.Name}, emailLocale)
-	if err == nil {
-		if err := s.emailSender.Send(ctx, ports.Email{
-			To:      user.Email,
-			Subject: subject,
-			HTML:    html,
-			Text:    text,
-		}); err != nil {
-			slog.Warn("failed to send welcome email", "to", user.Email, "error", err)
-		}
-	}
+	s.sendWelcomeWithVerification(ctx, user, emailLocale)
 
 	return user, tokens, nil
 }
@@ -185,4 +188,138 @@ func (s *authService) Logout(_ context.Context, accessToken, refreshToken string
 	s.blacklist.Add(accessToken, s.accessTokenDuration)
 	s.blacklist.Add(refreshToken, s.refreshTokenDuration)
 	return nil
+}
+
+// VerifyEmail validates the verification token and marks the user's email as verified.
+func (s *authService) VerifyEmail(ctx context.Context, token string) error {
+	// Step 1: Find the token (scoped to email_verification type)
+	vt, err := s.tokenRepo.GetByToken(ctx, token, entities.TokenTypeEmailVerification)
+	if err != nil {
+		return ErrInvalidVerificationToken
+	}
+
+	// Step 2: Check expiration
+	if vt.IsExpired() {
+		_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+		return ErrInvalidVerificationToken
+	}
+
+	// Step 3: Get the user
+	user, err := s.userRepo.GetByID(ctx, vt.UserID)
+	if err != nil {
+		return ErrInvalidVerificationToken
+	}
+
+	// Step 4: Check if already verified
+	if user.IsEmailVerified() {
+		_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+		return ErrEmailAlreadyVerified
+	}
+
+	// Step 5: Mark email as verified
+	user.VerifyEmail()
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	// Step 6: Delete all email verification tokens for this user
+	_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+
+	return nil
+}
+
+// ResendVerificationEmail creates a new verification token and sends the verification email.
+// Fails if the user's email is already verified.
+func (s *authService) ResendVerificationEmail(ctx context.Context, userID uuid.UUID) error {
+	// Step 1: Get the user
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	// Step 2: Check if already verified
+	if user.IsEmailVerified() {
+		return ErrEmailAlreadyVerified
+	}
+
+	// Step 3: Resolve locale
+	emailLocale, err := valueobjects.NewLocale(user.Locale)
+	if err != nil {
+		emailLocale = valueobjects.DefaultLocale
+	}
+
+	// Step 4: Delete old tokens and send a fresh one
+	_ = s.tokenRepo.DeleteByUserIDAndType(ctx, userID, entities.TokenTypeEmailVerification)
+	s.sendVerificationEmail(ctx, user, emailLocale)
+
+	return nil
+}
+
+// sendWelcomeWithVerification creates a verification token and sends a single welcome
+// email that includes both the greeting and the verification link.
+// Non-blocking — failures are logged but registration always succeeds.
+func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
+	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.verificationTTL)
+	if err != nil {
+		slog.Error("failed to generate verification token", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.tokenRepo.Create(ctx, vt); err != nil {
+		slog.Error("failed to persist verification token", "userID", user.ID, "error", err)
+		return
+	}
+
+	verificationURL := s.frontendURL + "/verify-email?token=" + vt.Token
+	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+		Name:            user.Name,
+		VerificationURL: verificationURL,
+	}, locale)
+	if err != nil {
+		slog.Error("failed to render welcome email", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.emailSender.Send(ctx, ports.Email{
+		To:      user.Email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+	}); err != nil {
+		slog.Warn("failed to send welcome email", "to", user.Email, "error", err)
+	}
+}
+
+// sendVerificationEmail is a helper that creates a token and sends the verification email.
+// Used by resend-verification. Non-blocking — failures are logged but don't break the calling flow.
+func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
+	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.verificationTTL)
+	if err != nil {
+		slog.Error("failed to generate verification token", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.tokenRepo.Create(ctx, vt); err != nil {
+		slog.Error("failed to persist verification token", "userID", user.ID, "error", err)
+		return
+	}
+
+	verificationURL := s.frontendURL + "/verify-email?token=" + vt.Token
+	subject, html, text, err := templates.RenderVerification(templates.VerificationData{
+		Name:            user.Name,
+		VerificationURL: verificationURL,
+	}, locale)
+	if err != nil {
+		slog.Error("failed to render verification email", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.emailSender.Send(ctx, ports.Email{
+		To:      user.Email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+	}); err != nil {
+		slog.Warn("failed to send verification email", "to", user.Email, "error", err)
+	}
 }

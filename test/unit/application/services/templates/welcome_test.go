@@ -11,32 +11,45 @@ import (
 )
 
 func TestRenderWelcome_English_ContainsUserName(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: "Juan"}, valueobjects.LocaleEN)
+	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+		Name:            "Juan",
+		VerificationURL: "http://localhost:3000/verify-email?token=abc123",
+	}, valueobjects.LocaleEN)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Welcome to Ductifact", subject)
+	assert.Contains(t, subject, "Welcome to Ductifact")
 	assert.Contains(t, html, "Juan")
 	assert.Contains(t, text, "Juan")
 	assert.Contains(t, html, "<h1>")
 	assert.NotContains(t, text, "<h1>") // plain text has no HTML tags
+	assert.Contains(t, html, "verify-email?token=abc123")
+	assert.Contains(t, text, "verify-email?token=abc123")
 }
 
 func TestRenderWelcome_Spanish_ContainsUserName(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: "Juan"}, valueobjects.LocaleES)
+	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+		Name:            "Juan",
+		VerificationURL: "http://localhost:3000/verify-email?token=abc123",
+	}, valueobjects.LocaleES)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Bienvenido a Ductifact", subject)
+	assert.Contains(t, subject, "Bienvenido a Ductifact")
 	assert.Contains(t, html, "Juan")
 	assert.Contains(t, text, "Juan")
 	assert.Contains(t, html, "Bienvenido")
 	assert.Contains(t, text, "Bienvenido")
+	assert.Contains(t, html, "verify-email?token=abc123")
+	assert.Contains(t, text, "verify-email?token=abc123")
 }
 
 func TestRenderWelcome_WithEmptyName_Succeeds(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{Name: ""}, valueobjects.LocaleEN)
+	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+		Name:            "",
+		VerificationURL: "http://localhost:3000/verify-email?token=xyz",
+	}, valueobjects.LocaleEN)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Welcome to Ductifact", subject)
+	assert.Contains(t, subject, "Welcome to Ductifact")
 	assert.Contains(t, html, "Welcome to Ductifact")
 	assert.Contains(t, text, "Welcome to Ductifact")
 }

@@ -21,7 +21,7 @@ import (
 
 // newTestAuthService creates an AuthService with a no-op blacklist, no-op throttler and test durations.
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
@@ -30,7 +30,7 @@ func newTestAuthServiceWithEmail(
 	token *mocks.MockTokenProvider,
 	emailSender *mocks.MockEmailSender,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
@@ -39,7 +39,7 @@ func newTestAuthServiceWithBlacklist(
 	token *mocks.MockTokenProvider,
 	blacklist *mocks.MockTokenBlacklist,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
 }
 
 // newTestAuthServiceWithThrottler creates an AuthService with a custom login throttler.
@@ -48,7 +48,7 @@ func newTestAuthServiceWithThrottler(
 	token *mocks.MockTokenProvider,
 	throttler *mocks.MockLoginThrottler,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour)
+	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, "http://localhost:3000")
 }
 
 // =============================================================================
@@ -231,11 +231,13 @@ func TestRegister_SendsWelcomeEmail(t *testing.T) {
 
 	// ASSERT
 	require.NoError(t, err)
-	require.Len(t, mockEmail.Sent, 1)
+	require.Len(t, mockEmail.Sent, 1) // single welcome email with verification link
 	assert.Equal(t, user.Email, mockEmail.Sent[0].To)
-	assert.Equal(t, "Welcome to Ductifact", mockEmail.Sent[0].Subject)
+	assert.Contains(t, mockEmail.Sent[0].Subject, "Welcome to Ductifact")
 	assert.Contains(t, mockEmail.Sent[0].HTML, "Juan")
 	assert.Contains(t, mockEmail.Sent[0].Text, "Juan")
+	assert.Contains(t, mockEmail.Sent[0].HTML, "verify-email?token=")
+	assert.Contains(t, mockEmail.Sent[0].Text, "verify-email?token=")
 }
 
 func TestRegister_SucceedsEvenIfEmailFails(t *testing.T) {
@@ -355,10 +357,12 @@ func TestRegister_WithSpanishLocale_SendsSpanishWelcomeEmail(t *testing.T) {
 
 	// ASSERT
 	require.NoError(t, err)
-	require.Len(t, mockEmail.Sent, 1)
-	assert.Equal(t, "Bienvenido a Ductifact", mockEmail.Sent[0].Subject)
+	require.Len(t, mockEmail.Sent, 1) // single welcome email with verification link
+	assert.Contains(t, mockEmail.Sent[0].Subject, "Bienvenido a Ductifact")
 	assert.Contains(t, mockEmail.Sent[0].HTML, "Bienvenido")
 	assert.Contains(t, mockEmail.Sent[0].Text, "Bienvenido")
+	assert.Contains(t, mockEmail.Sent[0].HTML, "verify-email?token=")
+	assert.Contains(t, mockEmail.Sent[0].Text, "verify-email?token=")
 }
 
 // =============================================================================
