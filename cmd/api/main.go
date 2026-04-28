@@ -43,7 +43,6 @@ func main() {
 
 	// --- User wiring ---
 	userRepo := persistence.NewPostgresUserRepository(db)
-	userService := services.NewUserService(userRepo)
 
 	// --- Client wiring ---
 	clientRepo := persistence.NewPostgresClientRepository(db)
@@ -75,6 +74,7 @@ func main() {
 	pieceRepo := persistence.NewPostgresPieceRepository(db)
 
 	// --- Services (all repos must be created before services) ---
+	userService := services.NewUserService(userRepo, clientRepo)
 	clientService := services.NewClientService(clientRepo, userRepo, projectRepo)
 	projectService := services.NewProjectService(projectRepo, clientRepo, orderRepo)
 	orderService := services.NewOrderService(orderRepo, projectRepo, pieceRepo)

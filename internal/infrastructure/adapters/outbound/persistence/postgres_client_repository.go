@@ -125,6 +125,12 @@ func (r *PostgresClientRepository) Delete(ctx context.Context, id uuid.UUID) err
 	return r.db.WithContext(ctx).Delete(&ClientModel{}, "id = ?", id).Error
 }
 
+func (r *PostgresClientRepository) CountByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&ClientModel{}).Where("user_id = ?", userID).Count(&count).Error
+	return count, err
+}
+
 // --- Mappers (package-level functions, not methods) ---
 
 func toClientModel(client *entities.Client) *ClientModel {
