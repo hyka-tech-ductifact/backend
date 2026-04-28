@@ -24,6 +24,7 @@ var (
 	ErrInvalidVerificationToken = errors.New("invalid or expired verification token")
 	ErrEmailAlreadyVerified     = errors.New("email already verified")
 	ErrInvalidCurrentPassword   = errors.New("current password is incorrect")
+	ErrInvalidResetToken        = errors.New("invalid or expired password reset token")
 )
 
 // authService implements usecases.AuthService.
@@ -37,6 +38,7 @@ type authService struct {
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 	emailVerificationTTL time.Duration
+	passwordResetTTL     time.Duration
 	verificationBaseURL  string
 }
 
@@ -51,6 +53,7 @@ func NewAuthService(
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 	emailVerificationTTL time.Duration,
+	passwordResetTTL time.Duration,
 	verificationBaseURL string,
 ) *authService {
 	return &authService{
@@ -63,6 +66,7 @@ func NewAuthService(
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
 		emailVerificationTTL: emailVerificationTTL,
+		passwordResetTTL:     passwordResetTTL,
 		verificationBaseURL:  verificationBaseURL,
 	}
 }
@@ -219,6 +223,68 @@ func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	return nil
 }
 
+// ForgotPassword sends a password reset email to the given address.
+// For security, always returns nil even if the email doesn't exist (prevents email enumeration).
+func (s *authService) ForgotPassword(ctx context.Context, email string) error {
+	// Step 1: Find user by email (fail silently if not found)
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal whether the email exists
+		return nil
+	}
+
+	// Step 2: Delete any existing password reset tokens for this user
+	_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, user.ID, entities.TokenTypePasswordReset)
+
+	// Step 3: Resolve locale for the email
+	emailLocale, err := valueobjects.NewLocale(user.Locale)
+	if err != nil {
+		slog.Error("invariant: user has invalid locale", "locale", user.Locale, "userID", user.ID, "error", err)
+		emailLocale = valueobjects.DefaultLocale
+	}
+
+	// Step 4: Create token and send email
+	s.sendPasswordResetEmail(ctx, user, emailLocale)
+
+	return nil
+}
+
+// ResetPassword validates the reset token and sets a new password.
+func (s *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	// Step 1: Find the token (scoped to password_reset type)
+	vt, err := s.oneTimeTokenRepo.GetByToken(ctx, token, entities.TokenTypePasswordReset)
+	if err != nil {
+		return ErrInvalidResetToken
+	}
+
+	// Step 2: Check expiration
+	if vt.IsExpired() {
+		_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypePasswordReset)
+		return ErrInvalidResetToken
+	}
+
+	// Step 3: Get the user
+	user, err := s.userRepo.GetByID(ctx, vt.UserID)
+	if err != nil {
+		return ErrInvalidResetToken
+	}
+
+	// Step 4: Validate and set new password
+	if err := user.SetPassword(newPassword); err != nil {
+		return err
+	}
+
+	// Step 5: Persist
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	// Step 6: Delete all password reset tokens for this user
+	_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypePasswordReset)
+
+	return nil
+}
+
 // VerifyEmail validates the verification token and marks the user's email as verified.
 func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	// Step 1: Find the token (scoped to email_verification type)
@@ -351,5 +417,39 @@ func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.
 		Text:    text,
 	}); err != nil {
 		slog.Error("failed to send verification email", "to", user.Email, "error", err)
+	}
+}
+
+// sendPasswordResetEmail creates a password reset token and sends the reset email.
+// Non-blocking — failures are logged but don't break the calling flow.
+func (s *authService) sendPasswordResetEmail(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
+	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypePasswordReset, s.passwordResetTTL)
+	if err != nil {
+		slog.Error("failed to generate password reset token", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.oneTimeTokenRepo.Create(ctx, vt); err != nil {
+		slog.Error("failed to persist password reset token", "userID", user.ID, "error", err)
+		return
+	}
+
+	resetURL := s.verificationBaseURL + "/reset-password?token=" + vt.Token
+	subject, html, text, err := templates.RenderPasswordReset(templates.PasswordResetData{
+		Name:     user.Name,
+		ResetURL: resetURL,
+	}, locale)
+	if err != nil {
+		slog.Error("failed to render password reset email", "userID", user.ID, "error", err)
+		return
+	}
+
+	if err := s.emailSender.Send(ctx, ports.Email{
+		To:      user.Email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+	}); err != nil {
+		slog.Error("failed to send password reset email", "to", user.Email, "error", err)
 	}
 }
