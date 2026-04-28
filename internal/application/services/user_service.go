@@ -14,22 +14,22 @@ import (
 // --- Application-level errors ---
 
 var (
-	ErrEmailAlreadyInUse = errors.New("email already in use")
-	ErrUserNotFound      = errors.New("user not found")
+	ErrEmailAlreadyInUse    = errors.New("email already in use")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrHasAssociatedClients = errors.New("user has associated clients; set cascade=true to delete")
 )
 
 // userService implements usecases.UserService.
 // Unexported struct: can only be created via NewUserService.
 type userService struct {
-	userRepo repositories.UserRepository
+	userRepo   repositories.UserRepository
+	clientRepo repositories.ClientRepository
 }
 
 // NewUserService creates a new UserService.
-// It receives the outbound port (repository interface), not a concrete implementation.
-func NewUserService(userRepo repositories.UserRepository) *userService {
-	// 	"Accept interfaces, return structs"
-	// — 	Proverbio de Go
-	return &userService{userRepo: userRepo}
+// It receives the outbound ports (repository interfaces), not concrete implementations.
+func NewUserService(userRepo repositories.UserRepository, clientRepo repositories.ClientRepository) *userService {
+	return &userService{userRepo: userRepo, clientRepo: clientRepo}
 }
 
 // GetUserByID retrieves a user by ID.
@@ -96,4 +96,30 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email,
 	}
 
 	return user, nil
+}
+
+// DeleteUser permanently removes a user and all associated data (GDPR).
+// If cascade is false and the user has associated clients, it returns an error.
+// The database cascades the deletion to clients, projects, orders, and pieces.
+func (s *userService) DeleteUser(ctx context.Context, id uuid.UUID, cascade bool) error {
+	// Step 1: Verify the user exists
+	_, err := s.userRepo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+
+	// Step 2: Check for associated data
+	count, err := s.clientRepo.CountByUserID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if count > 0 && !cascade {
+		return ErrHasAssociatedClients
+	}
+
+	// Step 3: Hard delete (cascades via FK)
+	return s.userRepo.Delete(ctx, id)
 }

@@ -9,6 +9,7 @@ import (
 	"ductifact/internal/domain/entities"
 	"ductifact/internal/domain/repositories"
 	"ductifact/internal/domain/valueobjects"
+	"ductifact/test/unit/mocks"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ import (
 
 func TestGetUserByID_WithExistingUser_ReturnsUser(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.GetUserByID(context.Background(), user.ID)
 
@@ -31,7 +32,7 @@ func TestGetUserByID_WithExistingUser_ReturnsUser(t *testing.T) {
 }
 
 func TestGetUserByID_WithNonExistingUser_ReturnsError(t *testing.T) {
-	svc := services.NewUserService(userRepoReturning(nil))
+	svc := services.NewUserService(userRepoReturning(nil), &mocks.MockClientRepository{})
 
 	result, err := svc.GetUserByID(context.Background(), uuid.New())
 
@@ -45,7 +46,7 @@ func TestGetUserByID_WithNonExistingUser_ReturnsError(t *testing.T) {
 
 func TestUpdateUser_WithNewName_UpdatesOnlyName(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
@@ -60,7 +61,7 @@ func TestUpdateUser_WithNewEmail_UpdatesOnlyEmail(t *testing.T) {
 	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
 		return nil, repositories.ErrNotFound
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"), nil)
 
@@ -75,7 +76,7 @@ func TestUpdateUser_WithDuplicateEmail_ReturnsError(t *testing.T) {
 	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
 		return &entities.User{ID: uuid.New(), Email: email}, nil
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("taken@example.com"), nil)
 
@@ -91,7 +92,7 @@ func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
 		getByEmailCalled = true
 		return nil, nil
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr(user.Email), nil)
 
@@ -101,7 +102,7 @@ func TestUpdateUser_WithSameEmail_DoesNotCheckUniqueness(t *testing.T) {
 }
 
 func TestUpdateUser_WithNonExistingUser_ReturnsError(t *testing.T) {
-	svc := services.NewUserService(userRepoReturning(nil))
+	svc := services.NewUserService(userRepoReturning(nil), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), uuid.New(), strPtr("Pedro"), nil, nil)
 
@@ -115,7 +116,7 @@ func TestUpdateUser_WhenRepoFails_ReturnsError(t *testing.T) {
 	repo.UpdateFn = func(ctx context.Context, u *entities.User) error {
 		return errors.New("db write failed")
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
@@ -126,7 +127,7 @@ func TestUpdateUser_WhenRepoFails_ReturnsError(t *testing.T) {
 func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
 	user := newTestUser()
 	oldTime := user.UpdatedAt
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
 
@@ -142,7 +143,7 @@ func TestUpdateUser_WithNoChanges_SkipsPersistence(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	_, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, nil)
 
@@ -152,7 +153,7 @@ func TestUpdateUser_WithNoChanges_SkipsPersistence(t *testing.T) {
 
 func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr(""), nil, nil)
 
@@ -162,7 +163,7 @@ func TestUpdateUser_WithEmptyName_ReturnsError(t *testing.T) {
 
 func TestUpdateUser_WithInvalidEmailFormat_ReturnsError(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("not-an-email"), nil)
 
@@ -176,7 +177,7 @@ func TestUpdateUser_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	repo.GetByEmailFn = func(ctx context.Context, email string) (*entities.User, error) {
 		return nil, errors.New("db connection lost")
 	}
-	svc := services.NewUserService(repo)
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, strPtr("pedro@example.com"), nil)
 
@@ -190,7 +191,7 @@ func TestUpdateUser_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 
 func TestUpdateUser_WithValidLocale_UpdatesLocale(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, strPtr("es"))
 
@@ -200,11 +201,89 @@ func TestUpdateUser_WithValidLocale_UpdatesLocale(t *testing.T) {
 
 func TestUpdateUser_WithInvalidLocale_ReturnsError(t *testing.T) {
 	user := newTestUser()
-	svc := services.NewUserService(userRepoReturning(user))
+	svc := services.NewUserService(userRepoReturning(user), &mocks.MockClientRepository{})
 
 	result, err := svc.UpdateUser(context.Background(), user.ID, nil, nil, strPtr("fr"))
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid locale")
+}
+
+// =============================================================================
+// DeleteUser
+// =============================================================================
+
+func TestDeleteUser_WithNoClients_DeletesSuccessfully(t *testing.T) {
+	user := newTestUser()
+	deleteCalled := false
+	repo := userRepoReturning(user)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		assert.Equal(t, user.ID, id)
+		return nil
+	}
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
+
+	err := svc.DeleteUser(context.Background(), user.ID, false)
+
+	require.NoError(t, err)
+	assert.True(t, deleteCalled)
+}
+
+func TestDeleteUser_WithClients_AndCascadeTrue_DeletesSuccessfully(t *testing.T) {
+	user := newTestUser()
+	deleteCalled := false
+	repo := userRepoReturning(user)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		deleteCalled = true
+		return nil
+	}
+	clientRepo := &mocks.MockClientRepository{
+		CountByUserIDFn: func(ctx context.Context, userID uuid.UUID) (int64, error) {
+			return 3, nil
+		},
+	}
+	svc := services.NewUserService(repo, clientRepo)
+
+	err := svc.DeleteUser(context.Background(), user.ID, true)
+
+	require.NoError(t, err)
+	assert.True(t, deleteCalled)
+}
+
+func TestDeleteUser_WithClients_AndCascadeFalse_ReturnsError(t *testing.T) {
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	clientRepo := &mocks.MockClientRepository{
+		CountByUserIDFn: func(ctx context.Context, userID uuid.UUID) (int64, error) {
+			return 2, nil
+		},
+	}
+	svc := services.NewUserService(repo, clientRepo)
+
+	err := svc.DeleteUser(context.Background(), user.ID, false)
+
+	assert.ErrorIs(t, err, services.ErrHasAssociatedClients)
+}
+
+func TestDeleteUser_WithNonExistingUser_ReturnsError(t *testing.T) {
+	svc := services.NewUserService(userRepoReturning(nil), &mocks.MockClientRepository{})
+
+	err := svc.DeleteUser(context.Background(), uuid.New(), true)
+
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
+func TestDeleteUser_WhenDeleteFails_ReturnsError(t *testing.T) {
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.DeleteFn = func(ctx context.Context, id uuid.UUID) error {
+		return errors.New("db error")
+	}
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
+
+	err := svc.DeleteUser(context.Background(), user.ID, true)
+
+	assert.EqualError(t, err, "db error")
 }

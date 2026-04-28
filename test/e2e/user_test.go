@@ -185,3 +185,85 @@ func TestE2E_FullFlow_Register_GetMe_UpdateMe_GetMe(t *testing.T) {
 	assert.Equal(t, "Ana María", fetched2["name"])
 	assert.Equal(t, "anamaria@example.com", fetched2["email"])
 }
+
+// ─── Delete User (via DELETE /users/me) ──────────────────────────────────────
+
+func TestE2E_DeleteMe_Success(t *testing.T) {
+	clean(t)
+
+	_, token := registerUser(t, "Juan", "juan@example.com", "securepass123")
+
+	// Delete account (no clients, cascade not needed)
+	resp := helpers.AuthDeleteJSON(t, url("/users/me"), token)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Equal(t, "account deleted successfully", body["message"])
+
+	// Verify the user can no longer log in
+	loginResp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
+		"email":    "juan@example.com",
+		"password": "securepass123",
+	})
+	assert.Equal(t, http.StatusUnauthorized, loginResp.StatusCode)
+}
+
+func TestE2E_DeleteMe_NoAuth_Returns401(t *testing.T) {
+	clean(t)
+
+	resp := helpers.DeleteJSON(t, url("/users/me"))
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestE2E_DeleteMe_WithClients_NoCascade_Returns409(t *testing.T) {
+	clean(t)
+
+	// Register and create a client
+	_, token := registerUser(t, "Juan", "juan@example.com", "securepass123")
+	clientResp := helpers.AuthPostJSON(t, url("/clients"), token, map[string]string{
+		"name": "Acme Corp",
+	})
+	require.Equal(t, http.StatusCreated, clientResp.StatusCode)
+	clientResp.Body.Close()
+
+	// Try to delete without cascade — should fail
+	resp := helpers.AuthDeleteJSON(t, url("/users/me"), token)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Contains(t, body["error"], "cascade=true")
+}
+
+func TestE2E_DeleteMe_CascadesClientDeletion(t *testing.T) {
+	clean(t)
+
+	// Register and create a client
+	_, token := registerUser(t, "Juan", "juan@example.com", "securepass123")
+	clientResp := helpers.AuthPostJSON(t, url("/clients"), token, map[string]string{
+		"name": "Acme Corp",
+	})
+	require.Equal(t, http.StatusCreated, clientResp.StatusCode)
+	clientResp.Body.Close()
+
+	// Delete account with cascade=true
+	resp := helpers.AuthDeleteJSON(t, url("/users/me?cascade=true"), token)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// Re-register with same email — should succeed (old data is gone)
+	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+		"name":     "Juan New",
+		"email":    "juan@example.com",
+		"password": "securepass123",
+	})
+	assert.Equal(t, http.StatusCreated, regResp.StatusCode)
+	regBody := helpers.ParseBody(t, regResp)
+	newToken := regBody["access_token"].(string)
+
+	// Verify no clients exist for the new account
+	clientsResp := helpers.AuthGetJSON(t, url("/clients"), newToken)
+	assert.Equal(t, http.StatusOK, clientsResp.StatusCode)
+	clientsBody := helpers.ParseBody(t, clientsResp)
+	items := clientsBody["items"].([]any)
+	assert.Empty(t, items)
+}
