@@ -71,6 +71,7 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 }
 
 func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User) error {
+	user.UpdatedAt = time.Now()
 	model := toUserModel(user)
 	return r.db.WithContext(ctx).Save(model).Error
 }

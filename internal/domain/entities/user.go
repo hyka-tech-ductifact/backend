@@ -103,5 +103,4 @@ func (u *User) IsEmailVerified() bool {
 func (u *User) VerifyEmail() {
 	now := time.Now()
 	u.EmailVerifiedAt = &now
-	u.UpdatedAt = now
 }

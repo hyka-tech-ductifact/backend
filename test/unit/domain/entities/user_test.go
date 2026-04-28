@@ -223,12 +223,12 @@ func TestVerifyEmail_SetsEmailVerifiedAt(t *testing.T) {
 	assert.NotNil(t, user.EmailVerifiedAt)
 }
 
-func TestVerifyEmail_UpdatesUpdatedAt(t *testing.T) {
+func TestVerifyEmail_DoesNotMutateUpdatedAt(t *testing.T) {
 	user, err := entities.NewUser(validUserParams())
 	require.NoError(t, err)
 	originalUpdatedAt := user.UpdatedAt
 
 	user.VerifyEmail()
 
-	assert.True(t, user.UpdatedAt.After(originalUpdatedAt) || user.UpdatedAt.Equal(originalUpdatedAt))
+	assert.Equal(t, originalUpdatedAt, user.UpdatedAt, "UpdatedAt is the repository's responsibility")
 }
