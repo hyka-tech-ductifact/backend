@@ -107,7 +107,7 @@ func main() {
 	// --- One-time token repository ---
 	oneTimeTokenRepo := persistence.NewPostgresOneTimeTokenRepository(db)
 
-	authService := services.NewAuthService(userRepo, oneTimeTokenRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration, cfg.EmailVerification.TokenDuration, cfg.EmailVerification.FrontendURL)
+	authService := services.NewAuthService(userRepo, oneTimeTokenRepo, tokenProvider, blacklist, loginThrottler, emailSender, cfg.JWT.TokenDuration, cfg.JWT.RefreshTokenDuration, cfg.EmailVerification.TokenDuration, cfg.App.ClientURL)
 
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)

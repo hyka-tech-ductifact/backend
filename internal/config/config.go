@@ -34,7 +34,6 @@ type Config struct {
 // EmailVerification holds email verification settings.
 type EmailVerification struct {
 	TokenDuration time.Duration // How long verification tokens remain valid (e.g. "24h")
-	FrontendURL   string        // Base URL for verification links (e.g. "https://app.ductifact.com")
 }
 
 // MinIO holds S3-compatible object storage settings.
@@ -60,8 +59,9 @@ type SMTP struct {
 
 // App holds general application settings.
 type App struct {
-	Host string // Hostname/IP the API is reachable on (used by tests)
-	Port string // TCP port the HTTP server listens on
+	Host      string // Hostname/IP the API is reachable on (used by tests)
+	Port      string // TCP port the HTTP server listens on
+	ClientURL string // Base URL of the client app — used for action links in emails (web or mobile via Universal Links)
 }
 
 // Database holds PostgreSQL connection settings.
@@ -120,8 +120,9 @@ type LoginThrottle struct {
 func Load() Config {
 	return Config{
 		App: App{
-			Host: required("APP_HOST"),
-			Port: required("APP_PORT"),
+			Host:      required("APP_HOST"),
+			Port:      required("APP_PORT"),
+			ClientURL: required("CLIENT_URL"),
 		},
 		Database: Database{
 			Host:     required("DB_HOST"),
@@ -170,7 +171,6 @@ func Load() Config {
 		},
 		EmailVerification: EmailVerification{
 			TokenDuration: parseDuration(required("VERIFICATION_TOKEN_DURATION")),
-			FrontendURL:   required("FRONTEND_URL"),
 		},
 	}
 }
