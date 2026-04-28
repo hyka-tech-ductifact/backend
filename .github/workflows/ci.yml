@@ -57,6 +57,9 @@ env:
   SMTP_USERNAME: noop
   SMTP_PASSWORD: noop
   SMTP_FROM: noreply@ductifact.com
+  VERIFICATION_BASE_URL: http://localhost:3000
+  VERIFICATION_EMAIL_TOKEN_TTL: "24h"
+  VERIFICATION_PASSWORD_RESET_TOKEN_TTL: "1h"
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
 

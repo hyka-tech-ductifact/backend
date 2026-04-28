@@ -152,6 +152,7 @@ func (r *PostgresPieceRepository) ListByOrderID(ctx context.Context, orderID uui
 }
 
 func (r *PostgresPieceRepository) Update(ctx context.Context, piece *entities.Piece) error {
+	piece.UpdatedAt = time.Now()
 	model, err := toPieceModel(piece)
 	if err != nil {
 		return err

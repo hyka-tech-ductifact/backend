@@ -116,6 +116,7 @@ func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid
 }
 
 func (r *PostgresClientRepository) Update(ctx context.Context, client *entities.Client) error {
+	client.UpdatedAt = time.Now()
 	model := toClientModel(client)
 	return r.db.WithContext(ctx).Save(model).Error
 }

@@ -5,6 +5,8 @@ import (
 
 	"ductifact/internal/application/ports"
 	"ductifact/internal/domain/entities"
+
+	"github.com/google/uuid"
 )
 
 // AuthService is the inbound port for authentication operations.
@@ -13,4 +15,6 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (*entities.User, *ports.TokenPair, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*ports.TokenPair, error)
 	Logout(ctx context.Context, accessToken, refreshToken string) error
+	VerifyEmail(ctx context.Context, token string) error
+	ResendVerificationEmail(ctx context.Context, userID uuid.UUID) error
 }

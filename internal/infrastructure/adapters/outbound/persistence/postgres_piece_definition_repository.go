@@ -133,6 +133,7 @@ func (r *PostgresPieceDefinitionRepository) ListByUserID(ctx context.Context, us
 }
 
 func (r *PostgresPieceDefinitionRepository) Update(ctx context.Context, def *entities.PieceDefinition) error {
+	def.UpdatedAt = time.Now()
 	model, err := toPieceDefModel(def)
 	if err != nil {
 		return err

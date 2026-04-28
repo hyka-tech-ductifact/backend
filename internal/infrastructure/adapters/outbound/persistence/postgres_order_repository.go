@@ -134,6 +134,7 @@ func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID
 }
 
 func (r *PostgresOrderRepository) Update(ctx context.Context, order *entities.Order) error {
+	order.UpdatedAt = time.Now()
 	model := toOrderModel(order)
 	return r.db.WithContext(ctx).Save(model).Error
 }

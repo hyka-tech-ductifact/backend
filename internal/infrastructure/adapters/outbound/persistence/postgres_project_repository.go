@@ -128,6 +128,7 @@ func (r *PostgresProjectRepository) ListByClientID(ctx context.Context, clientID
 }
 
 func (r *PostgresProjectRepository) Update(ctx context.Context, project *entities.Project) error {
+	project.UpdatedAt = time.Now()
 	model := toProjectModel(project)
 	return r.db.WithContext(ctx).Save(model).Error
 }

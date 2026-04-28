@@ -17,14 +17,15 @@ import (
 // UserModel is the GORM-specific database representation.
 // It is NOT a domain entity. It lives here because only this adapter cares about it.
 type UserModel struct {
-	ID           uuid.UUID `gorm:"primaryKey"`
-	Name         string
-	Email        string
-	PasswordHash string
-	Locale       string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    gorm.DeletedAt
+	ID              uuid.UUID `gorm:"primaryKey"`
+	Name            string
+	Email           string
+	PasswordHash    string
+	Locale          string
+	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       gorm.DeletedAt
 }
 
 func (UserModel) TableName() string {
@@ -70,6 +71,7 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 }
 
 func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User) error {
+	user.UpdatedAt = time.Now()
 	model := toUserModel(user)
 	return r.db.WithContext(ctx).Save(model).Error
 }
@@ -78,13 +80,14 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User
 
 func toUserModel(user *entities.User) *UserModel {
 	model := &UserModel{
-		ID:           user.ID,
-		Name:         user.Name,
-		Email:        user.Email,
-		PasswordHash: user.PasswordHash,
-		Locale:       user.Locale,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
+		ID:              user.ID,
+		Name:            user.Name,
+		Email:           user.Email,
+		PasswordHash:    user.PasswordHash,
+		Locale:          user.Locale,
+		EmailVerifiedAt: user.EmailVerifiedAt,
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
 	}
 	if user.DeletedAt != nil {
 		model.DeletedAt = gorm.DeletedAt{Time: *user.DeletedAt, Valid: true}
@@ -94,13 +97,14 @@ func toUserModel(user *entities.User) *UserModel {
 
 func toUserEntity(model *UserModel) *entities.User {
 	entity := &entities.User{
-		ID:           model.ID,
-		Name:         model.Name,
-		Email:        model.Email,
-		PasswordHash: model.PasswordHash,
-		Locale:       model.Locale,
-		CreatedAt:    model.CreatedAt,
-		UpdatedAt:    model.UpdatedAt,
+		ID:              model.ID,
+		Name:            model.Name,
+		Email:           model.Email,
+		PasswordHash:    model.PasswordHash,
+		Locale:          model.Locale,
+		EmailVerifiedAt: model.EmailVerifiedAt,
+		CreatedAt:       model.CreatedAt,
+		UpdatedAt:       model.UpdatedAt,
 	}
 	if model.DeletedAt.Valid {
 		entity.DeletedAt = &model.DeletedAt.Time

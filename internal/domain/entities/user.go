@@ -13,14 +13,15 @@ var (
 )
 
 type User struct {
-	ID           uuid.UUID
-	Name         string
-	Email        string
-	PasswordHash string
-	Locale       string // BCP 47 language tag (e.g. "en", "es")
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time // nil = active, non-nil = soft-deleted
+	ID              uuid.UUID
+	Name            string
+	Email           string
+	PasswordHash    string
+	Locale          string     // BCP 47 language tag (e.g. "en", "es")
+	EmailVerifiedAt *time.Time // nil = unverified
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time // nil = active, non-nil = soft-deleted
 }
 
 // CreateUserParams groups all parameters needed to create a User.
@@ -91,4 +92,15 @@ func (u *User) SetLocale(locale string) error {
 	}
 	u.Locale = valid.String()
 	return nil
+}
+
+// IsEmailVerified returns true if the user has verified their email address.
+func (u *User) IsEmailVerified() bool {
+	return u.EmailVerifiedAt != nil
+}
+
+// VerifyEmail marks the user's email as verified at the current time.
+func (u *User) VerifyEmail() {
+	now := time.Now()
+	u.EmailVerifiedAt = &now
 }

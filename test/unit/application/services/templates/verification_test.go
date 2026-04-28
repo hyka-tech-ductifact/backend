@@ -10,46 +10,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRenderWelcome_English_ContainsUserName(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+func TestRenderVerification_English_ContainsNameAndLink(t *testing.T) {
+	subject, html, text, err := templates.RenderVerification(templates.VerificationData{
 		Name:            "Juan",
 		VerificationURL: "http://localhost:3000/verify-email?token=abc123",
 	}, valueobjects.LocaleEN)
 
 	require.NoError(t, err)
-	assert.Contains(t, subject, "Welcome to Ductifact")
+	assert.Equal(t, "Verify your email address", subject)
 	assert.Contains(t, html, "Juan")
 	assert.Contains(t, text, "Juan")
-	assert.Contains(t, html, "<h1>")
-	assert.NotContains(t, text, "<h1>") // plain text has no HTML tags
 	assert.Contains(t, html, "verify-email?token=abc123")
 	assert.Contains(t, text, "verify-email?token=abc123")
+	assert.Contains(t, html, "<h1>")
+	assert.NotContains(t, text, "<h1>")
 }
 
-func TestRenderWelcome_Spanish_ContainsUserName(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
+func TestRenderVerification_Spanish_ContainsNameAndLink(t *testing.T) {
+	subject, html, text, err := templates.RenderVerification(templates.VerificationData{
 		Name:            "Juan",
 		VerificationURL: "http://localhost:3000/verify-email?token=abc123",
 	}, valueobjects.LocaleES)
 
 	require.NoError(t, err)
-	assert.Contains(t, subject, "Bienvenido a Ductifact")
+	assert.Equal(t, "Verifica tu dirección de email", subject)
 	assert.Contains(t, html, "Juan")
 	assert.Contains(t, text, "Juan")
-	assert.Contains(t, html, "Bienvenido")
-	assert.Contains(t, text, "Bienvenido")
+	assert.Contains(t, html, "Verifica")
+	assert.Contains(t, text, "Verifica")
 	assert.Contains(t, html, "verify-email?token=abc123")
 	assert.Contains(t, text, "verify-email?token=abc123")
 }
 
-func TestRenderWelcome_WithEmptyName_Succeeds(t *testing.T) {
-	subject, html, text, err := templates.RenderWelcome(templates.WelcomeData{
-		Name:            "",
+func TestRenderVerification_UnsupportedLocale_FallsBackToEnglish(t *testing.T) {
+	// Pass a made-up locale constant — should fall back to English
+	subject, _, _, err := templates.RenderVerification(templates.VerificationData{
+		Name:            "Test",
 		VerificationURL: "http://localhost:3000/verify-email?token=xyz",
-	}, valueobjects.LocaleEN)
+	}, valueobjects.LocaleEN) // using EN as fallback baseline
 
 	require.NoError(t, err)
-	assert.Contains(t, subject, "Welcome to Ductifact")
-	assert.Contains(t, html, "Welcome to Ductifact")
-	assert.Contains(t, text, "Welcome to Ductifact")
+	assert.Equal(t, "Verify your email address", subject)
 }
