@@ -19,15 +19,22 @@ import (
 
 // Config holds all application configuration, grouped by concern.
 type Config struct {
-	App           App
-	Database      Database
-	JWT           JWT
-	Log           Log
-	CORS          CORS
-	RateLimit     RateLimit
-	LoginThrottle LoginThrottle
-	MinIO         MinIO
-	SMTP          SMTP
+	App               App
+	Database          Database
+	JWT               JWT
+	Log               Log
+	CORS              CORS
+	RateLimit         RateLimit
+	LoginThrottle     LoginThrottle
+	MinIO             MinIO
+	SMTP              SMTP
+	EmailVerification EmailVerification
+}
+
+// EmailVerification holds email verification settings.
+type EmailVerification struct {
+	TokenDuration time.Duration // How long verification tokens remain valid (e.g. "24h")
+	FrontendURL   string        // Base URL for verification links (e.g. "https://app.ductifact.com")
 }
 
 // MinIO holds S3-compatible object storage settings.
@@ -160,6 +167,10 @@ func Load() Config {
 			Username: required("SMTP_USERNAME"),
 			Password: required("SMTP_PASSWORD"),
 			From:     required("SMTP_FROM"),
+		},
+		EmailVerification: EmailVerification{
+			TokenDuration: parseDuration(required("VERIFICATION_TOKEN_DURATION")),
+			FrontendURL:   required("FRONTEND_URL"),
 		},
 	}
 }

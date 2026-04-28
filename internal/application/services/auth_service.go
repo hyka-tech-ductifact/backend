@@ -28,7 +28,7 @@ var (
 // authService implements usecases.AuthService.
 type authService struct {
 	userRepo             repositories.UserRepository
-	tokenRepo            repositories.OneTimeTokenRepository
+	oneTimeTokenRepo     repositories.OneTimeTokenRepository
 	tokenProvider        ports.TokenProvider
 	blacklist            ports.TokenBlacklist
 	loginThrottler       ports.LoginThrottler
@@ -42,7 +42,7 @@ type authService struct {
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	userRepo repositories.UserRepository,
-	tokenRepo repositories.OneTimeTokenRepository,
+	oneTimeTokenRepo repositories.OneTimeTokenRepository,
 	tokenProvider ports.TokenProvider,
 	blacklist ports.TokenBlacklist,
 	loginThrottler ports.LoginThrottler,
@@ -54,7 +54,7 @@ func NewAuthService(
 ) *authService {
 	return &authService{
 		userRepo:             userRepo,
-		tokenRepo:            tokenRepo,
+		oneTimeTokenRepo:     oneTimeTokenRepo,
 		tokenProvider:        tokenProvider,
 		blacklist:            blacklist,
 		loginThrottler:       loginThrottler,
@@ -193,14 +193,14 @@ func (s *authService) Logout(_ context.Context, accessToken, refreshToken string
 // VerifyEmail validates the verification token and marks the user's email as verified.
 func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	// Step 1: Find the token (scoped to email_verification type)
-	vt, err := s.tokenRepo.GetByToken(ctx, token, entities.TokenTypeEmailVerification)
+	vt, err := s.oneTimeTokenRepo.GetByToken(ctx, token, entities.TokenTypeEmailVerification)
 	if err != nil {
 		return ErrInvalidVerificationToken
 	}
 
 	// Step 2: Check expiration
 	if vt.IsExpired() {
-		_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+		_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
 		return ErrInvalidVerificationToken
 	}
 
@@ -212,7 +212,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 
 	// Step 4: Check if already verified
 	if user.IsEmailVerified() {
-		_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+		_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
 		return ErrEmailAlreadyVerified
 	}
 
@@ -223,7 +223,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	}
 
 	// Step 6: Delete all email verification tokens for this user
-	_ = s.tokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
+	_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, vt.UserID, entities.TokenTypeEmailVerification)
 
 	return nil
 }
@@ -245,11 +245,12 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, userID uuid.U
 	// Step 3: Resolve locale
 	emailLocale, err := valueobjects.NewLocale(user.Locale)
 	if err != nil {
+		slog.Error("invariant: user has invalid locale", "locale", user.Locale, "userID", user.ID, "error", err)
 		emailLocale = valueobjects.DefaultLocale
 	}
 
 	// Step 4: Delete old tokens and send a fresh one
-	_ = s.tokenRepo.DeleteByUserIDAndType(ctx, userID, entities.TokenTypeEmailVerification)
+	_ = s.oneTimeTokenRepo.DeleteByUserIDAndType(ctx, userID, entities.TokenTypeEmailVerification)
 	s.sendVerificationEmail(ctx, user, emailLocale)
 
 	return nil
@@ -265,7 +266,7 @@ func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *ent
 		return
 	}
 
-	if err := s.tokenRepo.Create(ctx, vt); err != nil {
+	if err := s.oneTimeTokenRepo.Create(ctx, vt); err != nil {
 		slog.Error("failed to persist verification token", "userID", user.ID, "error", err)
 		return
 	}
@@ -286,7 +287,7 @@ func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *ent
 		HTML:    html,
 		Text:    text,
 	}); err != nil {
-		slog.Warn("failed to send welcome email", "to", user.Email, "error", err)
+		slog.Error("failed to send welcome email", "to", user.Email, "error", err)
 	}
 }
 
@@ -299,7 +300,7 @@ func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.
 		return
 	}
 
-	if err := s.tokenRepo.Create(ctx, vt); err != nil {
+	if err := s.oneTimeTokenRepo.Create(ctx, vt); err != nil {
 		slog.Error("failed to persist verification token", "userID", user.ID, "error", err)
 		return
 	}
@@ -320,6 +321,6 @@ func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.
 		HTML:    html,
 		Text:    text,
 	}); err != nil {
-		slog.Warn("failed to send verification email", "to", user.Email, "error", err)
+		slog.Error("failed to send verification email", "to", user.Email, "error", err)
 	}
 }
