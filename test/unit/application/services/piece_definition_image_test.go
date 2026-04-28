@@ -67,7 +67,11 @@ func TestCreatePieceDefinition_WithImage_UploadsOriginalAndThumbnail(t *testing.
 }
 
 func TestCreatePieceDefinition_WithImage_SetsImageURLFromKey(t *testing.T) {
-	svc := newPieceDefServiceCustom(&mocks.MockPieceDefinitionRepository{}, &mocks.MockFileStorage{}, &mocks.MockImageProcessor{})
+	svc := newPieceDefServiceCustom(
+		&mocks.MockPieceDefinitionRepository{},
+		&mocks.MockFileStorage{},
+		&mocks.MockImageProcessor{},
+	)
 
 	def, err := svc.CreatePieceDefinition(context.Background(), uuid.New(), entities.CreatePieceDefParams{
 		Name:            "Keyed",
@@ -228,7 +232,13 @@ func TestUpdatePieceDefinition_WithNewImage_UploadsAndSetsURL(t *testing.T) {
 	repo := pieceDefRepoReturning(def)
 	svc := newPieceDefServiceCustom(repo, storage, &mocks.MockImageProcessor{})
 
-	result, err := svc.UpdatePieceDefinition(context.Background(), def.ID, userID, entities.UpdatePieceDefParams{}, fakeFileInput("new-image"))
+	result, err := svc.UpdatePieceDefinition(
+		context.Background(),
+		def.ID,
+		userID,
+		entities.UpdatePieceDefParams{},
+		fakeFileInput("new-image"),
+	)
 
 	require.NoError(t, err)
 	assert.Len(t, uploadedKeys, 2, "new original + new thumb uploaded")

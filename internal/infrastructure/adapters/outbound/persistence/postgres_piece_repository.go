@@ -68,7 +68,11 @@ func (r *PostgresPieceRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	return toPieceEntity(&model)
 }
 
-func (r *PostgresPieceRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error) {
+func (r *PostgresPieceRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Piece, error) {
 	var model PieceModel
 	err := r.db.WithContext(ctx).
 		Joins("JOIN orders ON orders.id = pieces.order_id AND orders.deleted_at IS NULL").
@@ -120,7 +124,11 @@ func (r *PostgresPieceRepository) diagnosePieceFailure(ctx context.Context, id u
 	return repositories.ErrPieceNotFound
 }
 
-func (r *PostgresPieceRepository) ListByOrderID(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {
+func (r *PostgresPieceRepository) ListByOrderID(
+	ctx context.Context,
+	orderID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Piece, int64, error) {
 	var totalItems int64
 
 	// Count total matching rows (before pagination)

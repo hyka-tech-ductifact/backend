@@ -65,7 +65,12 @@ func NewPieceDefinitionService(
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
 // On failure: compensate by deleting uploaded files.
-func (s *pieceDefinitionService) CreatePieceDefinition(ctx context.Context, userID uuid.UUID, params entities.CreatePieceDefParams, file *usecases.FileInput) (*entities.PieceDefinition, error) {
+func (s *pieceDefinitionService) CreatePieceDefinition(
+	ctx context.Context,
+	userID uuid.UUID,
+	params entities.CreatePieceDefParams,
+	file *usecases.FileInput,
+) (*entities.PieceDefinition, error) {
 	// Ensure the creator is set from the authenticated user
 	params.UserID = userID
 
@@ -98,14 +103,23 @@ func (s *pieceDefinitionService) CreatePieceDefinition(ctx context.Context, user
 
 // GetPieceDefinitionByID retrieves a piece definition by ID.
 // Returns the definition only if it is predefined or belongs to the requesting user.
-func (s *pieceDefinitionService) GetPieceDefinitionByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+func (s *pieceDefinitionService) GetPieceDefinitionByID(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+) (*entities.PieceDefinition, error) {
 	return s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 }
 
 // ListPieceDefinitions retrieves a paginated list of piece definitions visible to the user.
 // This includes all predefined definitions + the user's custom definitions.
 // When includeArchived is false, archived definitions are excluded.
-func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userID uuid.UUID, includeArchived bool, pg pagination.Pagination) (pagination.Result[*entities.PieceDefinition], error) {
+func (s *pieceDefinitionService) ListPieceDefinitions(
+	ctx context.Context,
+	userID uuid.UUID,
+	includeArchived bool,
+	pg pagination.Pagination,
+) (pagination.Result[*entities.PieceDefinition], error) {
 	defs, totalItems, err := s.pieceDefRepo.ListByUserID(ctx, userID, includeArchived, pg)
 	if err != nil {
 		return pagination.Result[*entities.PieceDefinition]{}, err
@@ -117,7 +131,13 @@ func (s *pieceDefinitionService) ListPieceDefinitions(ctx context.Context, userI
 // UpdatePieceDefinition applies a partial update to an existing piece definition.
 // Only custom (non-predefined) definitions owned by the user can be updated.
 // If a new image is provided, the old one is replaced (old files deleted).
-func (s *pieceDefinitionService) UpdatePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdatePieceDefParams, file *usecases.FileInput) (*entities.PieceDefinition, error) {
+func (s *pieceDefinitionService) UpdatePieceDefinition(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+	params entities.UpdatePieceDefParams,
+	file *usecases.FileInput,
+) (*entities.PieceDefinition, error) {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -223,7 +243,11 @@ func (s *pieceDefinitionService) DeletePieceDefinition(ctx context.Context, id u
 
 // ArchivePieceDefinition sets the archived_at timestamp on a piece definition.
 // Only custom (non-predefined) definitions owned by the user can be archived.
-func (s *pieceDefinitionService) ArchivePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+func (s *pieceDefinitionService) ArchivePieceDefinition(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+) (*entities.PieceDefinition, error) {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -249,7 +273,11 @@ func (s *pieceDefinitionService) ArchivePieceDefinition(ctx context.Context, id 
 
 // UnarchivePieceDefinition clears the archived_at timestamp on a piece definition.
 // Only custom (non-predefined) definitions owned by the user can be unarchived.
-func (s *pieceDefinitionService) UnarchivePieceDefinition(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*entities.PieceDefinition, error) {
+func (s *pieceDefinitionService) UnarchivePieceDefinition(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+) (*entities.PieceDefinition, error) {
 	def, err := s.pieceDefRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err
@@ -292,7 +320,10 @@ func (k *uploadedKeys) rollback(ctx context.Context, s *pieceDefinitionService) 
 // uploadWithThumbnail validates the image, uploads the original and a thumbnail
 // to storage, and returns the generated keys. On partial failure it compensates
 // by deleting whatever was already uploaded.
-func (s *pieceDefinitionService) uploadWithThumbnail(ctx context.Context, file *usecases.FileInput) (*uploadedKeys, error) {
+func (s *pieceDefinitionService) uploadWithThumbnail(
+	ctx context.Context,
+	file *usecases.FileInput,
+) (*uploadedKeys, error) {
 	if err := validateImage(file); err != nil {
 		return nil, err
 	}

@@ -15,7 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupOneTimeTokenRepo(t *testing.T) (*persistence.PostgresOneTimeTokenRepository, *persistence.PostgresUserRepository) {
+func setupOneTimeTokenRepo(
+	t *testing.T,
+) (*persistence.PostgresOneTimeTokenRepository, *persistence.PostgresUserRepository) {
 	db := helpers.SetupTestDB(t)
 	helpers.CleanDB(t, db)
 	return persistence.NewPostgresOneTimeTokenRepository(db), persistence.NewPostgresUserRepository(db)

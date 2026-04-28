@@ -73,7 +73,10 @@ func NewAuthService(
 
 // Register creates a new user with a hashed password and returns a token pair.
 // If locale is empty, the default ("en") is used.
-func (s *authService) Register(ctx context.Context, name, email, password, locale string) (*entities.User, *ports.TokenPair, error) {
+func (s *authService) Register(
+	ctx context.Context,
+	name, email, password, locale string,
+) (*entities.User, *ports.TokenPair, error) {
 	// Apply default locale (application policy, not a domain concern).
 	if locale == "" {
 		locale = valueobjects.DefaultLocale.String()
@@ -354,7 +357,11 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, userID uuid.U
 // sendWelcomeWithVerification creates a verification token and sends a single welcome
 // email that includes both the greeting and the verification link.
 // Non-blocking — failures are logged but registration always succeeds.
-func (s *authService) sendWelcomeWithVerification(ctx context.Context, user *entities.User, locale valueobjects.Locale) {
+func (s *authService) sendWelcomeWithVerification(
+	ctx context.Context,
+	user *entities.User,
+	locale valueobjects.Locale,
+) {
 	vt, err := entities.NewOneTimeToken(user.ID, entities.TokenTypeEmailVerification, s.emailVerificationTTL)
 	if err != nil {
 		slog.Error("failed to generate verification token", "userID", user.ID, "error", err)

@@ -41,7 +41,11 @@ func NewOrderService(
 // 1. Verify the owning project belongs to the user.
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, params entities.CreateOrderParams) (*entities.Order, error) {
+func (s *orderService) CreateOrder(
+	ctx context.Context,
+	userID uuid.UUID,
+	params entities.CreateOrderParams,
+) (*entities.Order, error) {
 	// Step 1: Verify project ownership
 	_, err := s.projectRepo.GetByIDForOwner(ctx, params.ProjectID, userID)
 	if err != nil {
@@ -69,7 +73,12 @@ func (s *orderService) GetOrderByID(ctx context.Context, id uuid.UUID, userID uu
 
 // ListOrdersByProjectID retrieves a paginated list of orders for a project,
 // ensuring the project belongs to the given user.
-func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Order], error) {
+func (s *orderService) ListOrdersByProjectID(
+	ctx context.Context,
+	projectID uuid.UUID,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) (pagination.Result[*entities.Order], error) {
 	_, err := s.projectRepo.GetByIDForOwner(ctx, projectID, userID)
 	if err != nil {
 		return pagination.Result[*entities.Order]{}, err
@@ -85,7 +94,12 @@ func (s *orderService) ListOrdersByProjectID(ctx context.Context, projectID uuid
 
 // UpdateOrder applies a partial update to an existing order.
 // Only non-nil fields in params are updated. Ensures the order belongs to the given user.
-func (s *orderService) UpdateOrder(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateOrderParams) (*entities.Order, error) {
+func (s *orderService) UpdateOrder(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+	params entities.UpdateOrderParams,
+) (*entities.Order, error) {
 	order, err := s.orderRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err

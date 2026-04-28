@@ -23,7 +23,11 @@ import (
 func TestCreateProject_WithValidData_ReturnsProject(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(client), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(client),
+		&mocks.MockOrderRepository{},
+	)
 
 	project, err := svc.CreateProject(context.Background(), userID, entities.CreateProjectParams{
 		Name:        "Residential Tower B",
@@ -46,7 +50,11 @@ func TestCreateProject_WithValidData_ReturnsProject(t *testing.T) {
 func TestCreateProject_WithEmptyName_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(client), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(client),
+		&mocks.MockOrderRepository{},
+	)
 
 	project, err := svc.CreateProject(context.Background(), userID, entities.CreateProjectParams{
 		ClientID: client.ID,
@@ -57,7 +65,11 @@ func TestCreateProject_WithEmptyName_ReturnsError(t *testing.T) {
 }
 
 func TestCreateProject_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(nil), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(nil),
+		&mocks.MockOrderRepository{},
+	)
 
 	project, err := svc.CreateProject(context.Background(), uuid.New(), entities.CreateProjectParams{
 		Name:     "Tower B",
@@ -71,7 +83,11 @@ func TestCreateProject_WithNonExistingClient_ReturnsError(t *testing.T) {
 func TestCreateProject_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
 	client := newTestClient(ownerID)
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(client), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(client),
+		&mocks.MockOrderRepository{},
+	)
 
 	project, err := svc.CreateProject(context.Background(), uuid.New(), entities.CreateProjectParams{
 		Name:     "Tower B",
@@ -108,7 +124,11 @@ func TestCreateProject_WhenRepoFails_ReturnsError(t *testing.T) {
 func TestGetProjectByID_WithExistingProject_ReturnsProject(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(project),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.GetProjectByID(context.Background(), project.ID, userID)
 
@@ -118,7 +138,11 @@ func TestGetProjectByID_WithExistingProject_ReturnsProject(t *testing.T) {
 }
 
 func TestGetProjectByID_WithNonExistingProject_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(nil),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.GetProjectByID(context.Background(), uuid.New(), uuid.New())
 
@@ -186,7 +210,11 @@ func TestListProjectsByClientID_EmptyList(t *testing.T) {
 }
 
 func TestListProjectsByClientID_WithNonExistingClient_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(nil), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(nil),
+		&mocks.MockOrderRepository{},
+	)
 
 	pg, _ := pagination.NewPagination(1, 20)
 	_, err := svc.ListProjectsByClientID(context.Background(), uuid.New(), uuid.New(), pg)
@@ -197,7 +225,11 @@ func TestListProjectsByClientID_WithNonExistingClient_ReturnsError(t *testing.T)
 func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
 	ownerID := uuid.New()
 	client := newTestClient(ownerID)
-	svc := services.NewProjectService(&mocks.MockProjectRepository{}, clientRepoReturning(client), &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		&mocks.MockProjectRepository{},
+		clientRepoReturning(client),
+		&mocks.MockOrderRepository{},
+	)
 
 	pg, _ := pagination.NewPagination(1, 20)
 	_, err := svc.ListProjectsByClientID(context.Background(), client.ID, uuid.New(), pg)
@@ -212,7 +244,11 @@ func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
 func TestUpdateProject_WithNewName_UpdatesName(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(project),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
@@ -225,7 +261,11 @@ func TestUpdateProject_WithNewName_UpdatesName(t *testing.T) {
 func TestUpdateProject_WithAllFields_UpdatesAll(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(project),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name:        strPtr("Updated Tower"),
@@ -246,7 +286,11 @@ func TestUpdateProject_WithAllFields_UpdatesAll(t *testing.T) {
 func TestUpdateProject_WithEmptyName_ReturnsError(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
-	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(project),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr(""),
@@ -274,7 +318,11 @@ func TestUpdateProject_WithNotOwnedProject_ReturnsError(t *testing.T) {
 
 func TestUpdateProject_WithNonExistingProject_ReturnsError(t *testing.T) {
 	userID := uuid.New()
-	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(nil),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.UpdateProject(context.Background(), uuid.New(), userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
@@ -288,7 +336,11 @@ func TestUpdateProject_UpdatesTimestamp(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
 	oldTime := project.UpdatedAt
-	svc := services.NewProjectService(projectRepoReturning(project), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(project),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	result, err := svc.UpdateProject(context.Background(), project.ID, userID, entities.UpdateProjectParams{
 		Name: strPtr("New Name"),
@@ -337,7 +389,11 @@ func TestDeleteProject_WithExistingProject_Succeeds(t *testing.T) {
 }
 
 func TestDeleteProject_WithNonExistingProject_ReturnsError(t *testing.T) {
-	svc := services.NewProjectService(projectRepoReturning(nil), &mocks.MockClientRepository{}, &mocks.MockOrderRepository{})
+	svc := services.NewProjectService(
+		projectRepoReturning(nil),
+		&mocks.MockClientRepository{},
+		&mocks.MockOrderRepository{},
+	)
 
 	err := svc.DeleteProject(context.Background(), uuid.New(), uuid.New(), true)
 

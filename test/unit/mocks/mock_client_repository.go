@@ -35,14 +35,22 @@ func (m *MockClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*enti
 	return nil, nil
 }
 
-func (m *MockClientRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
+func (m *MockClientRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Client, error) {
 	if m.GetByIDForOwnerFn != nil {
 		return m.GetByIDForOwnerFn(ctx, id, ownerID)
 	}
 	return nil, nil
 }
 
-func (m *MockClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+func (m *MockClientRepository) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Client, int64, error) {
 	if m.ListByUserIDFn != nil {
 		return m.ListByUserIDFn(ctx, userID, pg)
 	}

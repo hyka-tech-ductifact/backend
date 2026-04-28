@@ -24,14 +24,22 @@ func (m *MockOneTimeTokenRepository) Create(ctx context.Context, token *entities
 	return nil
 }
 
-func (m *MockOneTimeTokenRepository) GetByToken(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+func (m *MockOneTimeTokenRepository) GetByToken(
+	ctx context.Context,
+	token string,
+	tokenType entities.TokenType,
+) (*entities.OneTimeToken, error) {
 	if m.GetByTokenFn != nil {
 		return m.GetByTokenFn(ctx, token, tokenType)
 	}
 	return nil, nil
 }
 
-func (m *MockOneTimeTokenRepository) DeleteByUserIDAndType(ctx context.Context, userID uuid.UUID, tokenType entities.TokenType) error {
+func (m *MockOneTimeTokenRepository) DeleteByUserIDAndType(
+	ctx context.Context,
+	userID uuid.UUID,
+	tokenType entities.TokenType,
+) error {
 	if m.DeleteByUserIDAndTypeFn != nil {
 		return m.DeleteByUserIDAndTypeFn(ctx, userID, tokenType)
 	}

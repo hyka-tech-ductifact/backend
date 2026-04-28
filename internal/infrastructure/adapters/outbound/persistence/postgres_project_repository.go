@@ -64,7 +64,11 @@ func (r *PostgresProjectRepository) GetByID(ctx context.Context, id uuid.UUID) (
 	return toProjectEntity(&model), nil
 }
 
-func (r *PostgresProjectRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Project, error) {
+func (r *PostgresProjectRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Project, error) {
 	var model ProjectModel
 	err := r.db.WithContext(ctx).
 		Joins("JOIN clients ON clients.id = projects.client_id AND clients.deleted_at IS NULL").
@@ -100,7 +104,11 @@ func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, 
 	return repositories.ErrProjectNotFound
 }
 
-func (r *PostgresProjectRepository) ListByClientID(ctx context.Context, clientID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
+func (r *PostgresProjectRepository) ListByClientID(
+	ctx context.Context,
+	clientID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Project, int64, error) {
 	var totalItems int64
 
 	// Count total matching rows (before pagination)

@@ -44,7 +44,11 @@ func (r *PostgresOneTimeTokenRepository) Create(ctx context.Context, token *enti
 	return r.db.WithContext(ctx).Create(model).Error
 }
 
-func (r *PostgresOneTimeTokenRepository) GetByToken(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+func (r *PostgresOneTimeTokenRepository) GetByToken(
+	ctx context.Context,
+	token string,
+	tokenType entities.TokenType,
+) (*entities.OneTimeToken, error) {
 	var model OneTimeTokenModel
 	if err := r.db.WithContext(ctx).Where("token = ? AND type = ?", token, string(tokenType)).First(&model).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -55,8 +59,15 @@ func (r *PostgresOneTimeTokenRepository) GetByToken(ctx context.Context, token s
 	return toOneTimeTokenEntity(&model), nil
 }
 
-func (r *PostgresOneTimeTokenRepository) DeleteByUserIDAndType(ctx context.Context, userID uuid.UUID, tokenType entities.TokenType) error {
-	return r.db.WithContext(ctx).Where("user_id = ? AND type = ?", userID, string(tokenType)).Delete(&OneTimeTokenModel{}).Error
+func (r *PostgresOneTimeTokenRepository) DeleteByUserIDAndType(
+	ctx context.Context,
+	userID uuid.UUID,
+	tokenType entities.TokenType,
+) error {
+	return r.db.WithContext(ctx).
+		Where("user_id = ? AND type = ?", userID, string(tokenType)).
+		Delete(&OneTimeTokenModel{}).
+		Error
 }
 
 // --- Mappers ---

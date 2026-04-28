@@ -62,7 +62,11 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*e
 	return toOrderEntity(&model), nil
 }
 
-func (r *PostgresOrderRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+func (r *PostgresOrderRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Order, error) {
 	var model OrderModel
 	err := r.db.WithContext(ctx).
 		Joins("JOIN projects ON projects.id = orders.project_id AND projects.deleted_at IS NULL").
@@ -106,7 +110,11 @@ func (r *PostgresOrderRepository) diagnoseOrderFailure(ctx context.Context, id u
 	return repositories.ErrOrderNotFound
 }
 
-func (r *PostgresOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+func (r *PostgresOrderRepository) ListByProjectID(
+	ctx context.Context,
+	projectID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Order, int64, error) {
 	var totalItems int64
 
 	// Count total matching rows (before pagination)

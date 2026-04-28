@@ -46,7 +46,11 @@ func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*entities.
 
 // UpdateUser applies a partial update to an existing user.
 // Only non-nil fields are updated.
-func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, name, email, locale *string) (*entities.User, error) {
+func (s *userService) UpdateUser(
+	ctx context.Context,
+	id uuid.UUID,
+	name, email, locale *string,
+) (*entities.User, error) {
 	// Step 1: Fetch existing
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {

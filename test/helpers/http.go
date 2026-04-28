@@ -175,7 +175,13 @@ func PostMultipart(t *testing.T, url string, data any, imageBytes []byte, imageF
 }
 
 // AuthPostMultipart sends a POST multipart/form-data request with Authorization: Bearer <token>.
-func AuthPostMultipart(t *testing.T, url, token string, data any, imageBytes []byte, imageFilename string) *http.Response {
+func AuthPostMultipart(
+	t *testing.T,
+	url, token string,
+	data any,
+	imageBytes []byte,
+	imageFilename string,
+) *http.Response {
 	t.Helper()
 	body, contentType := buildMultipart(t, data, imageBytes, imageFilename)
 	req, err := http.NewRequest(http.MethodPost, url, body)
@@ -188,7 +194,13 @@ func AuthPostMultipart(t *testing.T, url, token string, data any, imageBytes []b
 }
 
 // AuthPutMultipart sends a PUT multipart/form-data request with Authorization: Bearer <token>.
-func AuthPutMultipart(t *testing.T, url, token string, data any, imageBytes []byte, imageFilename string) *http.Response {
+func AuthPutMultipart(
+	t *testing.T,
+	url, token string,
+	data any,
+	imageBytes []byte,
+	imageFilename string,
+) *http.Response {
 	t.Helper()
 	body, contentType := buildMultipart(t, data, imageBytes, imageFilename)
 	req, err := http.NewRequest(http.MethodPut, url, body)

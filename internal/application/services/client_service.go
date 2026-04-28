@@ -26,7 +26,11 @@ type clientService struct {
 // It receives both the client and user repositories (outbound ports).
 // The user repository is needed to verify that the owning user exists.
 // The project repository is needed to check for associated projects before deletion.
-func NewClientService(clientRepo repositories.ClientRepository, userRepo repositories.UserRepository, projectRepo repositories.ProjectRepository) *clientService {
+func NewClientService(
+	clientRepo repositories.ClientRepository,
+	userRepo repositories.UserRepository,
+	projectRepo repositories.ProjectRepository,
+) *clientService {
 	return &clientService{
 		clientRepo:  clientRepo,
 		userRepo:    userRepo,
@@ -38,7 +42,10 @@ func NewClientService(clientRepo repositories.ClientRepository, userRepo reposit
 // 1. Verify the owning user exists.
 // 2. Build the domain entity (which validates all fields).
 // 3. Persist via repository.
-func (s *clientService) CreateClient(ctx context.Context, params entities.CreateClientParams) (*entities.Client, error) {
+func (s *clientService) CreateClient(
+	ctx context.Context,
+	params entities.CreateClientParams,
+) (*entities.Client, error) {
 	// Step 1: Verify the user exists
 	_, err := s.userRepo.GetByID(ctx, params.UserID)
 	if err != nil {
@@ -68,7 +75,11 @@ func (s *clientService) GetClientByID(ctx context.Context, id uuid.UUID, userID 
 }
 
 // ListClientsByUserID retrieves a paginated list of clients belonging to a user.
-func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) (pagination.Result[*entities.Client], error) {
+func (s *clientService) ListClientsByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) (pagination.Result[*entities.Client], error) {
 	clients, totalItems, err := s.clientRepo.ListByUserID(ctx, userID, pg)
 	if err != nil {
 		return pagination.Result[*entities.Client]{}, err
@@ -79,7 +90,12 @@ func (s *clientService) ListClientsByUserID(ctx context.Context, userID uuid.UUI
 
 // UpdateClient applies a partial update to an existing client.
 // Only non-nil fields in params are updated. Ensures the client belongs to the given user.
-func (s *clientService) UpdateClient(ctx context.Context, id uuid.UUID, userID uuid.UUID, params entities.UpdateClientParams) (*entities.Client, error) {
+func (s *clientService) UpdateClient(
+	ctx context.Context,
+	id uuid.UUID,
+	userID uuid.UUID,
+	params entities.UpdateClientParams,
+) (*entities.Client, error) {
 	client, err := s.clientRepo.GetByIDForOwner(ctx, id, userID)
 	if err != nil {
 		return nil, err

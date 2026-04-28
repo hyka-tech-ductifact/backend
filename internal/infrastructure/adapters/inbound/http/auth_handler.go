@@ -79,7 +79,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, tokens, err := h.authService.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Locale.String())
+	user, tokens, err := h.authService.Register(
+		c.Request.Context(),
+		req.Name,
+		req.Email,
+		req.Password,
+		req.Locale.String(),
+	)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return

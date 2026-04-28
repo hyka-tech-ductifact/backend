@@ -21,7 +21,19 @@ import (
 
 // newTestAuthService creates an AuthService with a no-op blacklist, no-op throttler and test durations.
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(
+		repo,
+		&mocks.MockOneTimeTokenRepository{},
+		token,
+		&mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{},
+		&mocks.MockEmailSender{},
+		15*time.Minute,
+		7*24*time.Hour,
+		24*time.Hour,
+		1*time.Hour,
+		"http://localhost:3000",
+	)
 }
 
 // newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
@@ -30,7 +42,19 @@ func newTestAuthServiceWithEmail(
 	token *mocks.MockTokenProvider,
 	emailSender *mocks.MockEmailSender,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, emailSender, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(
+		repo,
+		&mocks.MockOneTimeTokenRepository{},
+		token,
+		&mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{},
+		emailSender,
+		15*time.Minute,
+		7*24*time.Hour,
+		24*time.Hour,
+		1*time.Hour,
+		"http://localhost:3000",
+	)
 }
 
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
@@ -39,7 +63,19 @@ func newTestAuthServiceWithBlacklist(
 	token *mocks.MockTokenProvider,
 	blacklist *mocks.MockTokenBlacklist,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, blacklist, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(
+		repo,
+		&mocks.MockOneTimeTokenRepository{},
+		token,
+		blacklist,
+		&mocks.MockLoginThrottler{},
+		&mocks.MockEmailSender{},
+		15*time.Minute,
+		7*24*time.Hour,
+		24*time.Hour,
+		1*time.Hour,
+		"http://localhost:3000",
+	)
 }
 
 // newTestAuthServiceWithThrottler creates an AuthService with a custom login throttler.
@@ -48,7 +84,19 @@ func newTestAuthServiceWithThrottler(
 	token *mocks.MockTokenProvider,
 	throttler *mocks.MockLoginThrottler,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, &mocks.MockOneTimeTokenRepository{}, token, &mocks.MockTokenBlacklist{}, throttler, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(
+		repo,
+		&mocks.MockOneTimeTokenRepository{},
+		token,
+		&mocks.MockTokenBlacklist{},
+		throttler,
+		&mocks.MockEmailSender{},
+		15*time.Minute,
+		7*24*time.Hour,
+		24*time.Hour,
+		1*time.Hour,
+		"http://localhost:3000",
+	)
 }
 
 // =============================================================================
@@ -839,7 +887,19 @@ func newTestAuthServiceWithTokenRepo(
 	repo *mocks.MockUserRepository,
 	tokenRepo *mocks.MockOneTimeTokenRepository,
 ) usecases.AuthService {
-	return services.NewAuthService(repo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{}, &mocks.MockLoginThrottler{}, &mocks.MockEmailSender{}, 15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000")
+	return services.NewAuthService(
+		repo,
+		tokenRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{},
+		&mocks.MockEmailSender{},
+		15*time.Minute,
+		7*24*time.Hour,
+		24*time.Hour,
+		1*time.Hour,
+		"http://localhost:3000",
+	)
 }
 
 func TestVerifyEmail_WithValidToken_VerifiesUser(t *testing.T) {

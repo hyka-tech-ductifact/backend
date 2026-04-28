@@ -307,6 +307,7 @@ docker-stop:
 # Format code
 fmt:
 	@echo "Formatting code..."
+	golines -m 120 -w --no-reformat-tags .
 	go fmt ./...
 
 # Lint code

@@ -15,7 +15,9 @@ import (
 )
 
 // setupProjectRepo creates client, user, and project repos with a clean DB.
-func setupProjectRepo(t *testing.T) (*persistence.PostgresProjectRepository, *persistence.PostgresClientRepository, *persistence.PostgresUserRepository) {
+func setupProjectRepo(
+	t *testing.T,
+) (*persistence.PostgresProjectRepository, *persistence.PostgresClientRepository, *persistence.PostgresUserRepository) {
 	db := helpers.SetupTestDB(t)
 	helpers.CleanDB(t, db)
 	return persistence.NewPostgresProjectRepository(db),
@@ -24,7 +26,11 @@ func setupProjectRepo(t *testing.T) (*persistence.PostgresProjectRepository, *pe
 }
 
 // createTestClient is a helper that creates and persists a client for FK tests.
-func createTestClient(t *testing.T, clientRepo *persistence.PostgresClientRepository, userID uuid.UUID) *entities.Client {
+func createTestClient(
+	t *testing.T,
+	clientRepo *persistence.PostgresClientRepository,
+	userID uuid.UUID,
+) *entities.Client {
 	client, err := entities.NewClient(entities.CreateClientParams{
 		Name:   "Test Client " + uuid.New().String()[:8],
 		UserID: userID,

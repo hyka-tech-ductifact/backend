@@ -35,14 +35,22 @@ func (m *MockOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*entit
 	return nil, nil
 }
 
-func (m *MockOrderRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error) {
+func (m *MockOrderRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Order, error) {
 	if m.GetByIDForOwnerFn != nil {
 		return m.GetByIDForOwnerFn(ctx, id, ownerID)
 	}
 	return nil, nil
 }
 
-func (m *MockOrderRepository) ListByProjectID(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+func (m *MockOrderRepository) ListByProjectID(
+	ctx context.Context,
+	projectID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Order, int64, error) {
 	if m.ListByProjectIDFn != nil {
 		return m.ListByProjectIDFn(ctx, projectID, pg)
 	}

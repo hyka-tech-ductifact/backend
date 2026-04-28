@@ -71,7 +71,9 @@ func ConnectTestDB() (*gorm.DB, error) {
 // Call this at the beginning of each integration test.
 // Order matters: truncate in dependency order (children first).
 func CleanDB(t *testing.T, db *gorm.DB) {
-	err := db.Exec("TRUNCATE TABLE one_time_tokens, pieces, piece_definitions, orders, projects, clients, users RESTART IDENTITY CASCADE").Error
+	err := db.Exec(
+		"TRUNCATE TABLE one_time_tokens, pieces, piece_definitions, orders, projects, clients, users RESTART IDENTITY CASCADE",
+	).Error
 	require.NoError(t, err)
 }
 
@@ -85,7 +87,11 @@ func WaitForAPI(baseURL string, maxRetries int) error {
 			return nil
 		}
 		if i == maxRetries-1 {
-			return fmt.Errorf("API not ready at %s after %d retries — is the server running? (make app-start)", baseURL, maxRetries)
+			return fmt.Errorf(
+				"API not ready at %s after %d retries — is the server running? (make app-start)",
+				baseURL,
+				maxRetries,
+			)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

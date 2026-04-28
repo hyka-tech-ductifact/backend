@@ -63,7 +63,11 @@ func (r *PostgresClientRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 	return toClientEntity(&model), nil
 }
 
-func (r *PostgresClientRepository) GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error) {
+func (r *PostgresClientRepository) GetByIDForOwner(
+	ctx context.Context,
+	id uuid.UUID,
+	ownerID uuid.UUID,
+) (*entities.Client, error) {
 	var model ClientModel
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND user_id = ?", id, ownerID).
@@ -88,7 +92,11 @@ func (r *PostgresClientRepository) diagnoseClientFailure(ctx context.Context, id
 	return repositories.ErrClientNotOwned
 }
 
-func (r *PostgresClientRepository) ListByUserID(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+func (r *PostgresClientRepository) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+	pg pagination.Pagination,
+) ([]*entities.Client, int64, error) {
 	var totalItems int64
 
 	// Count total matching rows (before pagination)
