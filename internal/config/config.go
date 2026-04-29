@@ -21,6 +21,7 @@ import (
 type Config struct {
 	App           App
 	Database      Database
+	Redis         Redis
 	JWT           JWT
 	Log           Log
 	CORS          CORS
@@ -57,6 +58,17 @@ type SMTP struct {
 	Username string // AUTH username ("apikey" for SendGrid)
 	Password string // AUTH password / API key
 	From     string // sender address (e.g. "noreply@ductifact.com")
+}
+
+// Redis holds Redis connection settings.
+// Redis is always the primary backend for distributed state.
+// If unavailable at runtime, the system degrades to in-memory adapters.
+type Redis struct {
+	Host     string // hostname (e.g. "localhost")
+	Port     string // port (e.g. "6379")
+	UseAuth  bool   // whether to authenticate with the Redis server
+	Password string // AUTH password (only used when UseAuth is true)
+	DB       int    // database number (0-15)
 }
 
 // App holds general application settings.
@@ -123,6 +135,13 @@ func Load() Config {
 		App: App{
 			Host: required("APP_HOST"),
 			Port: required("APP_PORT"),
+		},
+		Redis: Redis{
+			Host:     required("REDIS_HOST"),
+			Port:     required("REDIS_PORT"),
+			UseAuth:  parseBool(required("REDIS_AUTH")),
+			Password: required("REDIS_PASSWORD"),
+			DB:       parseInt(required("REDIS_DB")),
 		},
 		Database: Database{
 			Host:     required("DB_HOST"),

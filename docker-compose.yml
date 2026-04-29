@@ -41,6 +41,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: ductifact_dev_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # MailPit — development-only SMTP server that captures all outgoing emails.
   # Web UI: http://localhost:8025 — never deployed to production.
   mailpit:
@@ -99,6 +113,11 @@ services:
       - VERIFICATION_BASE_URL=${VERIFICATION_BASE_URL}
       - VERIFICATION_EMAIL_TOKEN_TTL=${VERIFICATION_EMAIL_TOKEN_TTL}
       - VERIFICATION_PASSWORD_RESET_TOKEN_TTL=${VERIFICATION_PASSWORD_RESET_TOKEN_TTL}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=${REDIS_AUTH}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,7 +125,10 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   minio_data:
+  redis_data:

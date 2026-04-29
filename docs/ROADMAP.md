@@ -172,7 +172,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 15.1 | Load testing with k6 (establish baselines) | ⬜ | 🔴 Now |
+| 15.1 | Load testing with k6 (establish baselines) | ⬜ | 🟡 Soon |
 | 15.2 | Profiling with `pprof` (identify bottlenecks) | ⬜ | 🟡 Soon |
 | 15.3 | Optimized indexes for frequent queries | ⬜ | 🟡 Soon |
 | 15.4 | Connection pooling tuning (GORM pool settings) | ⬜ | 🟡 Soon |
@@ -193,15 +193,15 @@
 | 16.2 | Redis adapter for rate limiter (IP + user) | ⬜ | 🔴 Now |
 | 16.3 | Redis adapter for login throttler | ⬜ | 🔴 Now |
 | 16.4 | Redis health check in `/readyz` endpoint | ⬜ | 🔴 Now |
-| 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🟡 Soon |
-| 16.6 | Configurable adapter selection (memory vs Redis via env) | ⬜ | 🟡 Soon |
+| 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🔵 Later |
+| 16.6 | Configurable adapter selection (memory vs Redis via env) | ⬜ | 🔴 Now 
 
 ### 17. Production Observability
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 17.1 | Grafana dashboards (latency p50/p95/p99, error rate, throughput) | ⬜ | 🔴 Now |
-| 17.2 | Alertmanager rules (error spikes, latency, downtime) | ⬜ | 🔴 Now |
+| 17.1 | Grafana dashboards (latency p50/p95/p99, error rate, throughput) | ⬜ | 🟡 Soon |
+| 17.2 | Alertmanager rules (error spikes, latency, downtime) | ⬜ | 🟡 Soon |
 | 17.3 | Log aggregation with Loki + Grafana | ⬜ | 🟡 Soon |
 | 17.4 | Distributed tracing with OpenTelemetry | ⬜ | 🟡 Soon |
 | 17.5 | Audit log (user action tracking, stored in DB) | ⬜ | 🟡 Soon |
@@ -218,10 +218,10 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 18.1 | `Role` entity (admin, user, readonly) | ⬜ | 🔵 Later |
-| 18.2 | Role assignment on registration (default: user) | ⬜ | 🔵 Later |
-| 18.3 | RBAC middleware (role-based route protection) | ⬜ | 🔵 Later |
-| 18.4 | Admin endpoints (`GET /admin/users`, `PUT /admin/users/:id/role`) | ⬜ | 🔵 Later |
+| 18.1 | `Role` entity (admin, user, readonly) | ⬜ | 🔴 Now |
+| 18.2 | Role assignment on registration (default: user) | ⬜ | 🔴 Now |
+| 18.3 | RBAC middleware (role-based route protection) | ⬜ | 🔴 Now |
+| 18.4 | Admin endpoints (`GET /admin/users`, `PUT /admin/users/:id/role`) | ⬜ | 🔴 Now |
 | 18.5 | Permission-based access control (fine-grained) | ⬜ | ⚪ Maybe never |
 
 ### 19. Email & Notifications
@@ -249,7 +249,7 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🔴 Now |
+| 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🟡 Soon |
 | 21.2 | `Invoice` entity (linked to Client, basic CRUD) | ⬜ | 🟡 Soon |
 | 21.3 | `Project` entity (linked to Client, status workflow) | ⬜ | 🟡 Soon |
 | 21.4 | Domain events (event-driven internal communication) | ⬜ | 🔵 Later |
