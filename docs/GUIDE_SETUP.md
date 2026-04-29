@@ -5,6 +5,7 @@
 - Go 1.26+
 - Docker + Compose plugin v2+ (or Podman)
 - Make
+- Redis 7+ (provided by `docker compose` in dev)
 
 ## Go bin directory
 
@@ -32,6 +33,11 @@ Key variables:
 | `APP_PORT` | `8080` | `8080` | API server port |
 | `JWT_SECRET` | (any 32+ chars) | (any 32+ chars) | Secret for JWT signing |
 | `AUTO_MIGRATE` | `true` | `false` | Auto-create tables on startup |
+| `REDIS_HOST` | `localhost` | `redis` | Redis host |
+| `REDIS_PORT` | `6379` | `6379` | Redis port |
+| `REDIS_AUTH` | `false` | `false` | Enable AUTH (set `true` in production) |
+| `REDIS_PASSWORD` | `noop` | `noop` | AUTH password (only used when `REDIS_AUTH=true`) |
+| `REDIS_DB` | `0` | `0` | Redis database number (0–15) |
 
 ## Install dependencies
 

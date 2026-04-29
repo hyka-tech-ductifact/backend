@@ -7,7 +7,7 @@ Go REST API following **Hexagonal Architecture** (Ports & Adapters) with Postgre
 ## Prerequisites
 
 - Go 1.26+
-- Docker + Compose plugin v2+
+- Docker + Compose plugin v2+ (starts PostgreSQL, Redis, MinIO, Mailpit)
 
 ## Setup
 

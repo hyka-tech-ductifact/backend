@@ -189,12 +189,12 @@
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 16.1 | Redis adapter for token blacklist | ⬜ | 🔴 Now |
-| 16.2 | Redis adapter for rate limiter (IP + user) | ⬜ | 🔴 Now |
-| 16.3 | Redis adapter for login throttler | ⬜ | 🔴 Now |
-| 16.4 | Redis health check in `/readyz` endpoint | ⬜ | 🔴 Now |
+| 16.1 | Redis adapter for token blacklist | ✅ | 🔴 Now |
+| 16.2 | Redis adapter for rate limiter (IP + user) | ✅ | 🔴 Now |
+| 16.3 | Redis adapter for login throttler | ✅ | 🔴 Now |
+| 16.4 | Redis health check in `/readyz` endpoint | ✅ | 🔴 Now |
 | 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🔵 Later |
-| 16.6 | Configurable adapter selection (memory vs Redis via env) | ⬜ | 🔴 Now 
+| 16.6 | Graceful fallback: Redis primary, memory if unavailable | ✅ | 🔴 Now |
 
 ### 17. Production Observability
 
@@ -315,17 +315,17 @@ Phase 2 — Hardening
   Developer Experience       ████████████████████  6/6   ✅
 
 Phase 3 — Account & API Maturity
-  Account Management         ░░░░░░░░░░░░░░░░░░░░  0/5
+  Account Management         ████████████████████  5/5   ✅
   Advanced API               ░░░░░░░░░░░░░░░░░░░░  0/7
   Performance & Baselines    ░░░░░░░░░░░░░░░░░░░░  0/5
 
 Phase 4 — Horizontal Scaling & Observability
-  Redis & Distributed State  ░░░░░░░░░░░░░░░░░░░░  0/6
+  Redis & Distributed State  ████████████████░░░░  5/6
   Production Observability   ░░░░░░░░░░░░░░░░░░░░  0/6
 
 Phase 5 — Business Features
   Roles & Permissions        ░░░░░░░░░░░░░░░░░░░░  0/5
-  Email & Notifications      ░░░░░░░░░░░░░░░░░░░░  0/6
+  Email & Notifications      ████████████████░░░░  5/6
   Background Processing      ░░░░░░░░░░░░░░░░░░░░  0/5
   Domain Enrichment          ░░░░░░░░░░░░░░░░░░░░  0/6
 
@@ -335,9 +335,10 @@ Phase 6 — Resilience & Polish
   API Governance             ░░░░░░░░░░░░░░░░░░░░  0/5
 ```
 
-> **Total progress**: 76/76 (Phase 1+2) + 0/59 (Phase 3–6) = 76/135 tasks (~56%)
+> **Total progress**: 76/76 (Phase 1+2) + 16/59 (Phase 3–6) = 92/135 tasks (~68%)
 > **Phases 1 & 2 complete** — solid production foundation, security, and DX.
-> **Recommendation**: Start Phase 3 (Account & API Maturity) — highest user-facing impact.
+> **Phase 3**: Account Management ✅, API Maturity in progress.
+> **Phase 4**: Redis ✅ (5/6), Observability pending.
 
 ### Suggested execution order
 
