@@ -7,7 +7,8 @@ The backend has 4 test levels, each with a different scope and purpose:
 | Level | What it tests | Dependencies | Location |
 |-------|---------------|--------------|----------|
 | **Unit** | Domain logic, services, value objects | None (uses mocks) | `test/unit/` |
-| **Integration** | Repositories against real PostgreSQL | DB | `test/integration/` |
+| **Integration** | Repositories against real PostgreSQL | DB | `test/integration/persistence/` |
+| **Integration (Redis)** | Redis adapters (blacklist, rate limiter, throttler, health) | Redis | `test/integration/redis/` |
 | **Contract** | API responses match the OpenAPI spec | DB + running server | `test/contract/` |
 | **E2E** | Full HTTP flows end-to-end | DB + running server | `test/e2e/` |
 

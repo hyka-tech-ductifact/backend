@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/config"
 	httpAdapter "ductifact/internal/infrastructure/adapters/inbound/http"
@@ -21,6 +22,7 @@ import (
 	"ductifact/internal/infrastructure/ratelimit"
 
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -92,17 +94,85 @@ func main() {
 
 	// --- Auth wiring ---
 	tokenProvider := auth.NewJWTProvider(cfg.JWT)
-	blacklist := auth.NewMemoryBlacklist(5 * time.Minute)
-	defer blacklist.Stop()
 
-	// --- Login throttler ---
-	loginThrottler := ratelimit.NewMemoryLoginThrottler(
-		cfg.LoginThrottle.MaxAttempts,
-		cfg.LoginThrottle.Window,
-		cfg.LoginThrottle.LockoutDuration,
-		1*time.Minute,
-	)
-	defer loginThrottler.Stop()
+	// --- Redis connection (primary backend for distributed state) ---
+	var redisClient *redis.Client
+	var redisChecker *persistence.RedisHealthChecker
+
+	redisOpts := &redis.Options{
+		Addr: cfg.Redis.Addr(),
+		DB:   cfg.Redis.DB,
+	}
+	if cfg.Redis.UseAuth {
+		redisOpts.Password = cfg.Redis.Password
+	}
+	redisClient = redis.NewClient(redisOpts)
+
+	// Try to connect — if Redis is unavailable, degrade to in-memory adapters
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	redisAvailable := redisClient.Ping(pingCtx).Err() == nil
+	pingCancel()
+
+	var blacklist ports.TokenBlacklist
+	var loginThrottler ports.LoginThrottler
+	var ipLimiter ports.RateLimiter
+	var userLimiter ports.RateLimiter
+
+	if redisAvailable {
+		slog.Info("redis connected, using distributed adapters", "addr", cfg.Redis.Addr())
+		redisChecker = persistence.NewRedisHealthChecker(redisClient)
+
+		blacklist = auth.NewRedisBlacklist(redisClient)
+		loginThrottler = ratelimit.NewRedisLoginThrottler(
+			redisClient,
+			cfg.LoginThrottle.MaxAttempts,
+			cfg.LoginThrottle.Window,
+			cfg.LoginThrottle.LockoutDuration,
+		)
+		ipLimiter = ratelimit.NewRedisRateLimiter(
+			redisClient,
+			cfg.RateLimit.IPMaxRequests,
+			cfg.RateLimit.IPWindow,
+		)
+		userLimiter = ratelimit.NewRedisRateLimiter(
+			redisClient,
+			cfg.RateLimit.UserMaxRequests,
+			cfg.RateLimit.UserWindow,
+		)
+	} else {
+		slog.Error("redis unavailable, degrading to in-memory adapters", "addr", cfg.Redis.Addr())
+		redisClient.Close()
+		redisClient = nil
+
+		memBlacklist := auth.NewMemoryBlacklist(5 * time.Minute)
+		defer memBlacklist.Stop()
+		blacklist = memBlacklist
+
+		memThrottler := ratelimit.NewMemoryLoginThrottler(
+			cfg.LoginThrottle.MaxAttempts,
+			cfg.LoginThrottle.Window,
+			cfg.LoginThrottle.LockoutDuration,
+			1*time.Minute,
+		)
+		defer memThrottler.Stop()
+		loginThrottler = memThrottler
+
+		memIPLimiter := ratelimit.NewMemoryRateLimiter(
+			cfg.RateLimit.IPMaxRequests,
+			cfg.RateLimit.IPWindow,
+			1*time.Minute,
+		)
+		defer memIPLimiter.Stop()
+		ipLimiter = memIPLimiter
+
+		memUserLimiter := ratelimit.NewMemoryRateLimiter(
+			cfg.RateLimit.UserMaxRequests,
+			cfg.RateLimit.UserWindow,
+			1*time.Minute,
+		)
+		defer memUserLimiter.Stop()
+		userLimiter = memUserLimiter
+	}
 
 	// --- One-time token repository ---
 	oneTimeTokenRepo := persistence.NewPostgresOneTimeTokenRepository(db)
@@ -124,26 +194,12 @@ func main() {
 	// --- Health checker ---
 	healthChecker := persistence.NewPostgresHealthChecker(db)
 
-	// --- Rate limiters ---
-	ipLimiter := ratelimit.NewMemoryRateLimiter(
-		cfg.RateLimit.IPMaxRequests,
-		cfg.RateLimit.IPWindow,
-		1*time.Minute,
-	)
-	defer ipLimiter.Stop()
-
-	userLimiter := ratelimit.NewMemoryRateLimiter(
-		cfg.RateLimit.UserMaxRequests,
-		cfg.RateLimit.UserWindow,
-		1*time.Minute,
-	)
-	defer userLimiter.Stop()
-
 	// --- HTTP server ---
 	router := httpAdapter.SetupRoutes(
 		healthChecker,
 		fileStorage,
 		emailSender,
+		redisChecker,
 		userService,
 		clientService,
 		projectService,
@@ -195,6 +251,11 @@ func main() {
 	sqlDB, err := db.DB()
 	if err == nil {
 		sqlDB.Close()
+	}
+
+	// Close Redis connection
+	if redisClient != nil {
+		redisClient.Close()
 	}
 
 	slog.Info("server stopped gracefully")
