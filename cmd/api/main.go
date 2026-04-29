@@ -144,6 +144,7 @@ func main() {
 		healthChecker,
 		fileStorage,
 		emailSender,
+		nil, // redisChecker — will be set in Paso 5 (adapter selection)
 		userService,
 		clientService,
 		projectService,

@@ -20,6 +20,7 @@ type HealthHandler struct {
 	healthChecker   ports.HealthChecker
 	storageChecker  storagePinger
 	emailChecker    emailPinger
+	redisChecker    redisPinger
 	startTime       time.Time
 	contractVersion string
 	version         string
@@ -39,12 +40,19 @@ type emailPinger interface {
 	Ping(ctx context.Context) error
 }
 
+// redisPinger is a minimal interface for checking Redis health.
+// Can be nil when running in memory-only mode.
+type redisPinger interface {
+	Ping(ctx context.Context) error
+}
+
 // NewHealthHandler creates a new HealthHandler.
 // Call this at application startup and pass the time the app started.
 func NewHealthHandler(
 	healthChecker ports.HealthChecker,
 	storageChecker ports.FileStorage,
 	emailChecker ports.EmailSender,
+	redisChecker redisPinger,
 	startTime time.Time,
 	contractVersion string,
 	version string,
@@ -55,6 +63,7 @@ func NewHealthHandler(
 		healthChecker:   healthChecker,
 		storageChecker:  storageChecker,
 		emailChecker:    emailChecker,
+		redisChecker:    redisChecker,
 		startTime:       startTime,
 		contractVersion: contractVersion,
 		version:         version,
@@ -132,6 +141,7 @@ type readyzResponse struct {
 	Uptime          string   `json:"uptime"`
 	Database        string   `json:"database"`
 	Storage         string   `json:"storage"`
+	Redis           string   `json:"redis"`
 	Email           string   `json:"email"`
 	Version         string   `json:"version"`
 	Commit          string   `json:"commit"`
@@ -146,6 +156,7 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 
 	dbStatus := "connected"
 	storageStatus := "connected"
+	redisStatus := "connected"
 	emailStatus := "connected"
 	var errs []string
 	var warnings []string
@@ -169,6 +180,21 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 			slog.Error("readyz: storage ping failed", "error", err.Error())
 			errs = append(errs, "storage: unavailable")
 		}
+	}
+
+	// Non-critical check — failure causes "degraded" but NOT 503
+	if h.redisChecker != nil {
+		if err := h.redisChecker.Ping(ctx); err != nil {
+			redisStatus = "unavailable"
+			if h.logLevel == "debug" {
+				warnings = append(warnings, "redis: "+err.Error())
+			} else {
+				slog.Warn("readyz: redis ping failed", "error", err.Error())
+				warnings = append(warnings, "redis: unavailable")
+			}
+		}
+	} else {
+		redisStatus = "not_configured"
 	}
 
 	// Non-critical check — failure causes "degraded" but NOT 503
@@ -196,6 +222,7 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		Uptime:          uptime,
 		Database:        dbStatus,
 		Storage:         storageStatus,
+		Redis:           redisStatus,
 		Email:           emailStatus,
 		Version:         h.version,
 		Commit:          h.commit,
