@@ -60,6 +60,11 @@ env:
   VERIFICATION_BASE_URL: http://localhost:3000
   VERIFICATION_EMAIL_TOKEN_TTL: "24h"
   VERIFICATION_PASSWORD_RESET_TOKEN_TTL: "1h"
+  REDIS_HOST: localhost
+  REDIS_PORT: "6379"
+  REDIS_AUTH: "false"
+  REDIS_PASSWORD: noop
+  REDIS_DB: "0"
 # ─── Jobs ────────────────────────────────────────────────────
 jobs:
 
@@ -131,7 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Start Postgres
+      - name: Start services (Postgres + Redis)
         run: make services-start
 
       - uses: actions/setup-go@v6
