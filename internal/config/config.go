@@ -71,6 +71,11 @@ type Redis struct {
 	DB       int    // database number (0-15)
 }
 
+// Addr returns the Redis address in host:port format.
+func (r Redis) Addr() string {
+	return r.Host + ":" + r.Port
+}
+
 // App holds general application settings.
 type App struct {
 	Host string // Hostname/IP the API is reachable on (used by tests)
