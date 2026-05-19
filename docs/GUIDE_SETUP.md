@@ -30,7 +30,7 @@ Key variables:
 |----------|-----------|--------------|-------------|
 | `DB_HOST` | `localhost` | `postgres` | Use `localhost` for local dev, `postgres` for Docker Compose |
 | `DB_PORT` | `5432` | `5432` | PostgreSQL port |
-| `APP_PORT` | `8080` | `8080` | API server port |
+| `BACKEND_PORT` | `8080` | `8080` | API server port |
 | `JWT_SECRET` | (any 32+ chars) | (any 32+ chars) | Secret for JWT signing |
 | `AUTO_MIGRATE` | `true` | `false` | Auto-create tables on startup |
 | `REDIS_HOST` | `localhost` | `redis` | Redis host |
