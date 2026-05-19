@@ -31,8 +31,8 @@ COPY --from=builder /app/app .
 # CI does this automatically; locally `make docker-build` handles it.
 COPY contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml
 
-ARG APP_PORT=8080
-EXPOSE ${APP_PORT}
+ARG BACKEND_PORT=8080
+EXPOSE ${BACKEND_PORT}
 
 # Run as non-root user (security best practice)
 RUN adduser -D -g '' appuser

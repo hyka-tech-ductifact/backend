@@ -138,8 +138,8 @@ type LoginThrottle struct {
 func Load() Config {
 	return Config{
 		App: App{
-			Host: required("APP_HOST"),
-			Port: required("APP_PORT"),
+			Host: required("BACKEND_HOST"),
+			Port: required("BACKEND_PORT"),
 		},
 		Redis: Redis{
 			Host:     required("REDIS_HOST"),
