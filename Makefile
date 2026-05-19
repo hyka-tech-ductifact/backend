@@ -186,7 +186,7 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE         ?= schemathesis/schemathesis:latest
+ST_IMAGE         ?= schemathesis/schemathesis:v4.18.5
 ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
 _ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
