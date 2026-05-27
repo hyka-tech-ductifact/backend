@@ -1,17 +1,12 @@
 name: CD
 
 # ─── When it runs ───────────────────────────────────────────
-# Staging:    after CI passes on main (PR merged → main → CI ✅ → CD)
-# Production: when a version tag is pushed (git tag v0.4.0 → CD)
+# After CI passes on main (PR merged → main → CI ✅ → CD)
 on:
   workflow_run:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
-
-  push:
-    tags:
-      - "v*"
 
 # ─── Shared environment variables ────────────────────────────
 env:
@@ -22,14 +17,14 @@ env:
 jobs:
 
   # ══════════════════════════════════════════════════════════
-  # STAGING — runs when CI passes on main
+  # BUILD — runs when CI passes on main
+  # Builds and pushes the image. That's it.
+  # Where it gets deployed is infra's decision.
   # ══════════════════════════════════════════════════════════
-  deploy-staging:
-    name: Deploy to Staging
+  build:
+    name: Build & Push Image
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
 
     permissions:
       contents: read
@@ -37,10 +32,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
-      # ── Build & push Docker image ─────────────────────────
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -48,111 +40,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
-        id: version
-        run: echo "VERSION=$(git describe --tags --always)" >> $GITHUB_OUTPUT
-
       - name: Ensure contract spec
         run: make ensure-contract
 
-      - name: Build and push (staging tag)
+      - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           build-args: |
-            APP_VERSION=${{ steps.version.outputs.VERSION }}
             APP_COMMIT=${{ github.sha }}
+            APP_BUILD_TIME=${{ github.event.head_commit.timestamp }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
 
-      # ── Deploy via SSH through Cloudflare Tunnel ───────────
-      - name: Install cloudflared
-        run: |
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
-            -o /tmp/cloudflared.deb
-          sudo dpkg -i /tmp/cloudflared.deb
-
-      - name: Deploy to staging server
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          # Use cloudflared access ssh with --id and --secret flags.
-          # GitHub Actions resolves ${{ secrets.* }} at parse time,
-          # so the actual values are baked into the command string.
-          ssh -v -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${{ secrets.CF_ACCESS_CLIENT_ID }} --secret ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-              -i ~/.ssh/deploy_key \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-              "~/ductifact/infra/scripts/deploy.sh staging"
-
-  # ══════════════════════════════════════════════════════════
-  # PRODUCTION — runs when a v* tag is pushed
-  # ══════════════════════════════════════════════════════════
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v6
+      - name: Notify infra
+        uses: peter-evans/repository-dispatch@v3
         with:
-          fetch-depth: 0
-
-      # ── Build & push Docker image ─────────────────────────
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-      - name: Ensure contract spec
-        run: make ensure-contract
-
-      - name: Build and push (production tags)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          build-args: |
-            APP_VERSION=${{ steps.version.outputs.VERSION }}
-            APP_COMMIT=${{ github.sha }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-
-      # ── Deploy via SSH through Cloudflare Tunnel ───────────
-      - name: Install cloudflared
-        run: |
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
-            -o /tmp/cloudflared.deb
-          sudo dpkg -i /tmp/cloudflared.deb
-
-      - name: Deploy to production server
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          # Use cloudflared access ssh with --id and --secret flags.
-          # GitHub Actions resolves ${{ secrets.* }} at parse time,
-          # so the actual values are baked into the command string.
-          ssh -v -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o "ProxyCommand=cloudflared access ssh --hostname %h --id ${{ secrets.CF_ACCESS_CLIENT_ID }} --secret ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-              -i ~/.ssh/deploy_key \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-              "~/ductifact/infra/scripts/deploy.sh prod"
+          token: ${{ secrets.INFRA_PAT }}
+          repository: hyka-tech-ductifact/infra
+          event-type: image-published
+          client-payload: |
+            {
+              "service": "backend",
+              "image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}",
+              "sha": "${{ github.sha }}",
+              "repository": "${{ github.repository }}"
+            }
