@@ -30,7 +30,7 @@ func setupLivezRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.Mo
 		nil,
 		time.Now(),
 		config.ContractVersion,
-		"test-version",
+		"v1.0.0-test",
 		"abc1234",
 		"debug",
 	)
@@ -47,8 +47,8 @@ func setupReadyzRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.M
 		nil,
 		time.Now(),
 		config.ContractVersion,
-		"test-version",
 		"abc1234",
+		"2026-05-27T14:30:00Z",
 		"debug",
 	)
 	r.GET("/readyz", h.Readyz)
@@ -68,8 +68,8 @@ func setupReadyzRouterWithEmail(
 		nil,
 		time.Now(),
 		config.ContractVersion,
-		"test-version",
 		"abc1234",
+		"2026-05-27T14:30:00Z",
 		"debug",
 	)
 	r.GET("/readyz", h.Readyz)
@@ -89,8 +89,8 @@ func setupReadyzRouterProd(
 		nil,
 		time.Now(),
 		config.ContractVersion,
-		"test-version",
 		"abc1234",
+		"2026-05-27T14:30:00Z",
 		"info",
 	)
 	r.GET("/readyz", h.Readyz)
@@ -134,8 +134,8 @@ func TestHealthHandler_Readyz_Ready(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"database":"connected"`)
 	assert.Contains(t, w.Body.String(), `"storage":"connected"`)
 	assert.Contains(t, w.Body.String(), `"email":"connected"`)
-	assert.Contains(t, w.Body.String(), `"version":"test-version"`)
 	assert.Contains(t, w.Body.String(), `"commit":"abc1234"`)
+	assert.Contains(t, w.Body.String(), `"build_time":"2026-05-27T14:30:00Z"`)
 	assert.Contains(t, w.Body.String(), `"uptime"`)
 	assert.Contains(t, w.Body.String(), fmt.Sprintf(`"contract_version":"%s"`, config.ContractVersion))
 }

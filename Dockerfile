@@ -11,10 +11,10 @@ RUN go mod download
 COPY . .
 
 # Build with optimizations: -s removes symbol table, -w removes DWARF debug info (~30% smaller binary)
-ARG APP_VERSION=dev
 ARG APP_COMMIT=unknown
+ARG APP_BUILD_TIME=unknown
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-s -w -X ductifact/internal/config.Version=${APP_VERSION} -X ductifact/internal/config.Commit=${APP_COMMIT}" \
+    -ldflags="-s -w -X ductifact/internal/config.Commit=${APP_COMMIT} -X ductifact/internal/config.BuildTime=${APP_BUILD_TIME}" \
     -o app ./cmd/api
 
 # ── Stage 2: Runtime ────────────────────────────────────────

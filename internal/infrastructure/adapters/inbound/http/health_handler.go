@@ -23,8 +23,8 @@ type HealthHandler struct {
 	redisChecker    redisPinger
 	startTime       time.Time
 	contractVersion string
-	version         string
 	commit          string
+	buildTime       string
 	logLevel        string
 }
 
@@ -55,8 +55,8 @@ func NewHealthHandler(
 	redisChecker redisPinger,
 	startTime time.Time,
 	contractVersion string,
-	version string,
 	commit string,
+	buildTime string,
 	logLevel string,
 ) *HealthHandler {
 	return &HealthHandler{
@@ -66,8 +66,8 @@ func NewHealthHandler(
 		redisChecker:    redisChecker,
 		startTime:       startTime,
 		contractVersion: contractVersion,
-		version:         version,
 		commit:          commit,
+		buildTime:       buildTime,
 		logLevel:        logLevel,
 	}
 }
@@ -102,8 +102,8 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "database": "connected",
 //	  "storage": "connected",
 //	  "email": "connected",
-//	  "version": "v1.0.0",
 //	  "commit": "abc1234",
+//	  "build_time": "2026-05-27T14:30:00Z",
 //	  "contract_version": "1.0.0"
 //	}
 //
@@ -116,8 +116,8 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "storage": "connected",
 //	  "email": "unavailable",
 //	  "warnings": ["email: unavailable"],
-//	  "version": "v1.0.0",
 //	  "commit": "abc1234",
+//	  "build_time": "2026-05-27T14:30:00Z",
 //	  "contract_version": "1.0.0"
 //	}
 //
@@ -130,8 +130,8 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "storage": "connected",
 //	  "email": "connected",
 //	  "errors": ["database: unavailable"],
-//	  "version": "v1.0.0",
 //	  "commit": "abc1234",
+//	  "build_time": "2026-05-27T14:30:00Z",
 //	  "contract_version": "1.0.0"
 //	}
 //
@@ -143,8 +143,8 @@ type readyzResponse struct {
 	Storage         string   `json:"storage"`
 	Redis           string   `json:"redis"`
 	Email           string   `json:"email"`
-	Version         string   `json:"version"`
 	Commit          string   `json:"commit"`
+	BuildTime       string   `json:"build_time"`
 	ContractVersion string   `json:"contract_version"`
 	Errors          []string `json:"errors,omitempty"`
 	Warnings        []string `json:"warnings,omitempty"`
@@ -224,8 +224,8 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		Storage:         storageStatus,
 		Redis:           redisStatus,
 		Email:           emailStatus,
-		Version:         h.version,
 		Commit:          h.commit,
+		BuildTime:       h.buildTime,
 		ContractVersion: h.contractVersion,
 	}
 	if len(errs) > 0 {
