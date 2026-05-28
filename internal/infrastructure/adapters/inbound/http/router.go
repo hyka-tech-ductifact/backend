@@ -232,8 +232,8 @@ func SetupRoutes(
 		redisChecker,
 		time.Now(),
 		config.ContractVersion,
-		config.Version,
 		config.Commit,
+		config.BuildTime,
 		logLevel,
 	)
 	r.GET("/healthz", healthHandler.Healthz)

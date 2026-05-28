@@ -28,12 +28,12 @@ env:
   DB_NAME: ci_db
   DB_HOST: localhost
   DB_PORT: "5432"
-  APP_PORT: "8080"
+  BACKEND_PORT: "8080"
   JWT_SECRET: ci-test-secret-at-least-32-characters-long
   CORS_ORIGINS: "*"
   LOG_LEVEL: error
   LOG_FORMAT: text
-  APP_HOST: localhost
+  BACKEND_HOST: localhost
   JWT_TOKEN_DURATION: "15m"
   JWT_REFRESH_TOKEN_DURATION: "168h"
   RATE_LIMIT_IP_MAX: "10000"
@@ -205,7 +205,7 @@ jobs:
         run: make docker-start
 
       - name: Health check
-        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.APP_PORT }}/healthz
+        run: curl --fail --retry 3 --retry-delay 2 http://localhost:${{ env.BACKEND_PORT }}/healthz
 
       - name: Teardown
         if: always()

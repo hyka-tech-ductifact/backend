@@ -32,8 +32,8 @@ func TestE2E_Readyz(t *testing.T) {
 	assert.Equal(t, "ready", body["status"])
 	assert.Equal(t, "connected", body["database"])
 	assert.Equal(t, "connected", body["storage"])
-	assert.NotEmpty(t, body["version"])
 	assert.NotEmpty(t, body["commit"])
+	assert.NotEmpty(t, body["build_time"])
 	assert.NotEmpty(t, body["uptime"])
 	assert.NotEmpty(t, body["contract_version"])
 }

@@ -186,7 +186,7 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE         ?= schemathesis/schemathesis:latest
+ST_IMAGE         ?= schemathesis/schemathesis:v4.16.1
 ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
 _ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
@@ -272,8 +272,8 @@ ensure-contract:
 docker-build: ensure-contract
 	@echo "Building Docker image..."
 	docker compose --profile smoke build \
-		--build-arg APP_VERSION=$$(git describe --tags --always --dirty 2>/dev/null || echo dev) \
-		--build-arg APP_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+		--build-arg APP_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) \
+		--build-arg APP_BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build + start postgres & app in Docker (smoke test)
 docker-start: docker-build
