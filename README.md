@@ -100,4 +100,4 @@ When the contracts repo publishes a new release:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, workflow, releases, and PR guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, workflow, and PR guidelines.

@@ -104,6 +104,8 @@
 | 9.5 | Caddy reverse proxy + HTTPS (Let's Encrypt) | ✅ |
 | 9.6 | Block `/metrics`, `/healthz`, `/readyz`, `/docs` from internet | ✅ |
 
+Current CD model: each merge into `main` publishes an immutable candidate image; production promotion is decided in `infra` via manifest updates.
+
 ---
 
 ## Phase 2 — Hardening (Complete)
