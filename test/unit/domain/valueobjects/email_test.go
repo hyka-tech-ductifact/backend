@@ -43,6 +43,8 @@ func TestNewEmail_WithInvalidEmails_ReturnsError(t *testing.T) {
 		{"no domain", "user@"},
 		{"no local part", "@example.com"},
 		{"spaces in local", "user @example.com"},
+		{"local part ends with hyphen", "user-@example.com"},
+		{"double dot in local part", "user..name@example.com"},
 		{"double at", "user@@example.com"},
 		{"no TLD", "user@example"},
 		{"only whitespace", "   "},
@@ -50,6 +52,10 @@ func TestNewEmail_WithInvalidEmails_ReturnsError(t *testing.T) {
 		{"domain label ends with hyphen", "user@example-.com"},
 		{"domain label starts with hyphen", "user@-example.com"},
 		{"domain label with only hyphen", "_0AncD@9nkNy0.Q-.Lf"},
+		{
+			"schemathesis sample invalid email",
+			"rDa-@nF--UXY09.mF0R2BDFfSj.t.b.N1haJi-Jg.hEDzvI.17XQ2.pv.g.a.QDBEySMp",
+		},
 		{
 			"domain label too long (>63 chars)",
 			"user@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
