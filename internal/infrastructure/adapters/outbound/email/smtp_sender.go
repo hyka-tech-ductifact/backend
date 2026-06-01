@@ -2,6 +2,7 @@ package email
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/smtp"
 
@@ -47,12 +48,43 @@ func (s *SMTPSender) Send(ctx context.Context, email ports.Email) error {
 	return nil
 }
 
-// Ping checks that the SMTP server is reachable by opening a TCP connection.
+// Ping checks that the SMTP server is reachable and usable.
+//
+// It validates SMTP session-level health (EHLO/NOOP) and, when auth is enabled,
+// attempts SMTP AUTH to avoid false positives where TCP is reachable but
+// credentials are invalid.
 func (s *SMTPSender) Ping(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	client, err := smtp.Dial(addr)
 	if err != nil {
 		return fmt.Errorf("smtp ping %s: %w", addr, err)
 	}
-	return client.Close()
+	defer client.Close()
+
+	if err := client.Hello("ductifact-health"); err != nil {
+		return fmt.Errorf("smtp hello %s: %w", addr, err)
+	}
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		tlsConfig := &tls.Config{
+			ServerName: s.host,
+			MinVersion: tls.VersionTLS12,
+		}
+		if err := client.StartTLS(tlsConfig); err != nil {
+			return fmt.Errorf("smtp starttls %s: %w", addr, err)
+		}
+	}
+
+	if s.useAuth {
+		auth := smtp.PlainAuth("", s.username, s.password, s.host)
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("smtp auth %s: %w", addr, err)
+		}
+	}
+
+	if err := client.Noop(); err != nil {
+		return fmt.Errorf("smtp noop %s: %w", addr, err)
+	}
+
+	return nil
 }
