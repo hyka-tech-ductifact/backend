@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/smtp"
+	"time"
 
 	"ductifact/internal/application/ports"
 )
@@ -55,9 +57,23 @@ func (s *SMTPSender) Send(ctx context.Context, email ports.Email) error {
 // credentials are invalid.
 func (s *SMTPSender) Ping(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
-	client, err := smtp.Dial(addr)
+
+	dialer := net.Dialer{Timeout: 3 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("smtp ping %s: %w", addr, err)
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	} else {
+		_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
+	}
+
+	client, err := smtp.NewClient(conn, s.host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("smtp client %s: %w", addr, err)
 	}
 	defer client.Close()
 
