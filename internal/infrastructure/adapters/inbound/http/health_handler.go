@@ -28,6 +28,8 @@ type HealthHandler struct {
 	logLevel        string
 }
 
+const readinessCheckTimeout = 3 * time.Second
+
 // storagePinger is a minimal interface for checking storage health.
 // ports.FileStorage satisfies it (via its Ping method).
 type storagePinger interface {
@@ -162,7 +164,10 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	var warnings []string
 
 	// Critical checks — failure causes 503
-	if err := h.healthChecker.Ping(ctx); err != nil {
+	dbCtx, dbCancel := context.WithTimeout(ctx, readinessCheckTimeout)
+	err := h.healthChecker.Ping(dbCtx)
+	dbCancel()
+	if err != nil {
 		dbStatus = "disconnected"
 		if h.logLevel == "debug" {
 			errs = append(errs, "database: "+err.Error())
@@ -172,7 +177,10 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 		}
 	}
 
-	if err := h.storageChecker.Ping(ctx); err != nil {
+	storageCtx, storageCancel := context.WithTimeout(ctx, readinessCheckTimeout)
+	err = h.storageChecker.Ping(storageCtx)
+	storageCancel()
+	if err != nil {
 		storageStatus = "disconnected"
 		if h.logLevel == "debug" {
 			errs = append(errs, "storage: "+err.Error())
@@ -184,7 +192,10 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 
 	// Non-critical check — failure causes "degraded" but NOT 503
 	if h.redisChecker != nil {
-		if err := h.redisChecker.Ping(ctx); err != nil {
+		redisCtx, redisCancel := context.WithTimeout(ctx, readinessCheckTimeout)
+		err = h.redisChecker.Ping(redisCtx)
+		redisCancel()
+		if err != nil {
 			redisStatus = "unavailable"
 			if h.logLevel == "debug" {
 				warnings = append(warnings, "redis: "+err.Error())
@@ -198,7 +209,10 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	}
 
 	// Non-critical check — failure causes "degraded" but NOT 503
-	if err := h.emailChecker.Ping(ctx); err != nil {
+	emailCtx, emailCancel := context.WithTimeout(ctx, readinessCheckTimeout)
+	err = h.emailChecker.Ping(emailCtx)
+	emailCancel()
+	if err != nil {
 		emailStatus = "unavailable"
 		if h.logLevel == "debug" {
 			warnings = append(warnings, "email: "+err.Error())
