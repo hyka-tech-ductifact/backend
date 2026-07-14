@@ -390,7 +390,10 @@ func (s *authService) sendWelcomeWithVerification(
 		Text:    text,
 	}); err != nil {
 		slog.Error("failed to send welcome email", "to", user.Email, "error", err)
+		return
 	}
+
+	slog.Info("welcome email sent", "to", user.Email)
 }
 
 // sendVerificationEmail is a helper that creates a token and sends the verification email.
@@ -424,7 +427,10 @@ func (s *authService) sendVerificationEmail(ctx context.Context, user *entities.
 		Text:    text,
 	}); err != nil {
 		slog.Error("failed to send verification email", "to", user.Email, "error", err)
+		return
 	}
+
+	slog.Info("verification email sent", "to", user.Email)
 }
 
 // sendPasswordResetEmail creates a password reset token and sends the reset email.
@@ -458,5 +464,8 @@ func (s *authService) sendPasswordResetEmail(ctx context.Context, user *entities
 		Text:    text,
 	}); err != nil {
 		slog.Error("failed to send password reset email", "to", user.Email, "error", err)
+		return
 	}
+
+	slog.Info("password reset email sent", "to", user.Email)
 }
