@@ -29,14 +29,13 @@ type Config struct {
 	LoginThrottle LoginThrottle
 	MinIO         MinIO
 	SMTP          SMTP
-	OneTimeTokens OneTimeTokens
+	OTP           OTP
 }
 
-// OneTimeTokens holds TTL configuration for one-time-use tokens.
-type OneTimeTokens struct {
-	EmailVerificationTTL time.Duration // How long email verification tokens remain valid (e.g. "24h")
-	PasswordResetTTL     time.Duration // How long password reset tokens remain valid (e.g. "1h")
-	VerificationBaseURL  string        // Base URL for verification links (e.g. "https://app.ductifact.com")
+// OTP holds TTL configuration for one-time verification codes.
+type OTP struct {
+	RegistrationTTL  time.Duration // How long a registration verification code remains valid (e.g. "15m")
+	PasswordResetTTL time.Duration // How long a password reset verification code remains valid (e.g. "1h")
 }
 
 // MinIO holds S3-compatible object storage settings.
@@ -193,10 +192,9 @@ func Load() Config {
 			Password: required("SMTP_PASSWORD"),
 			From:     required("SMTP_FROM"),
 		},
-		OneTimeTokens: OneTimeTokens{
-			EmailVerificationTTL: parseDuration(required("VERIFICATION_EMAIL_TOKEN_TTL")),
-			PasswordResetTTL:     parseDuration(required("VERIFICATION_PASSWORD_RESET_TOKEN_TTL")),
-			VerificationBaseURL:  required("VERIFICATION_BASE_URL"),
+		OTP: OTP{
+			RegistrationTTL:  parseDuration(required("VERIFICATION_REGISTRATION_OTP_TTL")),
+			PasswordResetTTL: parseDuration(required("VERIFICATION_PASSWORD_RESET_OTP_TTL")),
 		},
 	}
 }

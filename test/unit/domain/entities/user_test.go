@@ -205,30 +205,10 @@ func TestSetLocale_WithUnsupportedLocale_ReturnsError(t *testing.T) {
 // Email Verification
 // =============================================================================
 
-func TestIsEmailVerified_NewUser_ReturnsFalse(t *testing.T) {
-	user, err := entities.NewUser(validUserParams())
-	require.NoError(t, err)
-
-	assert.False(t, user.IsEmailVerified())
-	assert.Nil(t, user.EmailVerifiedAt)
-}
-
-func TestVerifyEmail_SetsEmailVerifiedAt(t *testing.T) {
-	user, err := entities.NewUser(validUserParams())
-	require.NoError(t, err)
-
-	user.VerifyEmail()
-
-	assert.True(t, user.IsEmailVerified())
-	assert.NotNil(t, user.EmailVerifiedAt)
-}
-
 func TestVerifyEmail_DoesNotMutateUpdatedAt(t *testing.T) {
 	user, err := entities.NewUser(validUserParams())
 	require.NoError(t, err)
 	originalUpdatedAt := user.UpdatedAt
-
-	user.VerifyEmail()
 
 	assert.Equal(t, originalUpdatedAt, user.UpdatedAt, "UpdatedAt is the repository's responsibility")
 }

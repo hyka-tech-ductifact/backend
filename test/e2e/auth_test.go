@@ -3,52 +3,145 @@ package e2e
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"ductifact/test/helpers"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// ─── Register ────────────────────────────────────────────────────────────────
+// seedOTP inserts a one-time OTP row with a known plaintext code and purpose,
+// so the OTP-based endpoints can be exercised end-to-end.
+func seedOTP(t *testing.T, email, purpose, code string) {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	err = env.db.Exec(
+		"INSERT INTO one_time_otps (id, email, purpose, code_hash, expires_at, attempts, created_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, 0, NOW())",
+		email,
+		purpose,
+		string(hash),
+		time.Now().Add(15*time.Minute),
+	).Error
+	require.NoError(t, err)
+}
 
-func TestE2E_Register_Success(t *testing.T) {
+// seedRegistrationOTP seeds a registration OTP with a known plaintext code.
+func seedRegistrationOTP(t *testing.T, email, code string) {
+	t.Helper()
+	seedOTP(t, email, "registration", code)
+}
+
+// ─── Start Registration ──────────────────────────────────────────────────────
+
+func TestE2E_StartRegistration_Success(t *testing.T) {
 	clean(t)
 
 	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
+		"email": "juan@example.com",
+	})
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// An OTP row should have been created for the email.
+	var count int64
+	err := env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").
+		Scan(&count).
+		Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestE2E_StartRegistration_InvalidEmail_Returns400(t *testing.T) {
+	clean(t)
+
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+		"email": "not-an-email",
+	})
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestE2E_StartRegistration_EmptyBody_Returns400(t *testing.T) {
+	clean(t)
+
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{})
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// ─── Complete Registration (verify) ──────────────────────────────────────────
+
+func TestE2E_Register_Success(t *testing.T) {
+	clean(t)
+	seedRegistrationOTP(t, "juan@example.com", "123456")
+
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
 		"email":    "juan@example.com",
+		"code":     "123456",
+		"name":     "Juan",
 		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-
 	assert.NotEmpty(t, body["access_token"])
 	assert.NotEmpty(t, body["refresh_token"])
 	user := body["user"].(map[string]any)
 	assert.NotEmpty(t, user["id"])
 	assert.Equal(t, "Juan", user["name"])
 	assert.Equal(t, "juan@example.com", user["email"])
+
+	// The OTP should have been consumed.
+	var count int64
+	require.NoError(
+		t,
+		env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").
+			Scan(&count).
+			Error,
+	)
+	assert.Equal(t, int64(0), count)
 }
 
-func TestE2E_Register_MissingName_Returns400(t *testing.T) {
+func TestE2E_Register_WrongCode_Returns400(t *testing.T) {
+	clean(t)
+	seedRegistrationOTP(t, "juan@example.com", "123456")
+
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
+		"email":    "juan@example.com",
+		"code":     "000000",
+		"name":     "Juan",
+		"password": "securepass123",
+	})
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Contains(t, body["error"], "invalid or expired verification code")
+}
+
+func TestE2E_Register_NoOTP_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
 		"email":    "juan@example.com",
+		"code":     "123456",
+		"name":     "Juan",
 		"password": "securepass123",
 	})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestE2E_Register_InvalidEmail_Returns400(t *testing.T) {
+func TestE2E_Register_MissingName_Returns400(t *testing.T) {
 	clean(t)
+	seedRegistrationOTP(t, "juan@example.com", "123456")
 
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "not-an-email",
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
+		"email":    "juan@example.com",
+		"code":     "123456",
 		"password": "securepass123",
 	})
 
@@ -57,10 +150,12 @@ func TestE2E_Register_InvalidEmail_Returns400(t *testing.T) {
 
 func TestE2E_Register_ShortPassword_Returns400(t *testing.T) {
 	clean(t)
+	seedRegistrationOTP(t, "juan@example.com", "123456")
 
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
 		"email":    "juan@example.com",
+		"code":     "123456",
+		"name":     "Juan",
 		"password": "short",
 	})
 
@@ -70,19 +165,15 @@ func TestE2E_Register_ShortPassword_Returns400(t *testing.T) {
 func TestE2E_Register_DuplicateEmail_Returns409(t *testing.T) {
 	clean(t)
 
-	// First registration
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "same@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	resp.Body.Close()
+	// Pre-existing account.
+	registerUser(t, "Juan", "same@example.com", "securepass123")
 
-	// Second registration with same email
-	resp = helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Pedro",
+	// A stale OTP for the same email; completing it must fail with conflict.
+	seedRegistrationOTP(t, "same@example.com", "123456")
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
 		"email":    "same@example.com",
+		"code":     "123456",
+		"name":     "Pedro",
 		"password": "securepass123",
 	})
 
@@ -91,28 +182,13 @@ func TestE2E_Register_DuplicateEmail_Returns409(t *testing.T) {
 	assert.Contains(t, body["error"], "email already in use")
 }
 
-func TestE2E_Register_EmptyBody_Returns400(t *testing.T) {
-	clean(t)
-
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{})
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-}
-
 // ─── Login ───────────────────────────────────────────────────────────────────
 
 func TestE2E_Login_Success(t *testing.T) {
 	clean(t)
 
 	// Register first
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	regUser := regBody["user"].(map[string]any)
+	id, _ := registerUser(t, "Juan", "juan@example.com", "securepass123")
 
 	// Login
 	resp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
@@ -125,7 +201,7 @@ func TestE2E_Login_Success(t *testing.T) {
 	assert.NotEmpty(t, body["access_token"])
 	assert.NotEmpty(t, body["refresh_token"])
 	user := body["user"].(map[string]any)
-	assert.Equal(t, regUser["id"], user["id"])
+	assert.Equal(t, id, user["id"])
 	assert.Equal(t, "Juan", user["name"])
 	assert.Equal(t, "juan@example.com", user["email"])
 }
@@ -134,13 +210,7 @@ func TestE2E_Login_WrongPassword_Returns401(t *testing.T) {
 	clean(t)
 
 	// Register
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regResp.Body.Close()
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
 
 	// Login with wrong password
 	resp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
@@ -201,14 +271,7 @@ func TestE2E_ChangePassword_Success(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "oldpass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	token := regBody["access_token"].(string)
+	_, token := registerUser(t, "Juan", "juan@example.com", "oldpass123")
 
 	// Change password
 	resp := helpers.AuthPutJSON(t, url("/auth/password"), token, map[string]string{
@@ -232,14 +295,7 @@ func TestE2E_ChangePassword_WrongCurrentPassword_Returns401(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "oldpass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	token := regBody["access_token"].(string)
+	_, token := registerUser(t, "Juan", "juan@example.com", "oldpass123")
 
 	// Try to change with wrong current password
 	resp := helpers.AuthPutJSON(t, url("/auth/password"), token, map[string]string{
@@ -256,14 +312,7 @@ func TestE2E_ChangePassword_ShortNewPassword_Returns400(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "oldpass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	token := regBody["access_token"].(string)
+	_, token := registerUser(t, "Juan", "juan@example.com", "oldpass123")
 
 	// Try to change with a too-short new password
 	resp := helpers.AuthPutJSON(t, url("/auth/password"), token, map[string]string{
@@ -278,14 +327,7 @@ func TestE2E_ChangePassword_MissingFields_Returns400(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "oldpass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	token := regBody["access_token"].(string)
+	_, token := registerUser(t, "Juan", "juan@example.com", "oldpass123")
 
 	// Missing current_password
 	resp := helpers.AuthPutJSON(t, url("/auth/password"), token, map[string]string{
@@ -312,26 +354,20 @@ func TestE2E_ForgotPassword_WithExistingEmail_Returns200(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regResp.Body.Close()
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
 
 	// Request password reset
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
 		"email": "juan@example.com",
 	})
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["message"], "password reset link")
+	assert.Contains(t, body["message"], "password reset code")
 
-	// Verify token was created in DB
+	// Verify a password-reset OTP was created in DB
 	var count int64
-	env.db.Raw("SELECT COUNT(*) FROM one_time_tokens WHERE type = 'password_reset'").Scan(&count)
+	env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'password_reset'").Scan(&count)
 	assert.Equal(t, int64(1), count)
 }
 
@@ -339,53 +375,68 @@ func TestE2E_ForgotPassword_WithNonExistingEmail_Returns200(t *testing.T) {
 	clean(t)
 
 	// Request password reset for non-existing email (should not reveal if email exists)
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
 		"email": "nonexistent@example.com",
 	})
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
-	assert.Contains(t, body["message"], "password reset link")
+	assert.Contains(t, body["message"], "password reset code")
 }
 
 func TestE2E_ForgotPassword_MissingEmail_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{})
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+func TestE2E_ForgotPassword_InvalidEmailFormat_Returns400(t *testing.T) {
+	clean(t)
+
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
+		"email": "4k@5X0vM0X0jW.lEFo89.rapos.ZR--qNHX.7X.p.1XioK0IeNS.Uslb.OrWqNyvRbdngop",
+	})
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestE2E_ForgotPassword_WithPendingOTP_DoesNotReplaceExistingCode(t *testing.T) {
+	clean(t)
+
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+	seedOTP(t, "juan@example.com", "password_reset", "654321")
+
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
+		"email": "juan@example.com",
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Existing OTP should remain valid, proving it was not replaced.
+	verifyResp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email":        "juan@example.com",
+		"code":         "654321",
+		"new_password": "newpass456",
+	})
+	assert.Equal(t, http.StatusOK, verifyResp.StatusCode)
+}
+
 // ─── Reset Password ─────────────────────────────────────────────────────────
 
-func TestE2E_ResetPassword_WithValidToken_Returns200(t *testing.T) {
+func TestE2E_ResetPassword_WithValidCode_Returns200(t *testing.T) {
 	clean(t)
 
 	// Register a user
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regResp.Body.Close()
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
 
-	// Request password reset to create a token
-	forgotResp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
-		"email": "juan@example.com",
-	})
-	require.Equal(t, http.StatusOK, forgotResp.StatusCode)
-	forgotResp.Body.Close()
-
-	// Get the reset token from the DB
-	var token string
-	err := env.db.Raw("SELECT token FROM one_time_tokens WHERE type = 'password_reset' LIMIT 1").Scan(&token).Error
-	require.NoError(t, err)
-	require.NotEmpty(t, token)
+	// Seed a password-reset OTP with a known code
+	seedOTP(t, "juan@example.com", "password_reset", "654321")
 
 	// Reset the password
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
-		"token":        token,
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email":        "juan@example.com",
+		"code":         "654321",
 		"new_password": "newpass456",
 	})
 
@@ -408,11 +459,15 @@ func TestE2E_ResetPassword_WithValidToken_Returns200(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, oldLoginResp.StatusCode)
 }
 
-func TestE2E_ResetPassword_WithInvalidToken_Returns400(t *testing.T) {
+func TestE2E_ResetPassword_WithInvalidCode_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
-		"token":        "invalid-token-abc123",
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+	seedOTP(t, "juan@example.com", "password_reset", "654321")
+
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email":        "juan@example.com",
+		"code":         "000000",
 		"new_password": "newpass456",
 	})
 
@@ -424,28 +479,13 @@ func TestE2E_ResetPassword_WithInvalidToken_Returns400(t *testing.T) {
 func TestE2E_ResetPassword_WithShortPassword_Returns400(t *testing.T) {
 	clean(t)
 
-	// Register a user and get a valid reset token
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	require.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regResp.Body.Close()
-
-	forgotResp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
-		"email": "juan@example.com",
-	})
-	require.Equal(t, http.StatusOK, forgotResp.StatusCode)
-	forgotResp.Body.Close()
-
-	var token string
-	err := env.db.Raw("SELECT token FROM one_time_tokens WHERE type = 'password_reset' LIMIT 1").Scan(&token).Error
-	require.NoError(t, err)
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+	seedOTP(t, "juan@example.com", "password_reset", "654321")
 
 	// Try to reset with a too-short password
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
-		"token":        token,
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email":        "juan@example.com",
+		"code":         "654321",
 		"new_password": "short",
 	})
 
@@ -455,8 +495,8 @@ func TestE2E_ResetPassword_WithShortPassword_Returns400(t *testing.T) {
 func TestE2E_ResetPassword_MissingFields_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
-		"token": "some-token",
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email": "juan@example.com",
 	})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

@@ -1,9 +1,11 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
+	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
@@ -13,9 +15,15 @@ import (
 
 // --- DTOs ---
 
+type StartRegistrationRequest struct {
+	Email  string       `json:"email" binding:"required,email"`
+	Locale StrictString `json:"locale" binding:"omitempty,oneof=en es"`
+}
+
 type RegisterRequest struct {
-	Name     string       `json:"name" binding:"required"`
 	Email    string       `json:"email" binding:"required,email"`
+	Code     string       `json:"code" binding:"required"`
+	Name     string       `json:"name" binding:"required"`
 	Password string       `json:"password" binding:"required,min=8"`
 	Locale   StrictString `json:"locale" binding:"omitempty,oneof=en es"`
 }
@@ -33,10 +41,6 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-type VerifyEmailRequest struct {
-	Token string `json:"token" binding:"required"`
-}
-
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=8"`
@@ -47,7 +51,8 @@ type ForgotPasswordRequest struct {
 }
 
 type ResetPasswordRequest struct {
-	Token       string `json:"token" binding:"required"`
+	Email       string `json:"email" binding:"required,email"`
+	Code        string `json:"code" binding:"required"`
 	NewPassword string `json:"new_password" binding:"required,min=8"`
 }
 
@@ -72,6 +77,26 @@ func NewAuthHandler(authService usecases.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
+func (h *AuthHandler) StartRegistration(c *gin.Context) {
+	var req StartRegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.StartRegistration(c.Request.Context(), req.Email, req.Locale.String()); err != nil {
+		if errors.Is(err, services.ErrEmailAlreadyInUse) || errors.Is(err, services.ErrOTPAlreadyPending) {
+			// Keep API response generic to avoid account enumeration / code-existence leaks.
+			c.JSON(http.StatusOK, gin.H{"message": "if the email is available, a verification code has been sent"})
+			return
+		}
+		helpers.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "if the email is available, a verification code has been sent"})
+}
+
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -81,8 +106,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, tokens, err := h.authService.Register(
 		c.Request.Context(),
-		req.Name,
 		req.Email,
+		req.Code,
+		req.Name,
 		req.Password,
 		req.Locale.String(),
 	)
@@ -159,32 +185,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }
 
-func (h *AuthHandler) VerifyEmail(c *gin.Context) {
-	var req VerifyEmailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.authService.VerifyEmail(c.Request.Context(), req.Token); err != nil {
-		helpers.HandleError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "email verified successfully"})
-}
-
-func (h *AuthHandler) ResendVerification(c *gin.Context) {
-	uid := c.MustGet("userID").(uuid.UUID)
-
-	if err := h.authService.ResendVerificationEmail(c.Request.Context(), uid); err != nil {
-		helpers.HandleError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "verification email sent"})
-}
-
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -214,7 +214,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a password reset link has been sent"})
+	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a password reset code has been sent"})
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
@@ -224,7 +224,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.ResetPassword(c.Request.Context(), req.Token, req.NewPassword); err != nil {
+	if err := h.authService.ResetPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
 		helpers.HandleError(c, err)
 		return
 	}

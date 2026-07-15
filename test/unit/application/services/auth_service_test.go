@@ -23,7 +23,7 @@ import (
 func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenProvider) usecases.AuthService {
 	return services.NewAuthService(
 		repo,
-		&mocks.MockOneTimeTokenRepository{},
+		&mocks.MockOneTimeOTPRepository{},
 		token,
 		&mocks.MockTokenBlacklist{},
 		&mocks.MockLoginThrottler{},
@@ -32,28 +32,6 @@ func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenPr
 		7*24*time.Hour,
 		24*time.Hour,
 		1*time.Hour,
-		"http://localhost:3000",
-	)
-}
-
-// newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
-func newTestAuthServiceWithEmail(
-	repo *mocks.MockUserRepository,
-	token *mocks.MockTokenProvider,
-	emailSender *mocks.MockEmailSender,
-) usecases.AuthService {
-	return services.NewAuthService(
-		repo,
-		&mocks.MockOneTimeTokenRepository{},
-		token,
-		&mocks.MockTokenBlacklist{},
-		&mocks.MockLoginThrottler{},
-		emailSender,
-		15*time.Minute,
-		7*24*time.Hour,
-		24*time.Hour,
-		1*time.Hour,
-		"http://localhost:3000",
 	)
 }
 
@@ -65,7 +43,7 @@ func newTestAuthServiceWithBlacklist(
 ) usecases.AuthService {
 	return services.NewAuthService(
 		repo,
-		&mocks.MockOneTimeTokenRepository{},
+		&mocks.MockOneTimeOTPRepository{},
 		token,
 		blacklist,
 		&mocks.MockLoginThrottler{},
@@ -74,7 +52,6 @@ func newTestAuthServiceWithBlacklist(
 		7*24*time.Hour,
 		24*time.Hour,
 		1*time.Hour,
-		"http://localhost:3000",
 	)
 }
 
@@ -86,7 +63,7 @@ func newTestAuthServiceWithThrottler(
 ) usecases.AuthService {
 	return services.NewAuthService(
 		repo,
-		&mocks.MockOneTimeTokenRepository{},
+		&mocks.MockOneTimeOTPRepository{},
 		token,
 		&mocks.MockTokenBlacklist{},
 		throttler,
@@ -95,322 +72,286 @@ func newTestAuthServiceWithThrottler(
 		7*24*time.Hour,
 		24*time.Hour,
 		1*time.Hour,
-		"http://localhost:3000",
+	)
+}
+
+// newTestAuthServiceForRegistration builds an AuthService wired for the
+// email-first OTP registration flow.
+func newTestAuthServiceForRegistration(
+	userRepo *mocks.MockUserRepository,
+	otpRepo *mocks.MockOneTimeOTPRepository,
+	token *mocks.MockTokenProvider,
+	email *mocks.MockEmailSender,
+) usecases.AuthService {
+	return services.NewAuthService(
+		userRepo,
+		otpRepo,
+		token,
+		&mocks.MockTokenBlacklist{},
+		&mocks.MockLoginThrottler{},
+		email,
+		15*time.Minute,
+		7*24*time.Hour,
+		15*time.Minute,
+		1*time.Hour,
 	)
 }
 
 // =============================================================================
-// Register
+// StartRegistration
 // =============================================================================
 
-func TestRegister_WithValidData_ReturnsUserAndToken(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
+func TestStartRegistration_NewEmail_SavesOTPAndSendsEmail(t *testing.T) {
+	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, repositories.ErrNotFound
 		},
 	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{
-				AccessToken:  "access-token-123",
-				RefreshToken: "refresh-token-123",
-			}, nil
-		},
-	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{}
+	email := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, email)
 
-	svc := newTestAuthService(mockRepo, mockToken)
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
 
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT
 	require.NoError(t, err)
-	assert.Equal(t, "Juan", user.Name)
-	assert.Equal(t, "juan@example.com", user.Email)
-	assert.NotEmpty(t, user.PasswordHash)
-	assert.NotEmpty(t, user.ID)
-	assert.Equal(t, "access-token-123", tokens.AccessToken)
-	assert.Equal(t, "refresh-token-123", tokens.RefreshToken)
+	require.Len(t, otpRepo.Saved, 1)
+	assert.Equal(t, "juan@example.com", otpRepo.Saved[0].Email)
+	require.Len(t, email.Sent, 1)
+	assert.Equal(t, "juan@example.com", email.Sent[0].To)
 }
 
-func TestRegister_WithDuplicateEmail_ReturnsError(t *testing.T) {
-	// ARRANGE
-	existingUser := &entities.User{
-		ID:    uuid.New(),
-		Name:  "Existing",
-		Email: "juan@example.com",
-	}
-
-	mockRepo := &mocks.MockUserRepository{
+func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
+	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return existingUser, nil
+			return existing, nil
 		},
 	}
-	mockToken := &mocks.MockTokenProvider{}
+	otpRepo := &mocks.MockOneTimeOTPRepository{}
+	email := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, email)
 
-	svc := newTestAuthService(mockRepo, mockToken)
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
 
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
+	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
+	assert.Empty(t, otpRepo.Saved, "no OTP should be created for an existing account")
+	assert.Empty(t, email.Sent, "no email should be sent for an existing account")
+}
 
-	// ASSERT
+func TestStartRegistration_PendingOTP_ReturnsErrOTPAlreadyPending(t *testing.T) {
+	pendingOTP, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return pendingOTP, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+
+	assert.ErrorIs(t, err, services.ErrOTPAlreadyPending)
+	assert.Empty(t, otpRepo.Created, "no new OTP should be created")
+	assert.Empty(t, emailSender.Sent, "no email should be sent")
+}
+
+func TestStartRegistration_ExpiredOTP_GeneratesNewOne(t *testing.T) {
+	expiredOTP, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, -1*time.Minute)
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return expiredOTP, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+
+	require.NoError(t, err)
+	require.Len(t, otpRepo.Created, 1, "a new OTP should be created after expiry")
+	require.Len(t, emailSender.Sent, 1, "a new email should be sent")
+}
+
+func TestStartRegistration_InvalidEmail_ReturnsError(t *testing.T) {
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{}, &mocks.MockOneTimeOTPRepository{},
+		&mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	err := svc.StartRegistration(context.Background(), "not-an-email", "")
+
+	assert.Error(t, err)
+}
+
+// =============================================================================
+// Register (complete)
+// =============================================================================
+
+func TestRegister_WithValidCode_CreatesUserAndReturnsToken(t *testing.T) {
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+	token := &mocks.MockTokenProvider{
+		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
+			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, token, &mocks.MockEmailSender{})
+
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "Juan", "securepass123", "")
+
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, tokens)
+	assert.Equal(t, "Juan", user.Name)
+	assert.Equal(t, "juan@example.com", user.Email)
+	assert.Equal(t, "a", tokens.AccessToken)
+}
+
+func TestRegister_WithNoOTP_ReturnsInvalidOTP(t *testing.T) {
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", "123456", "Juan", "securepass123", "")
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+}
+
+func TestRegister_WithWrongCode_IncrementsAttemptsAndReturnsError(t *testing.T) {
+	otp, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	incremented := false
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+		IncrementAttemptsFn: func(ctx context.Context, id uuid.UUID) error {
+			incremented = true
+			return nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", "000000", "Juan", "securepass123", "")
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+	assert.True(t, incremented, "a failed attempt should be recorded")
+}
+
+func TestRegister_WithExpiredOTP_ReturnsInvalidOTP(t *testing.T) {
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	otp.ExpiresAt = time.Now().Add(-time.Minute) // force expiry
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "Juan", "securepass123", "")
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+}
+
+func TestRegister_WithDuplicateEmail_ReturnsEmailInUse(t *testing.T) {
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Existing", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existing, nil
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
+
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "Juan", "securepass123", "")
+
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
 }
 
-func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	user, tokens, err := svc.Register(context.Background(), "", "juan@example.com", "securepass123", "")
-
-	assert.Nil(t, user)
-	assert.Nil(t, tokens)
-	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
-}
-
-func TestRegister_WithInvalidEmail_ReturnsError(t *testing.T) {
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	user, tokens, err := svc.Register(context.Background(), "Juan", "not-an-email", "securepass123", "")
-
-	assert.Nil(t, user)
-	assert.Nil(t, tokens)
-	assert.Error(t, err)
-}
-
 func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
-	mockRepo := &mocks.MockUserRepository{
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, repositories.ErrNotFound
 		},
 	}
-	mockToken := &mocks.MockTokenProvider{}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
 
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "short", "")
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "Juan", "short", "")
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
 }
 
-func TestRegister_WhenRepoCreateFails_ReturnsError(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
+func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, repositories.ErrNotFound
 		},
-		CreateFn: func(ctx context.Context, user *entities.User) error {
-			return errors.New("db connection lost")
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
 		},
 	}
-	mockToken := &mocks.MockTokenProvider{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
 
-	svc := newTestAuthService(mockRepo, mockToken)
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "", "securepass123", "")
 
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
-	assert.EqualError(t, err, "db connection lost")
-}
-
-func TestRegister_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return nil, errors.New("token generation failed")
-		},
-	}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT
-	assert.Nil(t, user)
-	assert.Nil(t, tokens)
-	assert.EqualError(t, err, "token generation failed")
-}
-
-func TestRegister_SendsWelcomeEmail(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
-		},
-	}
-	mockEmail := &mocks.MockEmailSender{}
-
-	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
-
-	// ACT
-	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT
-	require.NoError(t, err)
-	require.Len(t, mockEmail.Sent, 1) // single welcome email with verification link
-	assert.Equal(t, user.Email, mockEmail.Sent[0].To)
-	assert.Contains(t, mockEmail.Sent[0].Subject, "Welcome to Ductifact")
-	assert.Contains(t, mockEmail.Sent[0].HTML, "Juan")
-	assert.Contains(t, mockEmail.Sent[0].Text, "Juan")
-	assert.Contains(t, mockEmail.Sent[0].HTML, "verify-email?token=")
-	assert.Contains(t, mockEmail.Sent[0].Text, "verify-email?token=")
-}
-
-func TestRegister_SucceedsEvenIfEmailFails(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
-		},
-	}
-	mockEmail := &mocks.MockEmailSender{
-		SendFn: func(ctx context.Context, email ports.Email) error {
-			return errors.New("smtp down")
-		},
-	}
-
-	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
-
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT: registration succeeds despite email failure
-	require.NoError(t, err)
-	assert.NotNil(t, user)
-	assert.NotNil(t, tokens)
-}
-
-func TestRegister_WithLocale_SetsUserLocale(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
-		},
-	}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	// ACT
-	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "es")
-
-	// ASSERT
-	require.NoError(t, err)
-	assert.Equal(t, "es", user.Locale)
-}
-
-func TestRegister_WithoutLocale_DefaultsToEnglish(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
-		},
-	}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	// ACT
-	user, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
-
-	// ASSERT
-	require.NoError(t, err)
-	assert.Equal(t, "en", user.Locale)
-}
-
-func TestRegister_WithInvalidLocale_ReturnsError(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{}
-
-	svc := newTestAuthService(mockRepo, mockToken)
-
-	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "fr")
-
-	// ASSERT
-	assert.Nil(t, user)
-	assert.Nil(t, tokens)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid locale")
-}
-
-func TestRegister_WithSpanishLocale_SendsSpanishWelcomeEmail(t *testing.T) {
-	// ARRANGE
-	mockRepo := &mocks.MockUserRepository{
-		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-	mockToken := &mocks.MockTokenProvider{
-		GenerateTokenPairFn: func(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-			return &ports.TokenPair{AccessToken: "a", RefreshToken: "r"}, nil
-		},
-	}
-	mockEmail := &mocks.MockEmailSender{}
-
-	svc := newTestAuthServiceWithEmail(mockRepo, mockToken, mockEmail)
-
-	// ACT
-	_, _, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "es")
-
-	// ASSERT
-	require.NoError(t, err)
-	require.Len(t, mockEmail.Sent, 1) // single welcome email with verification link
-	assert.Contains(t, mockEmail.Sent[0].Subject, "Bienvenido a Ductifact")
-	assert.Contains(t, mockEmail.Sent[0].HTML, "Bienvenido")
-	assert.Contains(t, mockEmail.Sent[0].Text, "Bienvenido")
-	assert.Contains(t, mockEmail.Sent[0].HTML, "verify-email?token=")
-	assert.Contains(t, mockEmail.Sent[0].Text, "verify-email?token=")
+	assert.ErrorIs(t, err, entities.ErrEmptyUserName)
 }
 
 // =============================================================================
@@ -543,17 +484,21 @@ func TestLogin_WhenTokenGenerationFails_ReturnsError(t *testing.T) {
 
 func TestRegister_WhenGetByEmailFails_ReturnsError(t *testing.T) {
 	// ARRANGE: GetByEmail returns a non-"not found" error (e.g. DB failure)
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
 	mockRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, errors.New("db connection lost")
 		},
 	}
-	mockToken := &mocks.MockTokenProvider{}
-
-	svc := newTestAuthService(mockRepo, mockToken)
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+	svc := newTestAuthServiceForRegistration(mockRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
 
 	// ACT
-	user, tokens, err := svc.Register(context.Background(), "Juan", "juan@example.com", "securepass123", "")
+	user, tokens, err := svc.Register(context.Background(), "juan@example.com", code, "Juan", "securepass123", "")
 
 	// ASSERT: DB error is propagated instead of silently ignored
 	assert.Nil(t, user)
@@ -879,268 +824,6 @@ func TestLogin_WhenBlocked_DoesNotQueryDatabase(t *testing.T) {
 }
 
 // =============================================================================
-// VerifyEmail
-// =============================================================================
-
-// newTestAuthServiceWithTokenRepo creates an AuthService with custom user repo and token repo.
-func newTestAuthServiceWithTokenRepo(
-	repo *mocks.MockUserRepository,
-	tokenRepo *mocks.MockOneTimeTokenRepository,
-) usecases.AuthService {
-	return services.NewAuthService(
-		repo,
-		tokenRepo,
-		&mocks.MockTokenProvider{},
-		&mocks.MockTokenBlacklist{},
-		&mocks.MockLoginThrottler{},
-		&mocks.MockEmailSender{},
-		15*time.Minute,
-		7*24*time.Hour,
-		24*time.Hour,
-		1*time.Hour,
-		"http://localhost:3000",
-	)
-}
-
-func TestVerifyEmail_WithValidToken_VerifiesUser(t *testing.T) {
-	userID := uuid.New()
-	user := &entities.User{
-		ID:     userID,
-		Name:   "Juan",
-		Email:  "juan@example.com",
-		Locale: "en",
-	}
-
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypeEmailVerification,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
-		},
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return user, nil
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "valid-token")
-
-	require.NoError(t, err)
-	assert.True(t, user.IsEmailVerified())
-}
-
-func TestVerifyEmail_WithInvalidToken_ReturnsError(t *testing.T) {
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "invalid-token")
-
-	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
-}
-
-func TestVerifyEmail_WithExpiredToken_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypeEmailVerification,
-				ExpiresAt: time.Now().Add(-1 * time.Hour), // expired
-			}, nil
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "expired-token")
-
-	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
-}
-
-func TestVerifyEmail_WhenUserNotFound_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypeEmailVerification,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
-		},
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "orphan-token")
-
-	assert.ErrorIs(t, err, services.ErrInvalidVerificationToken)
-}
-
-func TestVerifyEmail_WhenAlreadyVerified_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	now := time.Now()
-	user := &entities.User{
-		ID:              userID,
-		Name:            "Juan",
-		Email:           "juan@example.com",
-		Locale:          "en",
-		EmailVerifiedAt: &now, // already verified
-	}
-
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypeEmailVerification,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
-		},
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return user, nil
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "some-token")
-
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyVerified)
-}
-
-func TestVerifyEmail_WhenUpdateFails_PropagatesError(t *testing.T) {
-	userID := uuid.New()
-	user := &entities.User{
-		ID:     userID,
-		Name:   "Juan",
-		Email:  "juan@example.com",
-		Locale: "en",
-	}
-	updateErr := errors.New("db connection lost")
-
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypeEmailVerification,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
-		},
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return user, nil
-		},
-		UpdateFn: func(ctx context.Context, u *entities.User) error {
-			return updateErr
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
-
-	err := svc.VerifyEmail(context.Background(), "some-token")
-
-	assert.ErrorIs(t, err, updateErr)
-}
-
-// =============================================================================
-// ResendVerificationEmail
-// =============================================================================
-
-func TestResendVerification_WhenUserNotFound_ReturnsError(t *testing.T) {
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return nil, repositories.ErrNotFound
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, &mocks.MockOneTimeTokenRepository{})
-
-	err := svc.ResendVerificationEmail(context.Background(), uuid.New())
-
-	assert.ErrorIs(t, err, services.ErrUserNotFound)
-}
-
-func TestResendVerification_WhenAlreadyVerified_ReturnsError(t *testing.T) {
-	now := time.Now()
-	user := &entities.User{
-		ID:              uuid.New(),
-		Name:            "Juan",
-		Email:           "juan@example.com",
-		Locale:          "en",
-		EmailVerifiedAt: &now,
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return user, nil
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, &mocks.MockOneTimeTokenRepository{})
-
-	err := svc.ResendVerificationEmail(context.Background(), user.ID)
-
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyVerified)
-}
-
-func TestResendVerification_WhenNotVerified_DeletesOldTokensAndCreatesNew(t *testing.T) {
-	user := &entities.User{
-		ID:     uuid.New(),
-		Name:   "Juan",
-		Email:  "juan@example.com",
-		Locale: "en",
-	}
-	deleteCalled := false
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		DeleteByUserIDAndTypeFn: func(ctx context.Context, userID uuid.UUID, tokenType entities.TokenType) error {
-			deleteCalled = true
-			assert.Equal(t, user.ID, userID)
-			assert.Equal(t, entities.TokenTypeEmailVerification, tokenType)
-			return nil
-		},
-	}
-	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
-			return user, nil
-		},
-	}
-
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
-
-	err := svc.ResendVerificationEmail(context.Background(), user.ID)
-
-	require.NoError(t, err)
-	assert.True(t, deleteCalled, "should delete old tokens before creating new one")
-	assert.Len(t, tokenRepo.Created, 1, "should create a new verification token")
-}
-
-// =============================================================================
 // ChangePassword
 // =============================================================================
 
@@ -1239,39 +922,64 @@ func TestChangePassword_WithNonExistentUser_ReturnsError(t *testing.T) {
 // ForgotPassword
 // =============================================================================
 
-func TestForgotPassword_WithExistingEmail_SendsResetEmail(t *testing.T) {
-	userID := uuid.New()
+func TestForgotPassword_WithExistingEmail_SendsResetOTP(t *testing.T) {
 	user := &entities.User{
-		ID:     userID,
+		ID:     uuid.New(),
 		Name:   "Juan",
 		Email:  "juan@example.com",
 		Locale: "en",
 	}
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return user, nil
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{}
+	emailSender := &mocks.MockEmailSender{}
+
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err := svc.ForgotPassword(context.Background(), "juan@example.com")
+
+	require.NoError(t, err)
+	// Verify a password-reset OTP was created
+	require.Len(t, otpRepo.Saved, 1)
+	assert.Equal(t, entities.OTPPurposePasswordReset, otpRepo.Saved[0].Purpose)
+	assert.Equal(t, "juan@example.com", otpRepo.Saved[0].Email)
+	// Verify an email was sent
+	require.Len(t, emailSender.Sent, 1)
+	assert.Equal(t, "juan@example.com", emailSender.Sent[0].To)
+}
+
+func TestForgotPassword_WithPendingOTP_DoesNotCreateOrSendAgain(t *testing.T) {
+	user := &entities.User{
+		ID:     uuid.New(),
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+	pendingOTP, _, err := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	require.NoError(t, err)
 
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return user, nil
 		},
 	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return pendingOTP, nil
+		},
+	}
 	emailSender := &mocks.MockEmailSender{}
-	tokenRepo := &mocks.MockOneTimeTokenRepository{}
 
-	svc := services.NewAuthService(
-		userRepo, tokenRepo, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{},
-		&mocks.MockLoginThrottler{}, emailSender,
-		15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000",
-	)
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
 
-	err := svc.ForgotPassword(context.Background(), "juan@example.com")
+	err = svc.ForgotPassword(context.Background(), "juan@example.com")
 
 	require.NoError(t, err)
-	// Verify a token was created
-	require.Len(t, tokenRepo.Created, 1)
-	assert.Equal(t, entities.TokenTypePasswordReset, tokenRepo.Created[0].Type)
-	assert.Equal(t, userID, tokenRepo.Created[0].UserID)
-	// Verify an email was sent
-	require.Len(t, emailSender.Sent, 1)
-	assert.Equal(t, "juan@example.com", emailSender.Sent[0].To)
+	assert.Empty(t, otpRepo.Saved, "no OTP should be created while one is pending")
+	assert.Empty(t, emailSender.Sent, "no email should be sent while one OTP is pending")
 }
 
 func TestForgotPassword_WithNonExistingEmail_ReturnsNilSilently(t *testing.T) {
@@ -1280,18 +988,15 @@ func TestForgotPassword_WithNonExistingEmail_ReturnsNilSilently(t *testing.T) {
 			return nil, repositories.ErrNotFound
 		},
 	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{}
 	emailSender := &mocks.MockEmailSender{}
 
-	svc := services.NewAuthService(
-		userRepo, &mocks.MockOneTimeTokenRepository{}, &mocks.MockTokenProvider{}, &mocks.MockTokenBlacklist{},
-		&mocks.MockLoginThrottler{}, emailSender,
-		15*time.Minute, 7*24*time.Hour, 24*time.Hour, 1*time.Hour, "http://localhost:3000",
-	)
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
 
 	err := svc.ForgotPassword(context.Background(), "notfound@example.com")
 
 	require.NoError(t, err)
-	// No email should be sent
+	assert.Empty(t, otpRepo.Saved, "no OTP should be created for an unknown email")
 	assert.Empty(t, emailSender.Sent)
 }
 
@@ -1299,31 +1004,25 @@ func TestForgotPassword_WithNonExistingEmail_ReturnsNilSilently(t *testing.T) {
 // ResetPassword
 // =============================================================================
 
-func TestResetPassword_WithValidToken_ResetsPassword(t *testing.T) {
-	userID := uuid.New()
+func TestResetPassword_WithValidCode_ResetsPassword(t *testing.T) {
 	pwd, _ := valueobjects.NewPassword("oldpass123")
 	user := &entities.User{
-		ID:           userID,
+		ID:           uuid.New(),
 		Name:         "Juan",
 		Email:        "juan@example.com",
 		PasswordHash: pwd.Hash(),
 		Locale:       "en",
 	}
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
 
 	var updatedUser *entities.User
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypePasswordReset,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
 		},
 	}
 	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return user, nil
 		},
 		UpdateFn: func(ctx context.Context, u *entities.User) error {
@@ -1332,9 +1031,9 @@ func TestResetPassword_WithValidToken_ResetsPassword(t *testing.T) {
 		},
 	}
 
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
 
-	err := svc.ResetPassword(context.Background(), "valid-reset-token", "newpass456")
+	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "newpass456")
 
 	require.NoError(t, err)
 	require.NotNil(t, updatedUser)
@@ -1343,70 +1042,94 @@ func TestResetPassword_WithValidToken_ResetsPassword(t *testing.T) {
 	assert.Error(t, newPwd.Compare("oldpass123"))
 }
 
-func TestResetPassword_WithInvalidToken_ReturnsError(t *testing.T) {
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
+func TestResetPassword_WithNoOTP_ReturnsInvalidOTP(t *testing.T) {
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
 			return nil, repositories.ErrNotFound
 		},
 	}
 
-	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
 
-	err := svc.ResetPassword(context.Background(), "invalid-token", "newpass456")
+	err := svc.ResetPassword(context.Background(), "juan@example.com", "123456", "newpass456")
 
-	assert.ErrorIs(t, err, services.ErrInvalidResetToken)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
-func TestResetPassword_WithExpiredToken_ReturnsError(t *testing.T) {
-	userID := uuid.New()
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypePasswordReset,
-				ExpiresAt: time.Now().Add(-time.Hour), // Already expired
-			}, nil
+func TestResetPassword_WithWrongCode_IncrementsAttemptsAndReturnsError(t *testing.T) {
+	otp, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	incremented := false
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+		IncrementAttemptsFn: func(ctx context.Context, id uuid.UUID) error {
+			incremented = true
+			return nil
 		},
 	}
 
-	svc := newTestAuthServiceWithTokenRepo(&mocks.MockUserRepository{}, tokenRepo)
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
 
-	err := svc.ResetPassword(context.Background(), "expired-token", "newpass456")
+	err := svc.ResetPassword(context.Background(), "juan@example.com", "000000", "newpass456")
 
-	assert.ErrorIs(t, err, services.ErrInvalidResetToken)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+	assert.True(t, incremented, "a failed attempt should be recorded")
+}
+
+func TestResetPassword_WithExpiredCode_ReturnsInvalidOTP(t *testing.T) {
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	otp.ExpiresAt = time.Now().Add(-time.Minute)
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+	}
+
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
+
+	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "newpass456")
+
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
 func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
-	userID := uuid.New()
 	user := &entities.User{
-		ID:     userID,
+		ID:     uuid.New(),
 		Name:   "Juan",
 		Email:  "juan@example.com",
 		Locale: "en",
 	}
-
-	tokenRepo := &mocks.MockOneTimeTokenRepository{
-		GetByTokenFn: func(ctx context.Context, token string, tokenType entities.TokenType) (*entities.OneTimeToken, error) {
-			return &entities.OneTimeToken{
-				ID:        uuid.New(),
-				UserID:    userID,
-				Token:     token,
-				Type:      entities.TokenTypePasswordReset,
-				ExpiresAt: time.Now().Add(time.Hour),
-			}, nil
+	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return otp, nil
 		},
 	}
 	userRepo := &mocks.MockUserRepository{
-		GetByIDFn: func(ctx context.Context, id uuid.UUID) (*entities.User, error) {
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return user, nil
 		},
 	}
 
-	svc := newTestAuthServiceWithTokenRepo(userRepo, tokenRepo)
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
 
-	err := svc.ResetPassword(context.Background(), "valid-token", "short")
+	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "short")
 
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
 }

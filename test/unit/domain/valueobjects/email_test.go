@@ -57,6 +57,10 @@ func TestNewEmail_WithInvalidEmails_ReturnsError(t *testing.T) {
 			"rDa-@nF--UXY09.mF0R2BDFfSj.t.b.N1haJi-Jg.hEDzvI.17XQ2.pv.g.a.QDBEySMp",
 		},
 		{
+			"schemathesis reset sample invalid email",
+			"4k@5X0vM0X0jW.lEFo89.rapos.ZR--qNHX.7X.p.1XioK0IeNS.Uslb.OrWqNyvRbdngop",
+		},
+		{
 			"domain label too long (>63 chars)",
 			"user@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com",
 		},

@@ -192,22 +192,17 @@ _ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
-# Auth: tries register first; falls back to login if user already exists.
-test-contract: ensure-contract
+# Auth: logs in with the seeded dev user; seed is ensured before login.
+test-contract: ensure-contract ensure-seed
 	@echo "Running contract tests (Schemathesis)..."
 	@mkdir -p schemathesis-report
-	@TOKEN=$$(curl -sf http://localhost:8080/v1/auth/register \
+	@docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -c "INSERT INTO users (id, name, email, password_hash, locale, created_at, updated_at, deleted_at) VALUES (gen_random_uuid(), 'Schemathesis Bot', 'st@test.ductifact.dev', CHR(36) || '2a' || CHR(36) || '10' || CHR(36) || 'rEhzOFFg9EHdgq9lnGw2hulMCZSXU4RzeYV0iuLWKoVAs8Snqs9yy', 'en', NOW(), NOW(), NULL) ON CONFLICT (email) WHERE deleted_at IS NULL DO UPDATE SET name = EXCLUDED.name, password_hash = CHR(36) || '2a' || CHR(36) || '10' || CHR(36) || 'rEhzOFFg9EHdgq9lnGw2hulMCZSXU4RzeYV0iuLWKoVAs8Snqs9yy', locale = EXCLUDED.locale, updated_at = NOW(), deleted_at = NULL;" >/dev/null
+	@TOKEN=$$(curl -sf http://localhost:8080/v1/auth/login \
 		-H 'Content-Type: application/json' \
-		-d '{"name":"Schemathesis Bot","email":"st@test.ductifact.dev","password":"password123"}' \
+		-d '{"email":"st@test.ductifact.dev","password":"password123"}' \
 		| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
 	if [ -z "$$TOKEN" ]; then \
-		TOKEN=$$(curl -sf http://localhost:8080/v1/auth/login \
-			-H 'Content-Type: application/json' \
-			-d '{"email":"st@test.ductifact.dev","password":"password123"}' \
-			| grep -o '"access_token":"[^"]*"' | cut -d'"' -f4); \
-	fi; \
-	if [ -z "$$TOKEN" ]; then \
-		echo "❌ Could not obtain auth token — is the API running?"; exit 1; \
+		echo "❌ Could not obtain auth token — is the API running and seeded?"; exit 1; \
 	fi; \
 	echo "  Auth token obtained ✅"; \
 	docker run --rm --network host \

@@ -174,20 +174,14 @@ func SetupRoutes(
 	helpers.RegisterDomainError(services.ErrPieceDefArchived, http.StatusConflict, "piece definition is archived")
 	helpers.RegisterDomainError(valueobjects.ErrInvalidEmail, http.StatusBadRequest, "invalid email format")
 	helpers.RegisterDomainError(
-		services.ErrInvalidVerificationToken,
+		entities.ErrInvalidOTP,
 		http.StatusBadRequest,
-		"invalid or expired verification token",
+		"invalid or expired verification code",
 	)
-	helpers.RegisterDomainError(services.ErrEmailAlreadyVerified, http.StatusConflict, "email already verified")
 	helpers.RegisterDomainError(
 		services.ErrInvalidCurrentPassword,
 		http.StatusUnauthorized,
 		"current password is incorrect",
-	)
-	helpers.RegisterDomainError(
-		services.ErrInvalidResetToken,
-		http.StatusBadRequest,
-		"invalid or expired password reset token",
 	)
 
 	// --- Reject unknown JSON fields (RFC 7231 §6.5.1) ---
@@ -256,12 +250,12 @@ func SetupRoutes(
 	authHandler := NewAuthHandler(authService)
 	authRoutes := v1.Group("/auth")
 	{
-		authRoutes.POST("/register", authHandler.Register)
+		authRoutes.POST("/register", authHandler.StartRegistration)
+		authRoutes.POST("/register/verify", authHandler.Register)
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/refresh", authHandler.Refresh)
-		authRoutes.POST("/verify-email", authHandler.VerifyEmail)
-		authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
-		authRoutes.POST("/reset-password", authHandler.ResetPassword)
+		authRoutes.POST("/password/reset", authHandler.ForgotPassword)
+		authRoutes.POST("/password/reset/verify", authHandler.ResetPassword)
 	}
 
 	// --- Protected routes (auth required) ---
@@ -274,7 +268,6 @@ func SetupRoutes(
 	protectedAuth := protected.Group("/auth")
 	{
 		protectedAuth.POST("/logout", authHandler.Logout)
-		protectedAuth.POST("/resend-verification", authHandler.ResendVerification)
 		protectedAuth.PUT("/password", authHandler.ChangePassword)
 	}
 
