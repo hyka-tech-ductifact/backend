@@ -72,7 +72,7 @@ func ConnectTestDB() (*gorm.DB, error) {
 // Order matters: truncate in dependency order (children first).
 func CleanDB(t *testing.T, db *gorm.DB) {
 	err := db.Exec(
-		"TRUNCATE TABLE one_time_tokens, pieces, piece_definitions, orders, projects, clients, users RESTART IDENTITY CASCADE",
+		"TRUNCATE TABLE one_time_otps, pieces, piece_definitions, orders, projects, clients, users RESTART IDENTITY CASCADE",
 	).Error
 	require.NoError(t, err)
 }

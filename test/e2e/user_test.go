@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"ductifact/internal/domain/entities"
 	"ductifact/test/helpers"
 
 	"github.com/stretchr/testify/assert"
@@ -38,18 +39,33 @@ func TestE2E_Readyz(t *testing.T) {
 	assert.NotEmpty(t, body["contract_version"])
 }
 
-// registerUser is a helper that registers a user and returns (id, token).
+// registerUser is a helper that provisions a verified user and returns (id, token).
+// It bypasses the email-first OTP flow (which requires real email delivery) by
+// inserting the user directly, then logs in through the API to obtain a token.
 func registerUser(t *testing.T, name, email, password string) (string, string) {
 	t.Helper()
-	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     name,
+
+	user, err := entities.NewUser(entities.CreateUserParams{
+		Name:     name,
+		Email:    email,
+		Password: password,
+		Locale:   "en",
+	})
+	require.NoError(t, err)
+
+	err = env.db.Exec(
+		"INSERT INTO users (id, name, email, password_hash, locale, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		user.ID, user.Name, user.Email, user.PasswordHash, user.Locale, user.CreatedAt, user.UpdatedAt,
+	).Error
+	require.NoError(t, err)
+
+	loginResp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
 		"email":    email,
 		"password": password,
 	})
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	body := helpers.ParseBody(t, resp)
-	user := body["user"].(map[string]any)
-	return user["id"].(string), body["access_token"].(string)
+	require.Equal(t, http.StatusOK, loginResp.StatusCode)
+	body := helpers.ParseBody(t, loginResp)
+	return user.ID.String(), body["access_token"].(string)
 }
 
 // ─── Get User (via /users/me) ────────────────────────────────────────────────
@@ -251,14 +267,7 @@ func TestE2E_DeleteMe_CascadesClientDeletion(t *testing.T) {
 	resp.Body.Close()
 
 	// Re-register with same email — should succeed (old data is gone)
-	regResp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
-		"name":     "Juan New",
-		"email":    "juan@example.com",
-		"password": "securepass123",
-	})
-	assert.Equal(t, http.StatusCreated, regResp.StatusCode)
-	regBody := helpers.ParseBody(t, regResp)
-	newToken := regBody["access_token"].(string)
+	_, newToken := registerUser(t, "Juan New", "juan@example.com", "securepass123")
 
 	// Verify no clients exist for the new account
 	clientsResp := helpers.AuthGetJSON(t, url("/clients"), newToken)

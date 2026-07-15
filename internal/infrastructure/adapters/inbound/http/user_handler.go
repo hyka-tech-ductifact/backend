@@ -19,11 +19,10 @@ type UpdateUserRequest struct {
 }
 
 type UserResponse struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Email         string `json:"email"`
-	Locale        string `json:"locale"`
-	EmailVerified bool   `json:"email_verified"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Locale string `json:"locale"`
 }
 
 // --- Handler ---
@@ -97,10 +96,9 @@ func (h *UserHandler) DeleteMe(c *gin.Context) {
 
 func toUserResponse(user *entities.User) *UserResponse {
 	return &UserResponse{
-		ID:            user.ID.String(),
-		Name:          user.Name,
-		Email:         user.Email,
-		Locale:        user.Locale,
-		EmailVerified: user.IsEmailVerified(),
+		ID:     user.ID.String(),
+		Name:   user.Name,
+		Email:  user.Email,
+		Locale: user.Locale,
 	}
 }
