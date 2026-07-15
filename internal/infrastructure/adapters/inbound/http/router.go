@@ -254,8 +254,8 @@ func SetupRoutes(
 		authRoutes.POST("/register/verify", authHandler.Register)
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/refresh", authHandler.Refresh)
-		authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
-		authRoutes.POST("/reset-password", authHandler.ResetPassword)
+		authRoutes.POST("/password/reset", authHandler.ForgotPassword)
+		authRoutes.POST("/password/reset/verify", authHandler.ResetPassword)
 	}
 
 	// --- Protected routes (auth required) ---

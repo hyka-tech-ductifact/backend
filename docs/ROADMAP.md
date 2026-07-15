@@ -155,8 +155,8 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 13.1 | `PUT /auth/password` (change password, requires current) | ✅ | 
 | 13.2 | `DELETE /users/me` (account self-deletion, GDPR) | ✅ |
 | 13.3 | Email verification on registration (token-based) | ✅ |
-| 13.4 | `POST /auth/forgot-password` (reset via email token) | ✅ |
-| 13.5 | `POST /auth/reset-password` (confirm reset with token) | ✅ |
+| 13.4 | `POST /auth/password/reset` (reset via email token) | ✅ |
+| 13.5 | `POST /auth/password/reset/verify` (confirm reset with token) | ✅ |
 
 ### 14. Advanced API
 

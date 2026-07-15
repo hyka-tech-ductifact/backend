@@ -92,7 +92,7 @@ include-operation-id = "register"
 enabled = false
 
 [[operations]]
-include-operation-id = "resetPassword"
+include-operation-id = "verifyPasswordReset"
 enabled = false
 
 [[operations]]

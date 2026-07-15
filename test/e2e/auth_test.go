@@ -347,7 +347,7 @@ func TestE2E_ForgotPassword_WithExistingEmail_Returns200(t *testing.T) {
 	registerUser(t, "Juan", "juan@example.com", "securepass123")
 
 	// Request password reset
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
 		"email": "juan@example.com",
 	})
 
@@ -365,7 +365,7 @@ func TestE2E_ForgotPassword_WithNonExistingEmail_Returns200(t *testing.T) {
 	clean(t)
 
 	// Request password reset for non-existing email (should not reveal if email exists)
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
 		"email": "nonexistent@example.com",
 	})
 
@@ -377,7 +377,7 @@ func TestE2E_ForgotPassword_WithNonExistingEmail_Returns200(t *testing.T) {
 func TestE2E_ForgotPassword_MissingEmail_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/forgot-password"), map[string]string{})
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -394,7 +394,7 @@ func TestE2E_ResetPassword_WithValidCode_Returns200(t *testing.T) {
 	seedOTP(t, "juan@example.com", "password_reset", "654321")
 
 	// Reset the password
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
 		"email":        "juan@example.com",
 		"code":         "654321",
 		"new_password": "newpass456",
@@ -425,7 +425,7 @@ func TestE2E_ResetPassword_WithInvalidCode_Returns400(t *testing.T) {
 	registerUser(t, "Juan", "juan@example.com", "securepass123")
 	seedOTP(t, "juan@example.com", "password_reset", "654321")
 
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
 		"email":        "juan@example.com",
 		"code":         "000000",
 		"new_password": "newpass456",
@@ -443,7 +443,7 @@ func TestE2E_ResetPassword_WithShortPassword_Returns400(t *testing.T) {
 	seedOTP(t, "juan@example.com", "password_reset", "654321")
 
 	// Try to reset with a too-short password
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
 		"email":        "juan@example.com",
 		"code":         "654321",
 		"new_password": "short",
@@ -455,7 +455,7 @@ func TestE2E_ResetPassword_WithShortPassword_Returns400(t *testing.T) {
 func TestE2E_ResetPassword_MissingFields_Returns400(t *testing.T) {
 	clean(t)
 
-	resp := helpers.PostJSON(t, url("/auth/reset-password"), map[string]string{
+	resp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
 		"email": "juan@example.com",
 	})
 
