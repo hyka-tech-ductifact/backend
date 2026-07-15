@@ -174,21 +174,20 @@ func main() {
 		userLimiter = memUserLimiter
 	}
 
-	// --- One-time token repository ---
-	oneTimeTokenRepo := persistence.NewPostgresOneTimeTokenRepository(db)
+	// --- One-time OTP repository ---
+	otpRepo := persistence.NewPostgresOneTimeOTPRepository(db)
 
 	authService := services.NewAuthService(
 		userRepo,
-		oneTimeTokenRepo,
+		otpRepo,
 		tokenProvider,
 		blacklist,
 		loginThrottler,
 		emailSender,
 		cfg.JWT.TokenDuration,
 		cfg.JWT.RefreshTokenDuration,
-		cfg.OneTimeTokens.EmailVerificationTTL,
-		cfg.OneTimeTokens.PasswordResetTTL,
-		cfg.OneTimeTokens.VerificationBaseURL,
+		cfg.OTP.RegistrationTTL,
+		cfg.OTP.PasswordResetTTL,
 	)
 
 	// --- Health checker ---
