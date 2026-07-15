@@ -318,14 +318,23 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 		return nil
 	}
 
-	// Step 3: Resolve locale for the email.
+	// Step 3: If a valid (non-expired) OTP already exists, don't spam the user.
+	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset); err == nil && prev != nil {
+		if !prev.IsExpired() && !prev.MaxAttemptsReached() {
+			return nil
+		}
+		// Expired or exhausted — clean it up so the upsert below starts fresh.
+		_ = s.otpRepo.DeleteByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset)
+	}
+
+	// Step 4: Resolve locale for the email.
 	emailLocale, err := valueobjects.NewLocale(user.Locale)
 	if err != nil {
 		slog.Error("invariant: user has invalid locale", "locale", user.Locale, "userID", user.ID, "error", err)
 		emailLocale = valueobjects.DefaultLocale
 	}
 
-	// Step 4: Generate a fresh OTP (replacing any previous one for this email/purpose).
+	// Step 5: Generate a fresh OTP for this email.
 	otp, code, err := entities.NewOneTimeOTP(normalizedEmail, entities.OTPPurposePasswordReset, s.passwordResetTTL)
 	if err != nil {
 		return err
@@ -334,7 +343,7 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 		return err
 	}
 
-	// Step 5: Send the reset code.
+	// Step 6: Send the reset code.
 	s.sendPasswordResetEmail(ctx, user, code, emailLocale)
 
 	return nil

@@ -382,6 +382,26 @@ func TestE2E_ForgotPassword_MissingEmail_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+func TestE2E_ForgotPassword_WithPendingOTP_DoesNotReplaceExistingCode(t *testing.T) {
+	clean(t)
+
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+	seedOTP(t, "juan@example.com", "password_reset", "654321")
+
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
+		"email": "juan@example.com",
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Existing OTP should remain valid, proving it was not replaced.
+	verifyResp := helpers.PostJSON(t, url("/auth/password/reset/verify"), map[string]string{
+		"email":        "juan@example.com",
+		"code":         "654321",
+		"new_password": "newpass456",
+	})
+	assert.Equal(t, http.StatusOK, verifyResp.StatusCode)
+}
+
 // ─── Reset Password ─────────────────────────────────────────────────────────
 
 func TestE2E_ResetPassword_WithValidCode_Returns200(t *testing.T) {

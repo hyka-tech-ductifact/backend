@@ -971,6 +971,37 @@ func TestForgotPassword_WithExistingEmail_SendsResetOTP(t *testing.T) {
 	assert.Equal(t, "juan@example.com", emailSender.Sent[0].To)
 }
 
+func TestForgotPassword_WithPendingOTP_DoesNotCreateOrSendAgain(t *testing.T) {
+	user := &entities.User{
+		ID:     uuid.New(),
+		Name:   "Juan",
+		Email:  "juan@example.com",
+		Locale: "en",
+	}
+	pendingOTP, _, err := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	require.NoError(t, err)
+
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return user, nil
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return pendingOTP, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err = svc.ForgotPassword(context.Background(), "juan@example.com")
+
+	require.NoError(t, err)
+	assert.Empty(t, otpRepo.Saved, "no OTP should be created while one is pending")
+	assert.Empty(t, emailSender.Sent, "no email should be sent while one OTP is pending")
+}
+
 func TestForgotPassword_WithNonExistingEmail_ReturnsNilSilently(t *testing.T) {
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
