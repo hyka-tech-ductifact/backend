@@ -96,7 +96,8 @@ func (s *authService) StartRegistration(ctx context.Context, email, locale strin
 	}
 
 	// If a valid (non-expired) OTP already exists, don't spam the user.
-	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposeRegistration); err == nil && prev != nil {
+	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposeRegistration); err == nil &&
+		prev != nil {
 		if !prev.IsExpired() && !prev.MaxAttemptsReached() {
 			return ErrOTPAlreadyPending
 		}
@@ -319,7 +320,8 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 	}
 
 	// Step 3: If a valid (non-expired) OTP already exists, don't spam the user.
-	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset); err == nil && prev != nil {
+	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset); err == nil &&
+		prev != nil {
 		if !prev.IsExpired() && !prev.MaxAttemptsReached() {
 			return nil
 		}
@@ -431,7 +433,12 @@ func (s *authService) sendRegistrationOTP(
 
 // sendPasswordResetEmail renders and sends the password reset code email.
 // Non-blocking — failures are logged but don't break the calling flow.
-func (s *authService) sendPasswordResetEmail(ctx context.Context, user *entities.User, code string, locale valueobjects.Locale) {
+func (s *authService) sendPasswordResetEmail(
+	ctx context.Context,
+	user *entities.User,
+	code string,
+	locale valueobjects.Locale,
+) {
 	expiryMinutes := int(s.passwordResetTTL.Minutes())
 	subject, html, text, err := templates.RenderPasswordReset(templates.PasswordResetData{
 		Name:          user.Name,

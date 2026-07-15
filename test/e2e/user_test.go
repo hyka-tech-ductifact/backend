@@ -55,7 +55,13 @@ func registerUser(t *testing.T, name, email, password string) (string, string) {
 
 	err = env.db.Exec(
 		"INSERT INTO users (id, name, email, password_hash, locale, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		user.ID, user.Name, user.Email, user.PasswordHash, user.Locale, user.CreatedAt, user.UpdatedAt,
+		user.ID,
+		user.Name,
+		user.Email,
+		user.PasswordHash,
+		user.Locale,
+		user.CreatedAt,
+		user.UpdatedAt,
 	).Error
 	require.NoError(t, err)
 

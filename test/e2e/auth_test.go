@@ -20,7 +20,10 @@ func seedOTP(t *testing.T, email, purpose, code string) {
 	require.NoError(t, err)
 	err = env.db.Exec(
 		"INSERT INTO one_time_otps (id, email, purpose, code_hash, expires_at, attempts, created_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, 0, NOW())",
-		email, purpose, string(hash), time.Now().Add(15*time.Minute),
+		email,
+		purpose,
+		string(hash),
+		time.Now().Add(15*time.Minute),
 	).Error
 	require.NoError(t, err)
 }
@@ -45,7 +48,9 @@ func TestE2E_StartRegistration_Success(t *testing.T) {
 
 	// An OTP row should have been created for the email.
 	var count int64
-	err := env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").Scan(&count).Error
+	err := env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").
+		Scan(&count).
+		Error
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
@@ -92,7 +97,12 @@ func TestE2E_Register_Success(t *testing.T) {
 
 	// The OTP should have been consumed.
 	var count int64
-	require.NoError(t, env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").Scan(&count).Error)
+	require.NoError(
+		t,
+		env.db.Raw("SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?", "juan@example.com").
+			Scan(&count).
+			Error,
+	)
 	assert.Equal(t, int64(0), count)
 }
 

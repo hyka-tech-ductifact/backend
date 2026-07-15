@@ -35,26 +35,6 @@ func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenPr
 	)
 }
 
-// newTestAuthServiceWithEmail creates an AuthService with a custom email sender.
-func newTestAuthServiceWithEmail(
-	repo *mocks.MockUserRepository,
-	token *mocks.MockTokenProvider,
-	emailSender *mocks.MockEmailSender,
-) usecases.AuthService {
-	return services.NewAuthService(
-		repo,
-		&mocks.MockOneTimeOTPRepository{},
-		token,
-		&mocks.MockTokenBlacklist{},
-		&mocks.MockLoginThrottler{},
-		emailSender,
-		15*time.Minute,
-		7*24*time.Hour,
-		24*time.Hour,
-		1*time.Hour,
-	)
-}
-
 // newTestAuthServiceWithBlacklist creates an AuthService with a custom blacklist.
 func newTestAuthServiceWithBlacklist(
 	repo *mocks.MockUserRepository,
@@ -1069,7 +1049,12 @@ func TestResetPassword_WithNoOTP_ReturnsInvalidOTP(t *testing.T) {
 		},
 	}
 
-	svc := newTestAuthServiceForRegistration(&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
 
 	err := svc.ResetPassword(context.Background(), "juan@example.com", "123456", "newpass456")
 
@@ -1089,7 +1074,12 @@ func TestResetPassword_WithWrongCode_IncrementsAttemptsAndReturnsError(t *testin
 		},
 	}
 
-	svc := newTestAuthServiceForRegistration(&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
 
 	err := svc.ResetPassword(context.Background(), "juan@example.com", "000000", "newpass456")
 
@@ -1106,7 +1096,12 @@ func TestResetPassword_WithExpiredCode_ReturnsInvalidOTP(t *testing.T) {
 		},
 	}
 
-	svc := newTestAuthServiceForRegistration(&mocks.MockUserRepository{}, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{})
+	svc := newTestAuthServiceForRegistration(
+		&mocks.MockUserRepository{},
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
 
 	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "newpass456")
 
