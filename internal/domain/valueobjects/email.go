@@ -37,6 +37,16 @@ func NewEmail(email string) (*Email, error) {
 	if !emailRegex.MatchString(email) {
 		return nil, ErrInvalidEmail
 	}
+
+	// Keep domain labels aligned with stricter validators used by contract tooling:
+	// labels with "--" in positions 3-4 are reserved unless they use the xn-- ACE prefix.
+	domain := parts[1]
+	for _, label := range strings.Split(domain, ".") {
+		if len(label) >= 4 && label[2] == '-' && label[3] == '-' && !strings.HasPrefix(strings.ToLower(label), "xn--") {
+			return nil, ErrInvalidEmail
+		}
+	}
+
 	return &Email{value: email}, nil
 }
 

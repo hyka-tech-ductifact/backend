@@ -382,6 +382,16 @@ func TestE2E_ForgotPassword_MissingEmail_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+func TestE2E_ForgotPassword_InvalidEmailFormat_Returns400(t *testing.T) {
+	clean(t)
+
+	resp := helpers.PostJSON(t, url("/auth/password/reset"), map[string]string{
+		"email": "4k@5X0vM0X0jW.lEFo89.rapos.ZR--qNHX.7X.p.1XioK0IeNS.Uslb.OrWqNyvRbdngop",
+	})
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
 func TestE2E_ForgotPassword_WithPendingOTP_DoesNotReplaceExistingCode(t *testing.T) {
 	clean(t)
 
