@@ -26,7 +26,7 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 # ─── .PHONY ─────────────────────────────────────────────────
 
 .PHONY: help \
-	dev app-build app-start ensure-seed \
+	dev dev-stop app-build app-start ensure-seed \
 	services-start services-stop \
 	test test-unit test-integration test-e2e test-clean \
 	test-contract \
@@ -44,6 +44,7 @@ help:
 	@echo ""
 	@echo "  Development:"
 	@echo "    dev              - Start DB and run with hot reload (auto build)"
+	@echo "    dev-stop         - Stop hot reload process and dev services"
 	@echo "    app-build        - Compile binary to bin/api"
 	@echo "    app-start        - Build and start API in background"
 	@echo ""
@@ -101,6 +102,13 @@ help:
 dev: ensure-contract services-start ensure-seed
 	@echo "Running ductifact with hot reloading..."
 	air
+
+# Stop hot reload process and dev services
+dev-stop: services-stop
+	@echo "Stopping air and dev services..."
+	@pkill -f '[a]ir' 2>/dev/null || true
+	@pkill -f 'bin/[a]pi' 2>/dev/null || true
+	@echo "✅ Dev environment stopped"
 
 # Compile binary to bin/api
 app-build:
