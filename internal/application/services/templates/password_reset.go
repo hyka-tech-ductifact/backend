@@ -14,20 +14,20 @@ const passwordResetHTMLEn = `<!DOCTYPE html>
 <html>
 <body>
     <h1>Reset your password, {{.Name}}</h1>
-    <p>We received a request to reset your password. Click the link below to set a new one:</p>
-    <p><a href="{{.ResetURL}}">Reset my password</a></p>
-    <p>This link will expire in 1 hour.</p>
+    <p>We received a request to reset your password. Use the verification code below to set a new one:</p>
+    <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{{.Code}}</p>
+    <p>This code will expire in {{.ExpiryMinutes}} minutes.</p>
     <p>If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
 </body>
 </html>`
 
 const passwordResetTextEn = `Reset your password, {{.Name}}
 
-We received a request to reset your password. Visit the following link to set a new one:
+We received a request to reset your password. Use the following verification code to set a new one:
 
-{{.ResetURL}}
+{{.Code}}
 
-This link will expire in 1 hour.
+This code will expire in {{.ExpiryMinutes}} minutes.
 If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.`
 
 const passwordResetSubjectEn = "Reset your password"
@@ -38,20 +38,20 @@ const passwordResetHTMLEs = `<!DOCTYPE html>
 <html>
 <body>
     <h1>Restablece tu contraseña, {{.Name}}</h1>
-    <p>Recibimos una solicitud para restablecer tu contraseña. Haz clic en el siguiente enlace para crear una nueva:</p>
-    <p><a href="{{.ResetURL}}">Restablecer mi contraseña</a></p>
-    <p>Este enlace expirará en 1 hora.</p>
+    <p>Recibimos una solicitud para restablecer tu contraseña. Usa el siguiente código de verificación para crear una nueva:</p>
+    <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{{.Code}}</p>
+    <p>Este código expirará en {{.ExpiryMinutes}} minutos.</p>
     <p>Si no solicitaste un restablecimiento de contraseña, puedes ignorar este email. Tu contraseña no será modificada.</p>
 </body>
 </html>`
 
 const passwordResetTextEs = `Restablece tu contraseña, {{.Name}}
 
-Recibimos una solicitud para restablecer tu contraseña. Visita el siguiente enlace para crear una nueva:
+Recibimos una solicitud para restablecer tu contraseña. Usa el siguiente código de verificación para crear una nueva:
 
-{{.ResetURL}}
+{{.Code}}
 
-Este enlace expirará en 1 hora.
+Este código expirará en {{.ExpiryMinutes}} minutos.
 Si no solicitaste un restablecimiento de contraseña, puedes ignorar este email. Tu contraseña no será modificada.`
 
 const passwordResetSubjectEs = "Restablece tu contraseña"
@@ -71,8 +71,9 @@ var passwordResetTemplates = map[valueobjects.Locale]passwordResetContent{
 
 // PasswordResetData holds the dynamic values for the password reset email template.
 type PasswordResetData struct {
-	Name     string
-	ResetURL string
+	Name          string
+	Code          string
+	ExpiryMinutes int
 }
 
 // RenderPasswordReset renders the password reset email in the given locale.
