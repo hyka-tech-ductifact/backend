@@ -22,6 +22,7 @@ var (
 	ErrInvalidRefreshToken    = errors.New("invalid or expired refresh token")
 	ErrAccountLocked          = errors.New("account temporarily locked due to too many failed login attempts")
 	ErrInvalidCurrentPassword = errors.New("current password is incorrect")
+	ErrOTPAlreadyPending      = errors.New("a verification code was already sent and has not yet expired")
 )
 
 // authService implements usecases.AuthService.
@@ -94,7 +95,16 @@ func (s *authService) StartRegistration(ctx context.Context, email, locale strin
 		return ErrEmailAlreadyInUse
 	}
 
-	// Generate a fresh OTP (replacing any previous one for this email).
+	// If a valid (non-expired) OTP already exists, don't spam the user.
+	if prev, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposeRegistration); err == nil && prev != nil {
+		if !prev.IsExpired() && !prev.MaxAttemptsReached() {
+			return ErrOTPAlreadyPending
+		}
+		// Expired or exhausted — clean it up so the upsert below starts fresh.
+		_ = s.otpRepo.DeleteByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposeRegistration)
+	}
+
+	// Generate a fresh OTP for this email.
 	otp, code, err := entities.NewOneTimeOTP(normalizedEmail, entities.OTPPurposeRegistration, s.registrationOTPTTL)
 	if err != nil {
 		return err

@@ -160,6 +160,50 @@ func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
 	assert.Empty(t, email.Sent, "no email should be sent for an existing account")
 }
 
+func TestStartRegistration_PendingOTP_ReturnsErrOTPAlreadyPending(t *testing.T) {
+	pendingOTP, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return pendingOTP, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+
+	assert.ErrorIs(t, err, services.ErrOTPAlreadyPending)
+	assert.Empty(t, otpRepo.Created, "no new OTP should be created")
+	assert.Empty(t, emailSender.Sent, "no email should be sent")
+}
+
+func TestStartRegistration_ExpiredOTP_GeneratesNewOne(t *testing.T) {
+	expiredOTP, _, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, -1*time.Minute)
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return expiredOTP, nil
+		},
+	}
+	emailSender := &mocks.MockEmailSender{}
+	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, emailSender)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+
+	require.NoError(t, err)
+	require.Len(t, otpRepo.Created, 1, "a new OTP should be created after expiry")
+	require.Len(t, emailSender.Sent, 1, "a new email should be sent")
+}
+
 func TestStartRegistration_InvalidEmail_ReturnsError(t *testing.T) {
 	svc := newTestAuthServiceForRegistration(
 		&mocks.MockUserRepository{}, &mocks.MockOneTimeOTPRepository{},

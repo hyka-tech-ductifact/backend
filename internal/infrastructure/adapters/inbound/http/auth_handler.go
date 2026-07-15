@@ -85,8 +85,8 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	}
 
 	if err := h.authService.StartRegistration(c.Request.Context(), req.Email, req.Locale.String()); err != nil {
-		if errors.Is(err, services.ErrEmailAlreadyInUse) {
-			// Keep API response generic to avoid account enumeration.
+		if errors.Is(err, services.ErrEmailAlreadyInUse) || errors.Is(err, services.ErrOTPAlreadyPending) {
+			// Keep API response generic to avoid account enumeration / code-existence leaks.
 			c.JSON(http.StatusOK, gin.H{"message": "if the email is available, a verification code has been sent"})
 			return
 		}
