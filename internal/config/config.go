@@ -156,8 +156,8 @@ func Load() Config {
 		},
 		JWT: JWT{
 			Secret:               required("JWT_SECRET"),
-			TokenDuration:        parseDuration(required("JWT_TOKEN_DURATION")),
-			RefreshTokenDuration: parseDuration(required("JWT_REFRESH_TOKEN_DURATION")),
+			TokenDuration:        parseSeconds(required("JWT_ACCESS_TOKEN_TTL_SECONDS")),
+			RefreshTokenDuration: parseSeconds(required("JWT_REFRESH_TOKEN_TTL_SECONDS")),
 		},
 		Log: Log{
 			Level:  required("LOG_LEVEL"),
@@ -168,14 +168,14 @@ func Load() Config {
 		},
 		RateLimit: RateLimit{
 			IPMaxRequests:   parseInt(required("RATE_LIMIT_IP_MAX")),
-			IPWindow:        parseDuration(required("RATE_LIMIT_IP_WINDOW")),
+			IPWindow:        parseSeconds(required("RATE_LIMIT_IP_WINDOW_SECONDS")),
 			UserMaxRequests: parseInt(required("RATE_LIMIT_USER_MAX")),
-			UserWindow:      parseDuration(required("RATE_LIMIT_USER_WINDOW")),
+			UserWindow:      parseSeconds(required("RATE_LIMIT_USER_WINDOW_SECONDS")),
 		},
 		LoginThrottle: LoginThrottle{
 			MaxAttempts:     parseInt(required("LOGIN_THROTTLE_MAX_ATTEMPTS")),
-			Window:          parseDuration(required("LOGIN_THROTTLE_WINDOW")),
-			LockoutDuration: parseDuration(required("LOGIN_THROTTLE_LOCKOUT")),
+			Window:          parseSeconds(required("LOGIN_THROTTLE_WINDOW_SECONDS")),
+			LockoutDuration: parseSeconds(required("LOGIN_THROTTLE_LOCKOUT_SECONDS")),
 		},
 		MinIO: MinIO{
 			Endpoint:  required("MINIO_HOST") + ":" + required("MINIO_API_PORT"),
@@ -193,8 +193,8 @@ func Load() Config {
 			From:     required("SMTP_FROM"),
 		},
 		OTP: OTP{
-			RegistrationTTL:  parseDuration(required("VERIFICATION_REGISTRATION_OTP_TTL")),
-			PasswordResetTTL: parseDuration(required("VERIFICATION_PASSWORD_RESET_OTP_TTL")),
+			RegistrationTTL:  parseSeconds(required("VERIFICATION_REGISTRATION_OTP_TTL_SECONDS")),
+			PasswordResetTTL: parseSeconds(required("VERIFICATION_PASSWORD_RESET_OTP_TTL_SECONDS")),
 		},
 	}
 }
@@ -222,14 +222,14 @@ func parseList(raw string) []string {
 	return result
 }
 
-// parseDuration parses a duration string (e.g. "24h", "30m").
+// parseSeconds parses a whole-number of seconds (e.g. "900") into a time.Duration.
 // Panics if the format is invalid — this is a configuration error.
-func parseDuration(s string) time.Duration {
-	d, err := time.ParseDuration(s)
+func parseSeconds(s string) time.Duration {
+	n, err := strconv.Atoi(s)
 	if err != nil {
-		panic(fmt.Sprintf("invalid duration %q: %v", s, err))
+		panic(fmt.Sprintf("invalid seconds value %q: %v", s, err))
 	}
-	return d
+	return time.Duration(n) * time.Second
 }
 
 // parseInt parses a string as an integer.
