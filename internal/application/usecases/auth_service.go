@@ -11,13 +11,16 @@ import (
 
 // AuthService is the inbound port for authentication operations.
 type AuthService interface {
-	Register(ctx context.Context, name, email, password, locale string) (*entities.User, *ports.TokenPair, error)
+	// StartRegistration begins the email-first registration flow: it generates a
+	// one-time verification code and emails it to the address. No account is created yet.
+	StartRegistration(ctx context.Context, email, locale string) error
+	// Register completes registration: it validates the verification code and, on success,
+	// creates the user account and returns a token pair (auto-login).
+	Register(ctx context.Context, email, code, name, password, locale string) (*entities.User, *ports.TokenPair, error)
 	Login(ctx context.Context, email, password string) (*entities.User, *ports.TokenPair, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*ports.TokenPair, error)
 	Logout(ctx context.Context, accessToken, refreshToken string) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error
 	ForgotPassword(ctx context.Context, email string) error
-	ResetPassword(ctx context.Context, token, newPassword string) error
-	VerifyEmail(ctx context.Context, token string) error
-	ResendVerificationEmail(ctx context.Context, userID uuid.UUID) error
+	ResetPassword(ctx context.Context, email, code, newPassword string) error
 }
