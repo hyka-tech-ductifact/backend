@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,7 +18,7 @@ type OrderRepository interface {
 	ListByProjectID(
 		ctx context.Context,
 		projectID uuid.UUID,
-		pg pagination.Pagination,
+		opts query.OrderListQuery,
 	) ([]*entities.Order, int64, error)
 	CountByProjectID(ctx context.Context, projectID uuid.UUID) (int64, error)
 	Update(ctx context.Context, order *entities.Order) error

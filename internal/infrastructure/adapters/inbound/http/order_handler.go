@@ -5,11 +5,16 @@ import (
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var orderSortFields = map[string]struct{}{
+	"title": {}, "status": {}, "created_at": {}, "updated_at": {},
+}
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
@@ -38,7 +43,7 @@ type ListOrderResponse struct {
 	Page       int              `json:"page"`
 	PageSize   int              `json:"page_size"`
 	TotalItems int64            `json:"total_items"`
-	TotalPages int              `json:"total_pages"`
+	TotalPages int64            `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -97,13 +102,23 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 		return
 	}
 
-	pg, err := parsePagination(c)
+	base, err := parseBaseListQuery(c, orderSortFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := h.orderService.ListOrdersByProjectID(c.Request.Context(), projectID, userID, pg)
+	opts := query.OrderListQuery{ListQuery: base}
+	if rawStatus, exists := c.GetQuery("status"); exists {
+		status := entities.OrderStatus(rawStatus)
+		if !status.IsValid() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 'pending' or 'completed'"})
+			return
+		}
+		opts.Status = &status
+	}
+
+	result, err := h.orderService.ListOrdersByProjectID(c.Request.Context(), projectID, userID, opts)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,8 +18,8 @@ type OrderService interface {
 		ctx context.Context,
 		projectID uuid.UUID,
 		userID uuid.UUID,
-		pg pagination.Pagination,
-	) (pagination.Result[*entities.Order], error)
+		opts query.OrderListQuery,
+	) (query.PaginatedResult[*entities.Order], error)
 	UpdateOrder(
 		ctx context.Context,
 		id uuid.UUID,

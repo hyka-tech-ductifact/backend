@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ type MockClientRepository struct {
 	CreateFn          func(ctx context.Context, client *entities.Client) error
 	GetByIDFn         func(ctx context.Context, id uuid.UUID) (*entities.Client, error)
 	GetByIDForOwnerFn func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Client, error)
-	ListByUserIDFn    func(ctx context.Context, userID uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error)
+	ListByUserIDFn    func(ctx context.Context, userID uuid.UUID, opts query.ClientListQuery) ([]*entities.Client, int64, error)
 	CountByUserIDFn   func(ctx context.Context, userID uuid.UUID) (int64, error)
 	UpdateFn          func(ctx context.Context, client *entities.Client) error
 	DeleteFn          func(ctx context.Context, id uuid.UUID) error
@@ -49,10 +49,10 @@ func (m *MockClientRepository) GetByIDForOwner(
 func (m *MockClientRepository) ListByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
-	pg pagination.Pagination,
+	opts query.ClientListQuery,
 ) ([]*entities.Client, int64, error) {
 	if m.ListByUserIDFn != nil {
-		return m.ListByUserIDFn(ctx, userID, pg)
+		return m.ListByUserIDFn(ctx, userID, opts)
 	}
 	return nil, 0, nil
 }
