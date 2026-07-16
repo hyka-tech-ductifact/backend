@@ -10,11 +10,16 @@ import (
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var pieceDefinitionSortFields = map[string]struct{}{
+	"name": {}, "predefined": {}, "created_at": {}, "updated_at": {}, "archived_at": {},
+}
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
@@ -45,7 +50,7 @@ type ListPieceDefinitionResponse struct {
 	Page       int                        `json:"page"`
 	PageSize   int                        `json:"page_size"`
 	TotalItems int64                      `json:"total_items"`
-	TotalPages int                        `json:"total_pages"`
+	TotalPages int64                      `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -119,26 +124,29 @@ func (h *PieceDefinitionHandler) ListPieceDefinitions(c *gin.Context) {
 		return
 	}
 
-	pg, err := parsePagination(c)
+	base, err := parseBaseListQuery(c, pieceDefinitionSortFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var includeArchived bool
-	if raw, exists := c.GetQuery("include_archived"); exists {
-		switch strings.ToLower(raw) {
-		case "true":
-			includeArchived = true
-		case "false":
-			includeArchived = false
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "include_archived must be a boolean (true/false)"})
-			return
-		}
+	predefined, err := parseBooleanQuery(c, "predefined")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	includeArchived, err := parseBooleanQuery(c, "include_archived")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	result, err := h.pieceDefService.ListPieceDefinitions(c.Request.Context(), userID, includeArchived, pg)
+	opts := query.PieceDefinitionListQuery{ListQuery: base, Predefined: predefined}
+	if includeArchived != nil {
+		opts.IncludeArchived = *includeArchived
+	}
+
+	result, err := h.pieceDefService.ListPieceDefinitions(c.Request.Context(), userID, opts)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return

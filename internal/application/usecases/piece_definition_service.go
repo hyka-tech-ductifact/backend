@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -32,9 +32,8 @@ type PieceDefinitionService interface {
 	ListPieceDefinitions(
 		ctx context.Context,
 		userID uuid.UUID,
-		includeArchived bool,
-		pg pagination.Pagination,
-	) (pagination.Result[*entities.PieceDefinition], error)
+		opts query.PieceDefinitionListQuery,
+	) (query.PaginatedResult[*entities.PieceDefinition], error)
 	UpdatePieceDefinition(
 		ctx context.Context,
 		id uuid.UUID,

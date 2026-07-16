@@ -181,6 +181,64 @@ func TestE2E_ListPieces_Success(t *testing.T) {
 	assert.Len(t, pieces, 2)
 }
 
+func TestE2E_ListPieces_SearchDefinitionSortAndPagination(t *testing.T) {
+	clean(t)
+	orderID, definitionID, token := createFullChainForPieces(t)
+	otherDefinitionID := createPieceDef(t, token, "Circle", []string{"Radius"})
+
+	pieces := []map[string]any{
+		{
+			"title": "Beta Panel", "definition_id": definitionID,
+			"dimensions": map[string]float64{"Length": 100, "Width": 50}, "quantity": 2,
+		},
+		{
+			"title": "Alpha Panel", "definition_id": definitionID,
+			"dimensions": map[string]float64{"Length": 200, "Width": 100}, "quantity": 5,
+		},
+		{
+			"title": "Other Panel", "definition_id": otherDefinitionID,
+			"dimensions": map[string]float64{"Radius": 25}, "quantity": 9,
+		},
+		{
+			"title": "Unrelated", "definition_id": definitionID,
+			"dimensions": map[string]float64{"Length": 50, "Width": 25}, "quantity": 8,
+		},
+	}
+	for _, piece := range pieces {
+		resp := helpers.AuthPostJSON(t, pieceURL(orderID), token, piece)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+
+	listURL := pieceURL(orderID) + "?search=panel&definition_id=" + definitionID + "&sort_by=quantity&sort_order=desc&page=1&page_size=1"
+	resp := helpers.AuthGetJSON(t, listURL, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	data := requirePaginatedData(t, body, 1, 1, 2, 2)
+	require.Len(t, data, 1)
+	assert.Equal(t, "Alpha Panel", data[0].(map[string]any)["title"])
+	assert.Equal(t, float64(5), data[0].(map[string]any)["quantity"])
+	assert.Equal(t, definitionID, data[0].(map[string]any)["definition_id"])
+
+	outOfRange := helpers.AuthGetJSON(t, pieceURL(orderID)+"?search=panel&definition_id="+definitionID+"&sort_by=quantity&sort_order=desc&page=99&page_size=1", token)
+	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
+	outOfRangeBody := helpers.ParseBody(t, outOfRange)
+	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))
+}
+
+func TestE2E_ListPieces_InvalidDefinitionIDFilter_Returns400(t *testing.T) {
+	clean(t)
+	orderID, _, token := createFullChainForPieces(t)
+
+	resp := helpers.AuthGetJSON(t, pieceURL(orderID)+"?definition_id=not-a-uuid", token)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	nonCanonical := helpers.AuthGetJSON(t, pieceURL(orderID)+"?definition_id=00000000000000000000000000000000", token)
+	defer nonCanonical.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, nonCanonical.StatusCode)
+}
+
 func TestE2E_ListPieces_Empty(t *testing.T) {
 	clean(t)
 	orderID, _, token := createFullChainForPieces(t)

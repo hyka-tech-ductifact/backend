@@ -108,6 +108,45 @@ func TestE2E_ListPieceDefinitions_Success(t *testing.T) {
 	assert.GreaterOrEqual(t, len(data), 2)
 }
 
+func TestE2E_ListPieceDefinitions_SearchFiltersSortAndPagination(t *testing.T) {
+	clean(t)
+	_, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	archivedID := createPieceDef(t, token, "Alpha Panel", []string{"Length"})
+	createPieceDef(t, token, "Beta Panel", []string{"Width"})
+	createPieceDef(t, token, "Unrelated", []string{"Radius"})
+
+	archiveResp := helpers.AuthPostJSON(t, pieceDefURL(archivedID)+"/archive", token, nil)
+	require.Equal(t, http.StatusOK, archiveResp.StatusCode)
+	archiveResp.Body.Close()
+
+	listURL := pieceDefURL() + "?search=panel&predefined=false&include_archived=true&sort_by=name&sort_order=asc&page=1&page_size=1"
+	resp := helpers.AuthGetJSON(t, listURL, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	data := requirePaginatedData(t, body, 1, 1, 2, 2)
+	require.Len(t, data, 1)
+	assert.Equal(t, "Alpha Panel", data[0].(map[string]any)["name"])
+	assert.False(t, data[0].(map[string]any)["predefined"].(bool))
+	assert.NotNil(t, data[0].(map[string]any)["archived_at"])
+
+	outOfRange := helpers.AuthGetJSON(t, pieceDefURL()+"?search=panel&predefined=false&include_archived=true&sort_by=name&sort_order=asc&page=99&page_size=1", token)
+	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
+	outOfRangeBody := helpers.ParseBody(t, outOfRange)
+	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))
+}
+
+func TestE2E_ListPieceDefinitions_InvalidBooleanFilters_Return400(t *testing.T) {
+	clean(t)
+	_, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	for _, query := range []string{"?predefined=maybe", "?include_archived=maybe"} {
+		resp := helpers.AuthGetJSON(t, pieceDefURL()+query, token)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		resp.Body.Close()
+	}
+}
+
 func TestE2E_ListPieceDefinitions_DoesNotReturnOtherUsersCustomDefs(t *testing.T) {
 	clean(t)
 	_, token1 := createUserForClients(t, "Juan", "juan@example.com")

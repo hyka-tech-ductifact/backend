@@ -14,7 +14,7 @@ import (
 	"ductifact/internal/application/ports"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -117,15 +117,14 @@ func (s *pieceDefinitionService) GetPieceDefinitionByID(
 func (s *pieceDefinitionService) ListPieceDefinitions(
 	ctx context.Context,
 	userID uuid.UUID,
-	includeArchived bool,
-	pg pagination.Pagination,
-) (pagination.Result[*entities.PieceDefinition], error) {
-	defs, totalItems, err := s.pieceDefRepo.ListByUserID(ctx, userID, includeArchived, pg)
+	opts query.PieceDefinitionListQuery,
+) (query.PaginatedResult[*entities.PieceDefinition], error) {
+	defs, totalItems, err := s.pieceDefRepo.ListByUserID(ctx, userID, opts)
 	if err != nil {
-		return pagination.Result[*entities.PieceDefinition]{}, err
+		return query.PaginatedResult[*entities.PieceDefinition]{}, err
 	}
 
-	return pagination.NewResult(defs, pg, totalItems), nil
+	return query.NewPaginatedResult(defs, opts.Page, totalItems), nil
 }
 
 // UpdatePieceDefinition applies a partial update to an existing piece definition.

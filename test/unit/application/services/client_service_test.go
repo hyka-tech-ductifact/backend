@@ -7,7 +7,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
@@ -148,36 +148,49 @@ func TestGetClientByID_WithWrongUser_ReturnsError(t *testing.T) {
 
 func TestListClientsByUserID_ReturnsClients(t *testing.T) {
 	userID := uuid.New()
+	pg, _ := query.NewPageRequest(1, 10)
+	opts := query.ClientListQuery{ListQuery: query.ListQuery{
+		Page:   pg,
+		Search: "acme",
+		Sort: &query.Sort{
+			Field:     "name",
+			Direction: query.SortAscending,
+		},
+	}}
 	expected := []*entities.Client{
 		{ID: uuid.New(), Name: "Client 1", UserID: userID},
 		{ID: uuid.New(), Name: "Client 2", UserID: userID},
 	}
 	clientRepo := &mocks.MockClientRepository{
-		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, got query.ClientListQuery) ([]*entities.Client, int64, error) {
+			assert.Equal(t, userID, uid)
+			assert.Equal(t, opts.Search, got.Search)
+			assert.Equal(t, opts.Sort, got.Sort)
+			assert.Equal(t, opts, got)
 			return expected, 2, nil
 		},
 	}
 	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListClientsByUserID(context.Background(), userID, pg)
+	result, err := svc.ListClientsByUserID(context.Background(), userID, opts)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
 	assert.Equal(t, int64(2), result.TotalItems)
-	assert.Equal(t, 1, result.TotalPages)
+	assert.Equal(t, int64(1), result.TotalPages)
 }
 
 func TestListClientsByUserID_EmptyList(t *testing.T) {
 	clientRepo := &mocks.MockClientRepository{
-		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, pg pagination.Pagination) ([]*entities.Client, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uid uuid.UUID, opts query.ClientListQuery) ([]*entities.Client, int64, error) {
 			return []*entities.Client{}, 0, nil
 		},
 	}
 	svc := services.NewClientService(clientRepo, &mocks.MockUserRepository{}, &mocks.MockProjectRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListClientsByUserID(context.Background(), uuid.New(), pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.ClientListQuery{ListQuery: query.ListQuery{Page: pg}}
+	result, err := svc.ListClientsByUserID(context.Background(), uuid.New(), opts)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)

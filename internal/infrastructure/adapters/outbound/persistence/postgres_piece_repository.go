@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	domainquery "ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -127,24 +127,29 @@ func (r *PostgresPieceRepository) diagnosePieceFailure(ctx context.Context, id u
 func (r *PostgresPieceRepository) ListByOrderID(
 	ctx context.Context,
 	orderID uuid.UUID,
-	pg pagination.Pagination,
+	opts domainquery.PieceListQuery,
 ) ([]*entities.Piece, int64, error) {
-	var totalItems int64
+	query := r.db.WithContext(ctx).Model(&PieceModel{}).Where("order_id = ?", orderID)
+	query = applyLiteralSearch(query, opts.Search, `(title ILIKE ? ESCAPE E'\\')`, 1)
+	if opts.DefinitionID != nil {
+		query = query.Where("definition_id = ?", *opts.DefinitionID)
+	}
 
-	// Count total matching rows (before pagination)
-	if err := r.db.WithContext(ctx).Model(&PieceModel{}).Where("order_id = ?", orderID).Count(&totalItems).Error; err != nil {
+	var totalItems int64
+	if err := query.Session(&gorm.Session{}).Count(&totalItems).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch the requested page
-	var models []PieceModel
-	err := r.db.WithContext(ctx).
-		Where("order_id = ?", orderID).
-		Order("created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
+	ordered, err := applyPieceOrder(query.Session(&gorm.Session{}), opts.Sort)
 	if err != nil {
+		return nil, 0, err
+	}
+	if pageStartsAfterResults(opts.Page, totalItems) {
+		return []*entities.Piece{}, totalItems, nil
+	}
+
+	var models []PieceModel
+	if err := applyPagination(ordered, opts.Page).Find(&models).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -157,6 +162,27 @@ func (r *PostgresPieceRepository) ListByOrderID(
 		pieces = append(pieces, piece)
 	}
 	return pieces, totalItems, nil
+}
+
+func applyPieceOrder(query *gorm.DB, sortOption *domainquery.Sort) (*gorm.DB, error) {
+	if sortOption == nil {
+		return applyStableOrder(query, "created_at", domainquery.SortDescending)
+	}
+
+	var column string
+	switch sortOption.Field {
+	case "title":
+		column = "title"
+	case "quantity":
+		column = "quantity"
+	case "created_at":
+		column = "created_at"
+	case "updated_at":
+		column = "updated_at"
+	default:
+		return nil, errors.New("invalid piece sort field")
+	}
+	return applyStableOrder(query, column, sortOption.Direction)
 }
 
 func (r *PostgresPieceRepository) Update(ctx context.Context, piece *entities.Piece) error {

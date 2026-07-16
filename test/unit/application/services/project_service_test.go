@@ -7,7 +7,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
@@ -171,38 +171,51 @@ func TestGetProjectByID_WithNotOwnedProject_ReturnsError(t *testing.T) {
 func TestListProjectsByClientID_ReturnsProjects(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
+	pg, _ := query.NewPageRequest(1, 10)
+	opts := query.ProjectListQuery{ListQuery: query.ListQuery{
+		Page:   pg,
+		Search: "tower",
+		Sort: &query.Sort{
+			Field:     "address",
+			Direction: query.SortDescending,
+		},
+	}}
 	expected := []*entities.Project{
 		{ID: uuid.New(), Name: "Project 1", ClientID: client.ID},
 		{ID: uuid.New(), Name: "Project 2", ClientID: client.ID},
 	}
 	projectRepo := &mocks.MockProjectRepository{
-		ListByClientIDFn: func(ctx context.Context, cID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
+		ListByClientIDFn: func(ctx context.Context, cID uuid.UUID, got query.ProjectListQuery) ([]*entities.Project, int64, error) {
+			assert.Equal(t, client.ID, cID)
+			assert.Equal(t, opts.Search, got.Search)
+			assert.Equal(t, opts.Sort, got.Sort)
+			assert.Equal(t, opts, got)
 			return expected, 2, nil
 		},
 	}
 	svc := services.NewProjectService(projectRepo, clientRepoReturning(client), &mocks.MockOrderRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListProjectsByClientID(context.Background(), client.ID, userID, pg)
+	result, err := svc.ListProjectsByClientID(context.Background(), client.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
 	assert.Equal(t, int64(2), result.TotalItems)
-	assert.Equal(t, 1, result.TotalPages)
+	assert.Equal(t, int64(1), result.TotalPages)
 }
 
 func TestListProjectsByClientID_EmptyList(t *testing.T) {
 	userID := uuid.New()
 	client := newTestClient(userID)
 	projectRepo := &mocks.MockProjectRepository{
-		ListByClientIDFn: func(ctx context.Context, cID uuid.UUID, pg pagination.Pagination) ([]*entities.Project, int64, error) {
+		ListByClientIDFn: func(ctx context.Context, cID uuid.UUID, opts query.ProjectListQuery) ([]*entities.Project, int64, error) {
 			return []*entities.Project{}, 0, nil
 		},
 	}
 	svc := services.NewProjectService(projectRepo, clientRepoReturning(client), &mocks.MockOrderRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListProjectsByClientID(context.Background(), client.ID, userID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.ProjectListQuery{ListQuery: query.ListQuery{Page: pg}}
+	result, err := svc.ListProjectsByClientID(context.Background(), client.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)
@@ -216,8 +229,9 @@ func TestListProjectsByClientID_WithNonExistingClient_ReturnsError(t *testing.T)
 		&mocks.MockOrderRepository{},
 	)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	_, err := svc.ListProjectsByClientID(context.Background(), uuid.New(), uuid.New(), pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.ProjectListQuery{ListQuery: query.ListQuery{Page: pg}}
+	_, err := svc.ListProjectsByClientID(context.Background(), uuid.New(), uuid.New(), opts)
 
 	assert.ErrorIs(t, err, repositories.ErrClientNotFound)
 }
@@ -231,8 +245,9 @@ func TestListProjectsByClientID_WithWrongUser_ReturnsError(t *testing.T) {
 		&mocks.MockOrderRepository{},
 	)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	_, err := svc.ListProjectsByClientID(context.Background(), client.ID, uuid.New(), pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.ProjectListQuery{ListQuery: query.ListQuery{Page: pg}}
+	_, err := svc.ListProjectsByClientID(context.Background(), client.ID, uuid.New(), opts)
 
 	assert.ErrorIs(t, err, repositories.ErrClientNotOwned)
 }

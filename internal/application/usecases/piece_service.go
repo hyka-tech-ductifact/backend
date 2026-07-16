@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,8 +18,8 @@ type PieceService interface {
 		ctx context.Context,
 		orderID uuid.UUID,
 		userID uuid.UUID,
-		pg pagination.Pagination,
-	) (pagination.Result[*entities.Piece], error)
+		opts query.PieceListQuery,
+	) (query.PaginatedResult[*entities.Piece], error)
 	UpdatePiece(
 		ctx context.Context,
 		id uuid.UUID,

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,8 +18,7 @@ type PieceDefinitionRepository interface {
 	ListByUserID(
 		ctx context.Context,
 		userID uuid.UUID,
-		includeArchived bool,
-		pg pagination.Pagination,
+		opts query.PieceDefinitionListQuery,
 	) ([]*entities.PieceDefinition, int64, error)
 	Update(ctx context.Context, def *entities.PieceDefinition) error
 	Delete(ctx context.Context, id uuid.UUID) error

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func clientListQuery(pg query.PageRequest) query.ClientListQuery {
+	return query.ClientListQuery{ListQuery: query.ListQuery{Page: pg}}
+}
 
 // setupClientRepo creates both user and client repos with a clean DB.
 func setupClientRepo(t *testing.T) (*persistence.PostgresClientRepository, *persistence.PostgresUserRepository) {
@@ -89,11 +93,60 @@ func TestPostgresClientRepository_ListByUserID(t *testing.T) {
 	require.NoError(t, clientRepo.Create(ctx, client1))
 	require.NoError(t, clientRepo.Create(ctx, client2))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, clientListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, clients, 2)
 	assert.Equal(t, int64(2), total)
+}
+
+func TestPostgresClientRepository_ListByUserID_SearchSortPaginationAndLiteralWildcards(t *testing.T) {
+	clientRepo, userRepo := setupClientRepo(t)
+	ctx := context.Background()
+	user := createTestUser(t, userRepo)
+
+	clients := []entities.CreateClientParams{
+		{Name: "Beta Duct", UserID: user.ID},
+		{Name: "Alpha Duct", UserID: user.ID},
+		{Name: "Email Match", Email: "duct@example.com", UserID: user.ID},
+		{Name: "100% Literal", UserID: user.ID},
+		{Name: "Unrelated", UserID: user.ID},
+	}
+	for _, params := range clients {
+		client, err := entities.NewClient(params)
+		require.NoError(t, err)
+		require.NoError(t, clientRepo.Create(ctx, client))
+	}
+
+	pg, _ := query.NewPageRequest(1, 2)
+	opts := query.ClientListQuery{ListQuery: query.ListQuery{
+		Page:   pg,
+		Search: "DUCT",
+		Sort:   &query.Sort{Field: "name", Direction: query.SortAscending},
+	}}
+	firstPage, total, err := clientRepo.ListByUserID(ctx, user.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 2)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, "Alpha Duct", firstPage[0].Name)
+	assert.Equal(t, "Beta Duct", firstPage[1].Name)
+
+	pg, _ = query.NewPageRequest(2, 2)
+	opts.Page = pg
+	secondPage, total, err := clientRepo.ListByUserID(ctx, user.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, "Email Match", secondPage[0].Name)
+
+	pg, _ = query.NewPageRequest(1, 20)
+	opts.Page = pg
+	opts.Search = "%"
+	literalMatch, total, err := clientRepo.ListByUserID(ctx, user.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, literalMatch, 1)
+	assert.Equal(t, int64(1), total)
+	assert.Equal(t, "100% Literal", literalMatch[0].Name)
 }
 
 func TestPostgresClientRepository_ListByUserID_Empty(t *testing.T) {
@@ -102,8 +155,8 @@ func TestPostgresClientRepository_ListByUserID_Empty(t *testing.T) {
 
 	user := createTestUser(t, userRepo)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	clients, total, err := clientRepo.ListByUserID(ctx, user.ID, clientListQuery(pg))
 	require.NoError(t, err)
 	assert.Empty(t, clients)
 	assert.Equal(t, int64(0), total)
@@ -122,14 +175,14 @@ func TestPostgresClientRepository_ListByUserID_DoesNotReturnOtherUsersClients(t 
 	require.NoError(t, clientRepo.Create(ctx, clientB))
 
 	// User 1 should only see their own client
-	pg, _ := pagination.NewPagination(1, 20)
-	clients1, _, err := clientRepo.ListByUserID(ctx, user1.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	clients1, _, err := clientRepo.ListByUserID(ctx, user1.ID, clientListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, clients1, 1)
 	assert.Equal(t, user1.ID, clients1[0].UserID)
 
 	// User 2 should only see their own client
-	clients2, _, err := clientRepo.ListByUserID(ctx, user2.ID, pg)
+	clients2, _, err := clientRepo.ListByUserID(ctx, user2.ID, clientListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, clients2, 1)
 	assert.Equal(t, user2.ID, clients2[0].UserID)
