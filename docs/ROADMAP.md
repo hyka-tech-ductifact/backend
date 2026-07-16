@@ -162,8 +162,8 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 14.1 | Filtering and sorting on list endpoints (query params) | ⬜ | 🔴 Now |
-| 14.2 | Pagination on all list endpoints (users for admin) | ⬜ | 🔴 Now |
+| 14.1 | Filtering and sorting on list endpoints (query params) | ✅ |
+| 14.2 | Pagination on all existing list endpoints (admin users deferred to §18) | ✅ |
 | 14.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🟡 Soon |
 | 14.4 | Request body validation middleware (against OpenAPI) | ⬜ | 🟡 Soon |
 | 14.5 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
@@ -191,12 +191,12 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 16.1 | Redis adapter for token blacklist | ✅ | 🔴 Now |
-| 16.2 | Redis adapter for rate limiter (IP + user) | ✅ | 🔴 Now |
-| 16.3 | Redis adapter for login throttler | ✅ | 🔴 Now |
-| 16.4 | Redis health check in `/readyz` endpoint | ✅ | 🔴 Now |
+| 16.1 | Redis adapter for token blacklist | ✅ 
+| 16.2 | Redis adapter for rate limiter (IP + user) | ✅ |
+| 16.3 | Redis adapter for login throttler | ✅ |
+| 16.4 | Redis health check in `/readyz` endpoint | ✅ |
 | 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🔵 Later |
-| 16.6 | Graceful fallback: Redis primary, memory if unavailable | ✅ | 🔴 Now |
+| 16.6 | Graceful fallback: Redis primary, memory if unavailable | ✅ |
 
 ### 17. Production Observability
 
@@ -318,7 +318,7 @@ Phase 2 — Hardening
 
 Phase 3 — Account & API Maturity
   Account Management         ████████████████████  5/5   ✅
-  Advanced API               ░░░░░░░░░░░░░░░░░░░░  0/7
+  Advanced API               ██████░░░░░░░░░░░░░░  2/7
   Performance & Baselines    ░░░░░░░░░░░░░░░░░░░░  0/5
 
 Phase 4 — Horizontal Scaling & Observability
@@ -337,8 +337,7 @@ Phase 6 — Resilience & Polish
   API Governance             ░░░░░░░░░░░░░░░░░░░░  0/5
 ```
 
-> **Total progress**: 76/76 (Phase 1+2) + 16/59 (Phase 3–6) = 92/135 tasks (~68%)
-> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
+> **Total progress**: 76/76 (Phase 1+2) + 18/59 (Phase 3–6) = 94/135 tasks (~70%) -> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
 > **Phase 3**: Account Management ✅, API Maturity in progress.
 > **Phase 4**: Redis ✅ (5/6), Observability pending.
 
