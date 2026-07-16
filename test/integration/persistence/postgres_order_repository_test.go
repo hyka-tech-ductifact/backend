@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func orderListQuery(pg query.PageRequest) query.OrderListQuery {
+	return query.OrderListQuery{ListQuery: query.ListQuery{Page: pg}}
+}
 
 // setupOrderRepo creates order, project, client, and user repos with a clean DB.
 func setupOrderRepo(t *testing.T) (
@@ -117,11 +121,55 @@ func TestPostgresOrderRepository_ListByProjectID(t *testing.T) {
 	require.NoError(t, orderRepo.Create(ctx, o1))
 	require.NoError(t, orderRepo.Create(ctx, o2))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	orders, total, err := orderRepo.ListByProjectID(ctx, project.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	orders, total, err := orderRepo.ListByProjectID(ctx, project.ID, orderListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, orders, 2)
 	assert.Equal(t, int64(2), total)
+}
+
+func TestPostgresOrderRepository_ListByProjectID_SearchStatusSortAndPagination(t *testing.T) {
+	orderRepo, projectRepo, clientRepo, userRepo := setupOrderRepo(t)
+	ctx := context.Background()
+	user := createTestUser(t, userRepo)
+	client := createTestClient(t, clientRepo, user.ID)
+	project := createTestProjectForOrder(t, projectRepo, client.ID)
+
+	orders := []entities.CreateOrderParams{
+		{Title: "Beta Duct", Status: "completed", ProjectID: project.ID},
+		{Title: "Alpha Duct", Status: "completed", ProjectID: project.ID},
+		{Title: "Pending Duct", Status: "pending", ProjectID: project.ID},
+		{Title: "Unrelated", Status: "completed", ProjectID: project.ID},
+	}
+	for _, params := range orders {
+		order, err := entities.NewOrder(params)
+		require.NoError(t, err)
+		require.NoError(t, orderRepo.Create(ctx, order))
+	}
+
+	status := entities.OrderStatusCompleted
+	pg, _ := query.NewPageRequest(1, 1)
+	opts := query.OrderListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "duct",
+			Sort:   &query.Sort{Field: "title", Direction: query.SortDescending},
+		},
+		Status: &status,
+	}
+	firstPage, total, err := orderRepo.ListByProjectID(ctx, project.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Beta Duct", firstPage[0].Title)
+
+	pg, _ = query.NewPageRequest(2, 1)
+	opts.Page = pg
+	secondPage, total, err := orderRepo.ListByProjectID(ctx, project.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Alpha Duct", secondPage[0].Title)
 }
 
 func TestPostgresOrderRepository_ListByProjectID_Empty(t *testing.T) {
@@ -132,8 +180,8 @@ func TestPostgresOrderRepository_ListByProjectID_Empty(t *testing.T) {
 	client := createTestClient(t, clientRepo, user.ID)
 	project := createTestProjectForOrder(t, projectRepo, client.ID)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	orders, total, err := orderRepo.ListByProjectID(ctx, project.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	orders, total, err := orderRepo.ListByProjectID(ctx, project.ID, orderListQuery(pg))
 	require.NoError(t, err)
 	assert.Empty(t, orders)
 	assert.Equal(t, int64(0), total)
@@ -153,14 +201,14 @@ func TestPostgresOrderRepository_ListByProjectID_DoesNotReturnOtherProjectsOrder
 	require.NoError(t, orderRepo.Create(ctx, oA))
 	require.NoError(t, orderRepo.Create(ctx, oB))
 
-	pg, _ := pagination.NewPagination(1, 20)
+	pg, _ := query.NewPageRequest(1, 20)
 
-	orders1, _, err := orderRepo.ListByProjectID(ctx, project1.ID, pg)
+	orders1, _, err := orderRepo.ListByProjectID(ctx, project1.ID, orderListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, orders1, 1)
 	assert.Equal(t, project1.ID, orders1[0].ProjectID)
 
-	orders2, _, err := orderRepo.ListByProjectID(ctx, project2.ID, pg)
+	orders2, _, err := orderRepo.ListByProjectID(ctx, project2.ID, orderListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, orders2, 1)
 	assert.Equal(t, project2.ID, orders2[0].ProjectID)

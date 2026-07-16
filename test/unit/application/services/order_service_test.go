@@ -7,7 +7,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
@@ -165,19 +165,37 @@ func TestGetOrderByID_WithNotOwned_ReturnsError(t *testing.T) {
 func TestListOrdersByProjectID_ReturnsOrders(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
+	status := entities.OrderStatusPending
+	pg, _ := query.NewPageRequest(1, 10)
+	opts := query.OrderListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "batch",
+			Sort: &query.Sort{
+				Field:     "status",
+				Direction: query.SortDescending,
+			},
+		},
+		Status: &status,
+	}
 	expected := []*entities.Order{
 		{ID: uuid.New(), Title: "Order 1", ProjectID: project.ID},
 		{ID: uuid.New(), Title: "Order 2", ProjectID: project.ID},
 	}
 	orderRepo := &mocks.MockOrderRepository{
-		ListByProjectIDFn: func(ctx context.Context, pID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+		ListByProjectIDFn: func(ctx context.Context, pID uuid.UUID, got query.OrderListQuery) ([]*entities.Order, int64, error) {
+			assert.Equal(t, project.ID, pID)
+			assert.Equal(t, opts.Search, got.Search)
+			assert.Equal(t, opts.Sort, got.Sort)
+			require.NotNil(t, got.Status)
+			assert.Equal(t, status, *got.Status)
+			assert.Equal(t, opts, got)
 			return expected, 2, nil
 		},
 	}
 	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
+	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
@@ -188,14 +206,15 @@ func TestListOrdersByProjectID_EmptyList(t *testing.T) {
 	userID := uuid.New()
 	project := newTestProject(uuid.New())
 	orderRepo := &mocks.MockOrderRepository{
-		ListByProjectIDFn: func(ctx context.Context, pID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error) {
+		ListByProjectIDFn: func(ctx context.Context, pID uuid.UUID, opts query.OrderListQuery) ([]*entities.Order, int64, error) {
 			return []*entities.Order{}, 0, nil
 		},
 	}
 	svc := services.NewOrderService(orderRepo, projectRepoReturning(project), &mocks.MockPieceRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.OrderListQuery{ListQuery: query.ListQuery{Page: pg}}
+	result, err := svc.ListOrdersByProjectID(context.Background(), project.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)
@@ -210,8 +229,9 @@ func TestListOrdersByProjectID_WithProjectNotOwned_ReturnsError(t *testing.T) {
 	}
 	svc := services.NewOrderService(&mocks.MockOrderRepository{}, projectRepo, &mocks.MockPieceRepository{})
 
-	pg, _ := pagination.NewPagination(1, 20)
-	_, err := svc.ListOrdersByProjectID(context.Background(), uuid.New(), uuid.New(), pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.OrderListQuery{ListQuery: query.ListQuery{Page: pg}}
+	_, err := svc.ListOrdersByProjectID(context.Background(), uuid.New(), uuid.New(), opts)
 
 	assert.ErrorIs(t, err, repositories.ErrProjectNotOwned)
 }

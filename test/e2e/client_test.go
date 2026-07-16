@@ -110,6 +110,47 @@ func TestE2E_ListClients_Success(t *testing.T) {
 	assert.Len(t, clients, 2)
 }
 
+func TestE2E_ListClients_SearchSortAndPagination(t *testing.T) {
+	clean(t)
+	_, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	for _, name := range []string{"Beta Duct", "Unrelated", "Alpha Duct"} {
+		resp := helpers.AuthPostJSON(t, url("/clients"), token, map[string]string{"name": name})
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+
+	listURL := url("/clients") + "?search=duct&sort_by=name&sort_order=asc&page=1&page_size=1"
+	resp := helpers.AuthGetJSON(t, listURL, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	clients := requirePaginatedData(t, body, 1, 1, 2, 2)
+	require.Len(t, clients, 1)
+	assert.Equal(t, "Alpha Duct", clients[0].(map[string]any)["name"])
+
+	outOfRange := helpers.AuthGetJSON(t, url("/clients")+"?search=duct&sort_by=name&sort_order=asc&page=99&page_size=1", token)
+	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
+	outOfRangeBody := helpers.ParseBody(t, outOfRange)
+	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))
+}
+
+func TestE2E_ListClients_InvalidListParameters_Return400(t *testing.T) {
+	clean(t)
+	_, token := createUserForClients(t, "Juan", "juan@example.com")
+
+	resp := helpers.AuthGetJSON(t, url("/clients")+"?sort_by=password_hash", token)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	invalidOrder := helpers.AuthGetJSON(t, url("/clients")+"?sort_order=sideways", token)
+	defer invalidOrder.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, invalidOrder.StatusCode)
+
+	nulSearch := helpers.AuthGetJSON(t, url("/clients")+"?search=%00", token)
+	defer nulSearch.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, nulSearch.StatusCode)
+}
+
 func TestE2E_ListClients_Empty(t *testing.T) {
 	clean(t)
 	_, token := createUserForClients(t, "Juan", "juan@example.com")

@@ -181,6 +181,10 @@ Content-Type: application/json
 GET {{baseUrl}}/clients
 Authorization: Bearer {{token}}
 
+### List clients — search, sort and pagination
+GET {{baseUrl}}/clients?search=client&sort_by=name&sort_order=asc&page=1&page_size=10
+Authorization: Bearer {{token}}
+
 ### Get a client by ID (replace with actual UUID)
 GET {{baseUrl}}/clients/{{client_id}}
 Authorization: Bearer {{token}}
@@ -282,6 +286,10 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/clients/{{client_id}}/projects?page=2&page_size=5
 Authorization: Bearer {{token}}
 
+### List projects — search and sort
+GET {{baseUrl}}/clients/{{client_id}}/projects?search=tower&sort_by=manager_name&sort_order=asc
+Authorization: Bearer {{token}}
+
 ### Get a project by ID
 GET {{baseUrl}}/projects/{{project_id}}
 Authorization: Bearer {{token}}
@@ -381,6 +389,10 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/projects/{{project_id}}/orders?page=2&page_size=5
 Authorization: Bearer {{token}}
 
+### List pending orders — search and sort
+GET {{baseUrl}}/projects/{{project_id}}/orders?status=pending&search=steel&sort_by=title&sort_order=asc
+Authorization: Bearer {{token}}
+
 ### Get an order by ID
 GET {{baseUrl}}/orders/{{order_id}}
 Authorization: Bearer {{token}}
@@ -441,4 +453,20 @@ Content-Type: application/json
 
 ### Get order — invalid UUID → 400
 GET {{baseUrl}}/projects/{{project_id}}/orders/not-a-uuid
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# PIECE DEFINITIONS — LIST QUERIES (protected)
+# =============================================================================
+
+### List piece definitions — search, exact filter and sort
+GET {{baseUrl}}/piece-definitions?search=rect&predefined=true&sort_by=name&sort_order=asc&page=1&page_size=10
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# PIECES — LIST QUERIES (protected)
+# =============================================================================
+
+### List pieces — definition filter, search and sort
+GET {{baseUrl}}/orders/{{order_id}}/pieces?definition_id={{piece_definition_id}}&search=panel&sort_by=quantity&sort_order=desc&page=1&page_size=10
 Authorization: Bearer {{token}}

@@ -5,11 +5,16 @@ import (
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var projectSortFields = map[string]struct{}{
+	"name": {}, "address": {}, "manager_name": {}, "created_at": {}, "updated_at": {},
+}
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
@@ -44,7 +49,7 @@ type ListProjectResponse struct {
 	Page       int                `json:"page"`
 	PageSize   int                `json:"page_size"`
 	TotalItems int64              `json:"total_items"`
-	TotalPages int                `json:"total_pages"`
+	TotalPages int64              `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -105,13 +110,15 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		return
 	}
 
-	pg, err := parsePagination(c)
+	base, err := parseBaseListQuery(c, projectSortFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := h.projectService.ListProjectsByClientID(c.Request.Context(), clientID, userID, pg)
+	result, err := h.projectService.ListProjectsByClientID(
+		c.Request.Context(), clientID, userID, query.ProjectListQuery{ListQuery: base},
+	)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -77,19 +77,19 @@ func (s *orderService) ListOrdersByProjectID(
 	ctx context.Context,
 	projectID uuid.UUID,
 	userID uuid.UUID,
-	pg pagination.Pagination,
-) (pagination.Result[*entities.Order], error) {
+	opts query.OrderListQuery,
+) (query.PaginatedResult[*entities.Order], error) {
 	_, err := s.projectRepo.GetByIDForOwner(ctx, projectID, userID)
 	if err != nil {
-		return pagination.Result[*entities.Order]{}, err
+		return query.PaginatedResult[*entities.Order]{}, err
 	}
 
-	orders, totalItems, err := s.orderRepo.ListByProjectID(ctx, projectID, pg)
+	orders, totalItems, err := s.orderRepo.ListByProjectID(ctx, projectID, opts)
 	if err != nil {
-		return pagination.Result[*entities.Order]{}, err
+		return query.PaginatedResult[*entities.Order]{}, err
 	}
 
-	return pagination.NewResult(orders, pg, totalItems), nil
+	return query.NewPaginatedResult(orders, opts.Page, totalItems), nil
 }
 
 // UpdateOrder applies a partial update to an existing order.

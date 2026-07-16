@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -92,19 +92,19 @@ func (s *pieceService) ListPiecesByOrderID(
 	ctx context.Context,
 	orderID uuid.UUID,
 	userID uuid.UUID,
-	pg pagination.Pagination,
-) (pagination.Result[*entities.Piece], error) {
+	opts query.PieceListQuery,
+) (query.PaginatedResult[*entities.Piece], error) {
 	_, err := s.orderRepo.GetByIDForOwner(ctx, orderID, userID)
 	if err != nil {
-		return pagination.Result[*entities.Piece]{}, err
+		return query.PaginatedResult[*entities.Piece]{}, err
 	}
 
-	pieces, totalItems, err := s.pieceRepo.ListByOrderID(ctx, orderID, pg)
+	pieces, totalItems, err := s.pieceRepo.ListByOrderID(ctx, orderID, opts)
 	if err != nil {
-		return pagination.Result[*entities.Piece]{}, err
+		return query.PaginatedResult[*entities.Piece]{}, err
 	}
 
-	return pagination.NewResult(pieces, pg, totalItems), nil
+	return query.NewPaginatedResult(pieces, opts.Page, totalItems), nil
 }
 
 // UpdatePiece applies a partial update to an existing piece.

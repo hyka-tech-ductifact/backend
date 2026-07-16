@@ -2,16 +2,19 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var clientSortFields = map[string]struct{}{
+	"name": {}, "email": {}, "created_at": {}, "updated_at": {},
+}
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
@@ -43,7 +46,7 @@ type ListClientResponse struct {
 	Page       int               `json:"page"`
 	PageSize   int               `json:"page_size"`
 	TotalItems int64             `json:"total_items"`
-	TotalPages int               `json:"total_pages"`
+	TotalPages int64             `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -91,13 +94,13 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		return
 	}
 
-	pg, err := parsePagination(c)
+	base, err := parseBaseListQuery(c, clientSortFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := h.clientService.ListClientsByUserID(c.Request.Context(), userID, pg)
+	result, err := h.clientService.ListClientsByUserID(c.Request.Context(), userID, query.ClientListQuery{ListQuery: base})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
@@ -115,14 +118,6 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		TotalItems: result.TotalItems,
 		TotalPages: result.TotalPages,
 	})
-}
-
-// parsePagination extracts page and page_size from query params
-// and returns a validation error if values are out of range.
-func parsePagination(c *gin.Context) (pagination.Pagination, error) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	return pagination.NewPagination(page, pageSize)
 }
 
 // GetClient handles GET /clients/:client_id

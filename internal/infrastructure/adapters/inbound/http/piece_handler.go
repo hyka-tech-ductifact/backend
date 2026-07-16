@@ -2,14 +2,20 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var pieceSortFields = map[string]struct{}{
+	"title": {}, "quantity": {}, "created_at": {}, "updated_at": {},
+}
 
 // --- DTOs (HTTP-specific, not domain objects) ---
 
@@ -40,7 +46,7 @@ type ListPieceResponse struct {
 	Page       int              `json:"page"`
 	PageSize   int              `json:"page_size"`
 	TotalItems int64            `json:"total_items"`
-	TotalPages int              `json:"total_pages"`
+	TotalPages int64            `json:"total_pages"`
 }
 
 // --- Handler ---
@@ -106,13 +112,23 @@ func (h *PieceHandler) ListPieces(c *gin.Context) {
 		return
 	}
 
-	pg, err := parsePagination(c)
+	base, err := parseBaseListQuery(c, pieceSortFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := h.pieceService.ListPiecesByOrderID(c.Request.Context(), orderID, userID, pg)
+	opts := query.PieceListQuery{ListQuery: base}
+	if rawDefinitionID, exists := c.GetQuery("definition_id"); exists {
+		definitionID, err := uuid.Parse(rawDefinitionID)
+		if err != nil || !strings.EqualFold(definitionID.String(), rawDefinitionID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "definition_id must be a valid UUID"})
+			return
+		}
+		opts.DefinitionID = &definitionID
+	}
+
+	result, err := h.pieceService.ListPiecesByOrderID(c.Request.Context(), orderID, userID, opts)
 	if err != nil {
 		helpers.HandleError(c, err)
 		return

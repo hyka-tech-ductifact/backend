@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,8 +18,8 @@ type ProjectService interface {
 		ctx context.Context,
 		clientID uuid.UUID,
 		userID uuid.UUID,
-		pg pagination.Pagination,
-	) (pagination.Result[*entities.Project], error)
+		opts query.ProjectListQuery,
+	) (query.PaginatedResult[*entities.Project], error)
 	UpdateProject(
 		ctx context.Context,
 		id uuid.UUID,

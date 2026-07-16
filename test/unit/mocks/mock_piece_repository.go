@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ type MockPieceRepository struct {
 	CreateFn              func(ctx context.Context, piece *entities.Piece) error
 	GetByIDFn             func(ctx context.Context, id uuid.UUID) (*entities.Piece, error)
 	GetByIDForOwnerFn     func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error)
-	ListByOrderIDFn       func(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error)
+	ListByOrderIDFn       func(ctx context.Context, orderID uuid.UUID, opts query.PieceListQuery) ([]*entities.Piece, int64, error)
 	CountByOrderIDFn      func(ctx context.Context, orderID uuid.UUID) (int64, error)
 	CountByDefinitionIDFn func(ctx context.Context, definitionID uuid.UUID) (int64, error)
 	UpdateFn              func(ctx context.Context, piece *entities.Piece) error
@@ -50,10 +50,10 @@ func (m *MockPieceRepository) GetByIDForOwner(
 func (m *MockPieceRepository) ListByOrderID(
 	ctx context.Context,
 	orderID uuid.UUID,
-	pg pagination.Pagination,
+	opts query.PieceListQuery,
 ) ([]*entities.Piece, int64, error) {
 	if m.ListByOrderIDFn != nil {
-		return m.ListByOrderIDFn(ctx, orderID, pg)
+		return m.ListByOrderIDFn(ctx, orderID, opts)
 	}
 	return nil, 0, nil
 }

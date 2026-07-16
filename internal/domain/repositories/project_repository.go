@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -18,7 +18,7 @@ type ProjectRepository interface {
 	ListByClientID(
 		ctx context.Context,
 		clientID uuid.UUID,
-		pg pagination.Pagination,
+		opts query.ProjectListQuery,
 	) ([]*entities.Project, int64, error)
 	CountByClientID(ctx context.Context, clientID uuid.UUID) (int64, error)
 	Update(ctx context.Context, project *entities.Project) error

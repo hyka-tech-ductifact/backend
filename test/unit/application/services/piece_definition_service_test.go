@@ -9,7 +9,7 @@ import (
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
@@ -140,19 +140,39 @@ func TestGetPieceDefinitionByID_NotFound_ReturnsError(t *testing.T) {
 
 func TestListPieceDefinitions_ReturnsDefs(t *testing.T) {
 	userID := uuid.New()
+	predefined := false
+	pg, _ := query.NewPageRequest(1, 10)
+	opts := query.PieceDefinitionListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "rect",
+			Sort: &query.Sort{
+				Field:     "archived_at",
+				Direction: query.SortDescending,
+			},
+		},
+		Predefined:      &predefined,
+		IncludeArchived: true,
+	}
 	expected := []*entities.PieceDefinition{
 		{ID: uuid.New(), Name: "Rect", DimensionSchema: []string{"Length"}},
 		{ID: uuid.New(), Name: "Circle", DimensionSchema: []string{"Radius"}},
 	}
 	repo := &mocks.MockPieceDefinitionRepository{
-		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, got query.PieceDefinitionListQuery) ([]*entities.PieceDefinition, int64, error) {
+			assert.Equal(t, userID, uID)
+			assert.Equal(t, opts.Search, got.Search)
+			assert.Equal(t, opts.Sort, got.Sort)
+			require.NotNil(t, got.Predefined)
+			assert.Equal(t, predefined, *got.Predefined)
+			assert.True(t, got.IncludeArchived)
+			assert.Equal(t, opts, got)
 			return expected, 2, nil
 		},
 	}
 	svc := newPieceDefService(repo)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPieceDefinitions(context.Background(), userID, false, pg)
+	result, err := svc.ListPieceDefinitions(context.Background(), userID, opts)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
@@ -161,14 +181,15 @@ func TestListPieceDefinitions_ReturnsDefs(t *testing.T) {
 
 func TestListPieceDefinitions_EmptyList(t *testing.T) {
 	repo := &mocks.MockPieceDefinitionRepository{
-		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, includeArchived bool, pg pagination.Pagination) ([]*entities.PieceDefinition, int64, error) {
+		ListByUserIDFn: func(ctx context.Context, uID uuid.UUID, opts query.PieceDefinitionListQuery) ([]*entities.PieceDefinition, int64, error) {
 			return []*entities.PieceDefinition{}, 0, nil
 		},
 	}
 	svc := newPieceDefService(repo)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPieceDefinitions(context.Background(), uuid.New(), false, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.PieceDefinitionListQuery{ListQuery: query.ListQuery{Page: pg}}
+	result, err := svc.ListPieceDefinitions(context.Background(), uuid.New(), opts)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)

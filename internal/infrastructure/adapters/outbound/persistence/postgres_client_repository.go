@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	domainquery "ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -95,24 +95,31 @@ func (r *PostgresClientRepository) diagnoseClientFailure(ctx context.Context, id
 func (r *PostgresClientRepository) ListByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
-	pg pagination.Pagination,
+	opts domainquery.ClientListQuery,
 ) ([]*entities.Client, int64, error) {
-	var totalItems int64
+	query := r.db.WithContext(ctx).Model(&ClientModel{}).Where("user_id = ?", userID)
+	query = applyLiteralSearch(
+		query,
+		opts.Search,
+		`(name ILIKE ? ESCAPE E'\\' OR email ILIKE ? ESCAPE E'\\')`,
+		2,
+	)
 
-	// Count total matching rows (before pagination)
-	if err := r.db.WithContext(ctx).Model(&ClientModel{}).Where("user_id = ?", userID).Count(&totalItems).Error; err != nil {
+	var totalItems int64
+	if err := query.Session(&gorm.Session{}).Count(&totalItems).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch the requested page
-	var models []ClientModel
-	err := r.db.WithContext(ctx).
-		Where("user_id = ?", userID).
-		Order("created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
+	ordered, err := applyClientOrder(query.Session(&gorm.Session{}), opts.Sort)
 	if err != nil {
+		return nil, 0, err
+	}
+	if pageStartsAfterResults(opts.Page, totalItems) {
+		return []*entities.Client{}, totalItems, nil
+	}
+
+	var models []ClientModel
+	if err := applyPagination(ordered, opts.Page).Find(&models).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -121,6 +128,27 @@ func (r *PostgresClientRepository) ListByUserID(
 		clients[i] = toClientEntity(&models[i])
 	}
 	return clients, totalItems, nil
+}
+
+func applyClientOrder(query *gorm.DB, sortOption *domainquery.Sort) (*gorm.DB, error) {
+	if sortOption == nil {
+		return applyStableOrder(query, "created_at", domainquery.SortDescending)
+	}
+
+	var column string
+	switch sortOption.Field {
+	case "name":
+		column = "name"
+	case "email":
+		column = "email"
+	case "created_at":
+		column = "created_at"
+	case "updated_at":
+		column = "updated_at"
+	default:
+		return nil, errors.New("invalid client sort field")
+	}
+	return applyStableOrder(query, column, sortOption.Direction)
 }
 
 func (r *PostgresClientRepository) Update(ctx context.Context, client *entities.Client) error {

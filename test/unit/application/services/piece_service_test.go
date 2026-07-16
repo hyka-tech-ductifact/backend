@@ -8,7 +8,7 @@ import (
 
 	"ductifact/internal/application/services"
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 	"ductifact/test/unit/mocks"
 
@@ -245,12 +245,31 @@ func TestGetPieceByID_WithNotOwned_ReturnsError(t *testing.T) {
 func TestListPiecesByOrderID_ReturnsPieces(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
+	definitionID := uuid.New()
+	pg, _ := query.NewPageRequest(1, 10)
+	opts := query.PieceListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "panel",
+			Sort: &query.Sort{
+				Field:     "quantity",
+				Direction: query.SortAscending,
+			},
+		},
+		DefinitionID: &definitionID,
+	}
 	expected := []*entities.Piece{
 		{ID: uuid.New(), Title: "Panel A", OrderID: order.ID},
 		{ID: uuid.New(), Title: "Panel B", OrderID: order.ID},
 	}
 	pieceRepo := &mocks.MockPieceRepository{
-		ListByOrderIDFn: func(ctx context.Context, oID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {
+		ListByOrderIDFn: func(ctx context.Context, oID uuid.UUID, got query.PieceListQuery) ([]*entities.Piece, int64, error) {
+			assert.Equal(t, order.ID, oID)
+			assert.Equal(t, opts.Search, got.Search)
+			assert.Equal(t, opts.Sort, got.Sort)
+			require.NotNil(t, got.DefinitionID)
+			assert.Equal(t, definitionID, *got.DefinitionID)
+			assert.Equal(t, opts, got)
 			return expected, 2, nil
 		},
 	}
@@ -260,8 +279,7 @@ func TestListPiecesByOrderID_ReturnsPieces(t *testing.T) {
 		orderRepoReturning(order),
 	)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPiecesByOrderID(context.Background(), order.ID, userID, pg)
+	result, err := svc.ListPiecesByOrderID(context.Background(), order.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Data, 2)
@@ -272,7 +290,7 @@ func TestListPiecesByOrderID_EmptyList(t *testing.T) {
 	userID := uuid.New()
 	order := newTestOrder(uuid.New())
 	pieceRepo := &mocks.MockPieceRepository{
-		ListByOrderIDFn: func(ctx context.Context, oID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error) {
+		ListByOrderIDFn: func(ctx context.Context, oID uuid.UUID, opts query.PieceListQuery) ([]*entities.Piece, int64, error) {
 			return []*entities.Piece{}, 0, nil
 		},
 	}
@@ -282,8 +300,9 @@ func TestListPiecesByOrderID_EmptyList(t *testing.T) {
 		orderRepoReturning(order),
 	)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	result, err := svc.ListPiecesByOrderID(context.Background(), order.ID, userID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.PieceListQuery{ListQuery: query.ListQuery{Page: pg}}
+	result, err := svc.ListPiecesByOrderID(context.Background(), order.ID, userID, opts)
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Data)
@@ -303,8 +322,9 @@ func TestListPiecesByOrderID_WithWrongUser_ReturnsError(t *testing.T) {
 		orderRepo,
 	)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	_, err := svc.ListPiecesByOrderID(context.Background(), uuid.New(), uuid.New(), pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	opts := query.PieceListQuery{ListQuery: query.ListQuery{Page: pg}}
+	_, err := svc.ListPiecesByOrderID(context.Background(), uuid.New(), uuid.New(), opts)
 
 	assert.ErrorIs(t, err, repositories.ErrOrderNotOwned)
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func pieceDefinitionListQuery(pg query.PageRequest, includeArchived bool) query.PieceDefinitionListQuery {
+	return query.PieceDefinitionListQuery{
+		ListQuery:     query.ListQuery{Page: pg},
+		IncludeArchived: includeArchived,
+	}
+}
 
 // setupPieceDefRepo creates piece definition and user repos with a clean DB.
 func setupPieceDefRepo(t *testing.T) (
@@ -87,11 +94,60 @@ func TestPostgresPieceDefRepository_ListByUserID(t *testing.T) {
 	createTestPieceDef(t, defRepo, user.ID)
 	createTestPieceDef(t, defRepo, user.ID)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pieceDefinitionListQuery(pg, false))
 	require.NoError(t, err)
 	assert.Len(t, defs, 2)
 	assert.Equal(t, int64(2), total)
+}
+
+func TestPostgresPieceDefRepository_ListByUserID_SearchFiltersSortAndPagination(t *testing.T) {
+	defRepo, userRepo := setupPieceDefRepo(t)
+	ctx := context.Background()
+	user := createTestUser(t, userRepo)
+
+	alpha, err := entities.NewPieceDefinition(entities.CreatePieceDefParams{
+		Name: "Alpha Panel", DimensionSchema: []string{"Length"}, UserID: user.ID,
+	})
+	require.NoError(t, err)
+	beta, err := entities.NewPieceDefinition(entities.CreatePieceDefParams{
+		Name: "Beta Panel", DimensionSchema: []string{"Width"}, UserID: user.ID,
+	})
+	require.NoError(t, err)
+	other, err := entities.NewPieceDefinition(entities.CreatePieceDefParams{
+		Name: "Unrelated", DimensionSchema: []string{"Radius"}, UserID: user.ID,
+	})
+	require.NoError(t, err)
+	for _, definition := range []*entities.PieceDefinition{alpha, beta, other} {
+		require.NoError(t, defRepo.Create(ctx, definition))
+	}
+	require.NoError(t, defRepo.Archive(ctx, alpha.ID))
+
+	predefined := false
+	pg, _ := query.NewPageRequest(1, 1)
+	opts := query.PieceDefinitionListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "panel",
+			Sort:   &query.Sort{Field: "name", Direction: query.SortAscending},
+		},
+		Predefined:      &predefined,
+		IncludeArchived: true,
+	}
+	firstPage, total, err := defRepo.ListByUserID(ctx, user.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Alpha Panel", firstPage[0].Name)
+	assert.NotNil(t, firstPage[0].ArchivedAt)
+
+	pg, _ = query.NewPageRequest(2, 1)
+	opts.Page = pg
+	secondPage, total, err := defRepo.ListByUserID(ctx, user.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Beta Panel", secondPage[0].Name)
 }
 
 func TestPostgresPieceDefRepository_ListByUserID_Empty(t *testing.T) {
@@ -100,8 +156,8 @@ func TestPostgresPieceDefRepository_ListByUserID_Empty(t *testing.T) {
 
 	user := createTestUser(t, userRepo)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pieceDefinitionListQuery(pg, false))
 	require.NoError(t, err)
 	assert.Empty(t, defs)
 	assert.Equal(t, int64(0), total)
@@ -116,8 +172,8 @@ func TestPostgresPieceDefRepository_ListByUserID_DoesNotReturnOtherUsersCustomDe
 	createTestPieceDef(t, defRepo, user1.ID)
 	createTestPieceDef(t, defRepo, user2.ID)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user1.ID, false, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user1.ID, pieceDefinitionListQuery(pg, false))
 	require.NoError(t, err)
 	assert.Len(t, defs, 1)
 	assert.Equal(t, int64(1), total)
@@ -261,8 +317,8 @@ func TestPostgresPieceDefRepository_ListByUserID_ExcludesArchivedByDefault(t *te
 
 	require.NoError(t, defRepo.Archive(ctx, archivedDef.ID))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, false, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pieceDefinitionListQuery(pg, false))
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(1), total)
@@ -280,8 +336,8 @@ func TestPostgresPieceDefRepository_ListByUserID_IncludesArchivedWhenRequested(t
 
 	require.NoError(t, defRepo.Archive(ctx, archivedDef.ID))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	defs, total, err := defRepo.ListByUserID(ctx, user.ID, true, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	defs, total, err := defRepo.ListByUserID(ctx, user.ID, pieceDefinitionListQuery(pg, true))
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(2), total)

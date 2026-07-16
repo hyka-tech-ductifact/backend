@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func pieceListQuery(pg query.PageRequest) query.PieceListQuery {
+	return query.PieceListQuery{ListQuery: query.ListQuery{Page: pg}}
+}
 
 // setupPieceRepo creates all repos needed for piece persistence tests.
 func setupPieceRepo(t *testing.T) (
@@ -112,11 +116,55 @@ func TestPostgresPieceRepository_ListByOrderID(t *testing.T) {
 	require.NoError(t, pieceRepo.Create(ctx, p1))
 	require.NoError(t, pieceRepo.Create(ctx, p2))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	pieces, total, err := pieceRepo.ListByOrderID(ctx, order.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	pieces, total, err := pieceRepo.ListByOrderID(ctx, order.ID, pieceListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, pieces, 2)
 	assert.Equal(t, int64(2), total)
+}
+
+func TestPostgresPieceRepository_ListByOrderID_SearchDefinitionSortAndPagination(t *testing.T) {
+	pieceRepo, defRepo, orderRepo, projectRepo, clientRepo, userRepo := setupPieceRepo(t)
+	ctx := context.Background()
+	user, order := createTestOrderForPiece(t, userRepo, clientRepo, projectRepo, orderRepo)
+	definition := createTestPieceDef(t, defRepo, user.ID)
+	otherDefinition := createTestPieceDef(t, defRepo, user.ID)
+
+	pieces := []entities.CreatePieceParams{
+		{Title: "Beta Panel", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 100, "Width": 50}, Quantity: 2},
+		{Title: "Alpha Panel", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 200, "Width": 100}, Quantity: 5},
+		{Title: "Other Panel", OrderID: order.ID, DefinitionID: otherDefinition.ID, Dimensions: map[string]float64{"Length": 50, "Width": 25}, Quantity: 9},
+		{Title: "Unrelated", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 75, "Width": 25}, Quantity: 8},
+	}
+	for _, params := range pieces {
+		piece, err := entities.NewPiece(params)
+		require.NoError(t, err)
+		require.NoError(t, pieceRepo.Create(ctx, piece))
+	}
+
+	pg, _ := query.NewPageRequest(1, 1)
+	opts := query.PieceListQuery{
+		ListQuery: query.ListQuery{
+			Page:   pg,
+			Search: "panel",
+			Sort:   &query.Sort{Field: "quantity", Direction: query.SortDescending},
+		},
+		DefinitionID: &definition.ID,
+	}
+	firstPage, total, err := pieceRepo.ListByOrderID(ctx, order.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Alpha Panel", firstPage[0].Title)
+	assert.Equal(t, 5, firstPage[0].Quantity)
+
+	pg, _ = query.NewPageRequest(2, 1)
+	opts.Page = pg
+	secondPage, total, err := pieceRepo.ListByOrderID(ctx, order.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, int64(2), total)
+	assert.Equal(t, "Beta Panel", secondPage[0].Title)
 }
 
 func TestPostgresPieceRepository_ListByOrderID_Empty(t *testing.T) {
@@ -125,8 +173,8 @@ func TestPostgresPieceRepository_ListByOrderID_Empty(t *testing.T) {
 
 	_, order := createTestOrderForPiece(t, userRepo, clientRepo, projectRepo, orderRepo)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	pieces, total, err := pieceRepo.ListByOrderID(ctx, order.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	pieces, total, err := pieceRepo.ListByOrderID(ctx, order.ID, pieceListQuery(pg))
 	require.NoError(t, err)
 	assert.Empty(t, pieces)
 	assert.Equal(t, int64(0), total)
@@ -151,14 +199,14 @@ func TestPostgresPieceRepository_ListByOrderID_DoesNotReturnOtherOrdersPieces(t 
 	require.NoError(t, pieceRepo.Create(ctx, pA))
 	require.NoError(t, pieceRepo.Create(ctx, pB))
 
-	pg, _ := pagination.NewPagination(1, 20)
+	pg, _ := query.NewPageRequest(1, 20)
 
-	pieces1, _, err := pieceRepo.ListByOrderID(ctx, order1.ID, pg)
+	pieces1, _, err := pieceRepo.ListByOrderID(ctx, order1.ID, pieceListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, pieces1, 1)
 	assert.Equal(t, order1.ID, pieces1[0].OrderID)
 
-	pieces2, _, err := pieceRepo.ListByOrderID(ctx, order2.ID, pg)
+	pieces2, _, err := pieceRepo.ListByOrderID(ctx, order2.ID, pieceListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, pieces2, 1)
 	assert.Equal(t, order2.ID, pieces2[0].OrderID)

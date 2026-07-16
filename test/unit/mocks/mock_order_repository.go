@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ type MockOrderRepository struct {
 	CreateFn           func(ctx context.Context, order *entities.Order) error
 	GetByIDFn          func(ctx context.Context, id uuid.UUID) (*entities.Order, error)
 	GetByIDForOwnerFn  func(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Order, error)
-	ListByProjectIDFn  func(ctx context.Context, projectID uuid.UUID, pg pagination.Pagination) ([]*entities.Order, int64, error)
+	ListByProjectIDFn  func(ctx context.Context, projectID uuid.UUID, opts query.OrderListQuery) ([]*entities.Order, int64, error)
 	CountByProjectIDFn func(ctx context.Context, projectID uuid.UUID) (int64, error)
 	UpdateFn           func(ctx context.Context, order *entities.Order) error
 	DeleteFn           func(ctx context.Context, id uuid.UUID) error
@@ -49,10 +49,10 @@ func (m *MockOrderRepository) GetByIDForOwner(
 func (m *MockOrderRepository) ListByProjectID(
 	ctx context.Context,
 	projectID uuid.UUID,
-	pg pagination.Pagination,
+	opts query.OrderListQuery,
 ) ([]*entities.Order, int64, error) {
 	if m.ListByProjectIDFn != nil {
-		return m.ListByProjectIDFn(ctx, projectID, pg)
+		return m.ListByProjectIDFn(ctx, projectID, opts)
 	}
 	return nil, 0, nil
 }

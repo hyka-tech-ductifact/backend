@@ -151,6 +151,47 @@ func TestE2E_ListOrders_Success(t *testing.T) {
 	assert.Len(t, orders, 2)
 }
 
+func TestE2E_ListOrders_SearchStatusSortAndPagination(t *testing.T) {
+	clean(t)
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+
+	orders := []map[string]string{
+		{"title": "Beta Duct", "status": "completed"},
+		{"title": "Alpha Duct", "status": "completed"},
+		{"title": "Gamma Duct", "status": "pending"},
+		{"title": "Unrelated", "status": "completed"},
+	}
+	for _, order := range orders {
+		resp := helpers.AuthPostJSON(t, orderURL(projectID), token, order)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+
+	listURL := orderURL(projectID) + "?search=duct&status=completed&sort_by=title&sort_order=asc&page=1&page_size=1"
+	resp := helpers.AuthGetJSON(t, listURL, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	data := requirePaginatedData(t, body, 1, 1, 2, 2)
+	require.Len(t, data, 1)
+	assert.Equal(t, "Alpha Duct", data[0].(map[string]any)["title"])
+	assert.Equal(t, "completed", data[0].(map[string]any)["status"])
+
+	outOfRange := helpers.AuthGetJSON(t, orderURL(projectID)+"?search=duct&status=completed&sort_by=title&sort_order=asc&page=99&page_size=1", token)
+	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
+	outOfRangeBody := helpers.ParseBody(t, outOfRange)
+	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))
+}
+
+func TestE2E_ListOrders_InvalidStatusFilter_Returns400(t *testing.T) {
+	clean(t)
+	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")
+
+	resp := helpers.AuthGetJSON(t, orderURL(projectID)+"?status=unknown", token)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
 func TestE2E_ListOrders_Empty(t *testing.T) {
 	clean(t)
 	_, _, projectID, token := createUserClientAndProject(t, "Juan", "juan@example.com", "Acme Corp", "Tower B")

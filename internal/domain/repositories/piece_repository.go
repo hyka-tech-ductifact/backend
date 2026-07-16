@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ type PieceRepository interface {
 	Create(ctx context.Context, piece *entities.Piece) error
 	GetByID(ctx context.Context, id uuid.UUID) (*entities.Piece, error)
 	GetByIDForOwner(ctx context.Context, id uuid.UUID, ownerID uuid.UUID) (*entities.Piece, error)
-	ListByOrderID(ctx context.Context, orderID uuid.UUID, pg pagination.Pagination) ([]*entities.Piece, int64, error)
+	ListByOrderID(ctx context.Context, orderID uuid.UUID, opts query.PieceListQuery) ([]*entities.Piece, int64, error)
 	CountByOrderID(ctx context.Context, orderID uuid.UUID) (int64, error)
 	CountByDefinitionID(ctx context.Context, definitionID uuid.UUID) (int64, error)
 	Update(ctx context.Context, piece *entities.Piece) error

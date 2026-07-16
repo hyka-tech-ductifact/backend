@@ -76,6 +76,31 @@ Infrastructure endpoints (`/healthz`, `/readyz`, `/metrics`, `/docs`) are at the
 | PUT | `/clients/:client_id` | Yes | Update client |
 | DELETE | `/clients/:client_id` | Yes | Delete client |
 
+### List query convention
+
+The five collection endpoints use the same optional query parameters:
+
+- `page` is 1-based and defaults to `1`.
+- `page_size` defaults to `20` and accepts values from `1` to `100`.
+- `search` accepts up to 200 characters and performs a case-insensitive literal
+  partial match. Surrounding whitespace is ignored; `\\`, `%`, and `_` are
+  treated literally.
+- `sort_by` selects an allowed field for the endpoint. When it is present,
+  `sort_order` accepts `asc` or `desc` and defaults to `asc`.
+- Without `sort_by`, the existing order is preserved: `created_at desc` for
+  clients, projects, orders, and pieces; `predefined desc, created_at desc` for
+  piece definitions. `sort_order` does not change this default by itself.
+
+| Endpoint | `search` fields | Exact filters | Allowed `sort_by` fields |
+|----------|-----------------|---------------|--------------------------|
+| `GET /clients` | `name`, `email` | — | `name`, `email`, `created_at`, `updated_at` |
+| `GET /clients/:client_id/projects` | `name`, `address`, `manager_name` | — | `name`, `address`, `manager_name`, `created_at`, `updated_at` |
+| `GET /projects/:project_id/orders` | `title` | `status=pending\|completed` | `title`, `status`, `created_at`, `updated_at` |
+| `GET /orders/:order_id/pieces` | `title` | `definition_id=<uuid>` | `title`, `quantity`, `created_at`, `updated_at` |
+| `GET /piece-definitions` | `name` | `predefined=true\|false`, `include_archived=true\|false` (default `false`) | `name`, `predefined`, `created_at`, `updated_at`, `archived_at` |
+
+Invalid pagination, filtering, search, or sorting parameters return `400 Bad Request`.
+
 See [test/api.http](test/api.http) for request examples.
 
 ## Other commands

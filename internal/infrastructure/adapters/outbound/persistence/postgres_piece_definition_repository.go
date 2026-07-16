@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	domainquery "ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -111,29 +111,34 @@ func (r *PostgresPieceDefinitionRepository) diagnosePieceDefFailure(
 func (r *PostgresPieceDefinitionRepository) ListByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
-	includeArchived bool,
-	pg pagination.Pagination,
+	opts domainquery.PieceDefinitionListQuery,
 ) ([]*entities.PieceDefinition, int64, error) {
-	var totalItems int64
-
 	query := r.db.WithContext(ctx).Model(&PieceDefinitionModel{}).
 		Where("predefined = ? OR user_id = ?", true, userID)
 
-	if !includeArchived {
+	if !opts.IncludeArchived {
 		query = query.Where("archived_at IS NULL")
 	}
+	if opts.Predefined != nil {
+		query = query.Where("predefined = ?", *opts.Predefined)
+	}
+	query = applyLiteralSearch(query, opts.Search, `(name ILIKE ? ESCAPE E'\\')`, 1)
 
-	if err := query.Count(&totalItems).Error; err != nil {
+	var totalItems int64
+	if err := query.Session(&gorm.Session{}).Count(&totalItems).Error; err != nil {
 		return nil, 0, err
 	}
 
-	var models []PieceDefinitionModel
-	err := query.
-		Order("predefined DESC, created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
+	ordered, err := applyPieceDefinitionOrder(query.Session(&gorm.Session{}), opts.Sort)
 	if err != nil {
+		return nil, 0, err
+	}
+	if pageStartsAfterResults(opts.Page, totalItems) {
+		return []*entities.PieceDefinition{}, totalItems, nil
+	}
+
+	var models []PieceDefinitionModel
+	if err := applyPagination(ordered, opts.Page).Find(&models).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -146,6 +151,29 @@ func (r *PostgresPieceDefinitionRepository) ListByUserID(
 		defs = append(defs, def)
 	}
 	return defs, totalItems, nil
+}
+
+func applyPieceDefinitionOrder(query *gorm.DB, sortOption *domainquery.Sort) (*gorm.DB, error) {
+	if sortOption == nil {
+		return applyDefaultPieceDefinitionOrder(query), nil
+	}
+
+	var column string
+	switch sortOption.Field {
+	case "name":
+		column = "name"
+	case "predefined":
+		column = "predefined"
+	case "created_at":
+		column = "created_at"
+	case "updated_at":
+		column = "updated_at"
+	case "archived_at":
+		column = "archived_at"
+	default:
+		return nil, errors.New("invalid piece definition sort field")
+	}
+	return applyStableOrder(query, column, sortOption.Direction)
 }
 
 func (r *PostgresPieceDefinitionRepository) Update(ctx context.Context, def *entities.PieceDefinition) error {
