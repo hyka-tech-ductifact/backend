@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	domainquery "ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -107,24 +107,31 @@ func (r *PostgresProjectRepository) diagnoseProjectFailure(ctx context.Context, 
 func (r *PostgresProjectRepository) ListByClientID(
 	ctx context.Context,
 	clientID uuid.UUID,
-	pg pagination.Pagination,
+	opts domainquery.ProjectListQuery,
 ) ([]*entities.Project, int64, error) {
-	var totalItems int64
+	query := r.db.WithContext(ctx).Model(&ProjectModel{}).Where("client_id = ?", clientID)
+	query = applyLiteralSearch(
+		query,
+		opts.Search,
+		`(name ILIKE ? ESCAPE E'\\' OR address ILIKE ? ESCAPE E'\\' OR manager_name ILIKE ? ESCAPE E'\\')`,
+		3,
+	)
 
-	// Count total matching rows (before pagination)
-	if err := r.db.WithContext(ctx).Model(&ProjectModel{}).Where("client_id = ?", clientID).Count(&totalItems).Error; err != nil {
+	var totalItems int64
+	if err := query.Session(&gorm.Session{}).Count(&totalItems).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch the requested page
-	var models []ProjectModel
-	err := r.db.WithContext(ctx).
-		Where("client_id = ?", clientID).
-		Order("created_at DESC").
-		Offset((pg.Page - 1) * pg.PageSize).
-		Limit(pg.PageSize).
-		Find(&models).Error
+	ordered, err := applyProjectOrder(query.Session(&gorm.Session{}), opts.Sort)
 	if err != nil {
+		return nil, 0, err
+	}
+	if pageStartsAfterResults(opts.Page, totalItems) {
+		return []*entities.Project{}, totalItems, nil
+	}
+
+	var models []ProjectModel
+	if err := applyPagination(ordered, opts.Page).Find(&models).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -133,6 +140,29 @@ func (r *PostgresProjectRepository) ListByClientID(
 		projects[i] = toProjectEntity(&models[i])
 	}
 	return projects, totalItems, nil
+}
+
+func applyProjectOrder(query *gorm.DB, sortOption *domainquery.Sort) (*gorm.DB, error) {
+	if sortOption == nil {
+		return applyStableOrder(query, "created_at", domainquery.SortDescending)
+	}
+
+	var column string
+	switch sortOption.Field {
+	case "name":
+		column = "name"
+	case "address":
+		column = "address"
+	case "manager_name":
+		column = "manager_name"
+	case "created_at":
+		column = "created_at"
+	case "updated_at":
+		column = "updated_at"
+	default:
+		return nil, errors.New("invalid project sort field")
+	}
+	return applyStableOrder(query, column, sortOption.Direction)
 }
 
 func (r *PostgresProjectRepository) Update(ctx context.Context, project *entities.Project) error {

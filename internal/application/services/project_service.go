@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/domain/repositories"
 
 	"github.com/google/uuid"
@@ -81,19 +81,19 @@ func (s *projectService) ListProjectsByClientID(
 	ctx context.Context,
 	clientID uuid.UUID,
 	userID uuid.UUID,
-	pg pagination.Pagination,
-) (pagination.Result[*entities.Project], error) {
+	opts query.ProjectListQuery,
+) (query.PaginatedResult[*entities.Project], error) {
 	_, err := s.clientRepo.GetByIDForOwner(ctx, clientID, userID)
 	if err != nil {
-		return pagination.Result[*entities.Project]{}, err
+		return query.PaginatedResult[*entities.Project]{}, err
 	}
 
-	projects, totalItems, err := s.projectRepo.ListByClientID(ctx, clientID, pg)
+	projects, totalItems, err := s.projectRepo.ListByClientID(ctx, clientID, opts)
 	if err != nil {
-		return pagination.Result[*entities.Project]{}, err
+		return query.PaginatedResult[*entities.Project]{}, err
 	}
 
-	return pagination.NewResult(projects, pg, totalItems), nil
+	return query.NewPaginatedResult(projects, opts.Page, totalItems), nil
 }
 
 // UpdateProject applies a partial update to an existing project.

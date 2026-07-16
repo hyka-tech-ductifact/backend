@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
-	"ductifact/internal/domain/pagination"
+	"ductifact/internal/domain/query"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func projectListQuery(pg query.PageRequest) query.ProjectListQuery {
+	return query.ProjectListQuery{ListQuery: query.ListQuery{Page: pg}}
+}
 
 // setupProjectRepo creates client, user, and project repos with a clean DB.
 func setupProjectRepo(
@@ -99,11 +103,51 @@ func TestPostgresProjectRepository_ListByClientID(t *testing.T) {
 	require.NoError(t, projectRepo.Create(ctx, p1))
 	require.NoError(t, projectRepo.Create(ctx, p2))
 
-	pg, _ := pagination.NewPagination(1, 20)
-	projects, total, err := projectRepo.ListByClientID(ctx, client.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	projects, total, err := projectRepo.ListByClientID(ctx, client.ID, projectListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, projects, 2)
 	assert.Equal(t, int64(2), total)
+}
+
+func TestPostgresProjectRepository_ListByClientID_SearchSortAndPagination(t *testing.T) {
+	projectRepo, clientRepo, userRepo := setupProjectRepo(t)
+	ctx := context.Background()
+	user := createTestUser(t, userRepo)
+	client := createTestClient(t, clientRepo, user.ID)
+
+	projects := []entities.CreateProjectParams{
+		{Name: "Beta Tower", ClientID: client.ID},
+		{Name: "Alpha Job", Address: "Tower Street", ClientID: client.ID},
+		{Name: "Gamma Job", ManagerName: "Tower Lead", ClientID: client.ID},
+		{Name: "Unrelated", ClientID: client.ID},
+	}
+	for _, params := range projects {
+		project, err := entities.NewProject(params)
+		require.NoError(t, err)
+		require.NoError(t, projectRepo.Create(ctx, project))
+	}
+
+	pg, _ := query.NewPageRequest(1, 2)
+	opts := query.ProjectListQuery{ListQuery: query.ListQuery{
+		Page:   pg,
+		Search: "tower",
+		Sort:   &query.Sort{Field: "name", Direction: query.SortAscending},
+	}}
+	firstPage, total, err := projectRepo.ListByClientID(ctx, client.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 2)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, "Alpha Job", firstPage[0].Name)
+	assert.Equal(t, "Beta Tower", firstPage[1].Name)
+
+	pg, _ = query.NewPageRequest(2, 2)
+	opts.Page = pg
+	secondPage, total, err := projectRepo.ListByClientID(ctx, client.ID, opts)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, int64(3), total)
+	assert.Equal(t, "Gamma Job", secondPage[0].Name)
 }
 
 func TestPostgresProjectRepository_ListByClientID_Empty(t *testing.T) {
@@ -113,8 +157,8 @@ func TestPostgresProjectRepository_ListByClientID_Empty(t *testing.T) {
 	user := createTestUser(t, userRepo)
 	client := createTestClient(t, clientRepo, user.ID)
 
-	pg, _ := pagination.NewPagination(1, 20)
-	projects, total, err := projectRepo.ListByClientID(ctx, client.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	projects, total, err := projectRepo.ListByClientID(ctx, client.ID, projectListQuery(pg))
 	require.NoError(t, err)
 	assert.Empty(t, projects)
 	assert.Equal(t, int64(0), total)
@@ -134,14 +178,14 @@ func TestPostgresProjectRepository_ListByClientID_DoesNotReturnOtherClientsProje
 	require.NoError(t, projectRepo.Create(ctx, pB))
 
 	// Client 1 should only see their own project
-	pg, _ := pagination.NewPagination(1, 20)
-	projects1, _, err := projectRepo.ListByClientID(ctx, client1.ID, pg)
+	pg, _ := query.NewPageRequest(1, 20)
+	projects1, _, err := projectRepo.ListByClientID(ctx, client1.ID, projectListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, projects1, 1)
 	assert.Equal(t, client1.ID, projects1[0].ClientID)
 
 	// Client 2 should only see their own project
-	projects2, _, err := projectRepo.ListByClientID(ctx, client2.ID, pg)
+	projects2, _, err := projectRepo.ListByClientID(ctx, client2.ID, projectListQuery(pg))
 	require.NoError(t, err)
 	assert.Len(t, projects2, 1)
 	assert.Equal(t, client2.ID, projects2[0].ClientID)
