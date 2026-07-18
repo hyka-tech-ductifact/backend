@@ -117,6 +117,7 @@ func main() {
 	var loginThrottler ports.LoginThrottler
 	var ipLimiter ports.RateLimiter
 	var userLimiter ports.RateLimiter
+	var registrationNoticeLimiter ports.RateLimiter
 
 	if redisAvailable {
 		slog.Info("redis connected, using distributed adapters", "addr", cfg.Redis.Addr())
@@ -138,6 +139,11 @@ func main() {
 			redisClient,
 			cfg.RateLimit.UserMaxRequests,
 			cfg.RateLimit.UserWindow,
+		)
+		registrationNoticeLimiter = ratelimit.NewRedisRateLimiter(
+			redisClient,
+			1,
+			cfg.OTP.RegistrationTTL,
 		)
 	} else {
 		slog.Error("redis unavailable, degrading to in-memory adapters", "addr", cfg.Redis.Addr())
@@ -172,6 +178,14 @@ func main() {
 		)
 		defer memUserLimiter.Stop()
 		userLimiter = memUserLimiter
+
+		memRegistrationNoticeLimiter := ratelimit.NewMemoryRateLimiter(
+			1,
+			cfg.OTP.RegistrationTTL,
+			1*time.Minute,
+		)
+		defer memRegistrationNoticeLimiter.Stop()
+		registrationNoticeLimiter = memRegistrationNoticeLimiter
 	}
 
 	// --- One-time OTP repository ---
@@ -184,6 +198,7 @@ func main() {
 		blacklist,
 		loginThrottler,
 		emailSender,
+		registrationNoticeLimiter,
 		cfg.JWT.TokenDuration,
 		cfg.JWT.RefreshTokenDuration,
 		cfg.OTP.RegistrationTTL,

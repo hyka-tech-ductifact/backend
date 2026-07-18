@@ -12,6 +12,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const registrationStartedMessage = "if the email is available, a verification code has been sent"
+
 // seedOTP inserts a one-time OTP row with a known plaintext code and purpose,
 // so the OTP-based endpoints can be exercised end-to-end.
 func seedOTP(t *testing.T, email, purpose, code string) {
@@ -44,7 +46,8 @@ func TestE2E_StartRegistration_Success(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	resp.Body.Close()
+	body := helpers.ParseBody(t, resp)
+	assert.Equal(t, registrationStartedMessage, body["message"])
 
 	// An OTP row should have been created for the email.
 	var count int64
@@ -53,6 +56,27 @@ func TestE2E_StartRegistration_Success(t *testing.T) {
 		Error
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
+}
+
+func TestE2E_StartRegistration_ExistingUser_ReturnsSameResponseWithoutOTP(t *testing.T) {
+	clean(t)
+	registerUser(t, "Juan", "registered@example.com", "securepass123")
+
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+		"email": "registered@example.com",
+	})
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.Equal(t, registrationStartedMessage, body["message"])
+
+	var count int64
+	err := env.db.Raw(
+		"SELECT COUNT(*) FROM one_time_otps WHERE purpose = 'registration' AND email = ?",
+		"registered@example.com",
+	).Scan(&count).Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
 }
 
 func TestE2E_StartRegistration_InvalidEmail_Returns400(t *testing.T) {

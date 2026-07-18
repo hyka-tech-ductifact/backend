@@ -34,7 +34,7 @@ type Config struct {
 
 // OTP holds TTL configuration for one-time verification codes.
 type OTP struct {
-	RegistrationTTL  time.Duration // How long a registration verification code remains valid (e.g. "15m")
+	RegistrationTTL  time.Duration // Registration code TTL and account-exists email cooldown (e.g. "15m")
 	PasswordResetTTL time.Duration // How long a password reset verification code remains valid (e.g. "1h")
 }
 

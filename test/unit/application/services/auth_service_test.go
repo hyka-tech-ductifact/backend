@@ -28,6 +28,7 @@ func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenPr
 		&mocks.MockTokenBlacklist{},
 		&mocks.MockLoginThrottler{},
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -48,6 +49,7 @@ func newTestAuthServiceWithBlacklist(
 		blacklist,
 		&mocks.MockLoginThrottler{},
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -68,6 +70,7 @@ func newTestAuthServiceWithThrottler(
 		&mocks.MockTokenBlacklist{},
 		throttler,
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -83,6 +86,22 @@ func newTestAuthServiceForRegistration(
 	token *mocks.MockTokenProvider,
 	email *mocks.MockEmailSender,
 ) usecases.AuthService {
+	return newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo,
+		otpRepo,
+		token,
+		email,
+		&mocks.MockRateLimiter{},
+	)
+}
+
+func newTestAuthServiceForRegistrationWithNoticeLimiter(
+	userRepo *mocks.MockUserRepository,
+	otpRepo *mocks.MockOneTimeOTPRepository,
+	token *mocks.MockTokenProvider,
+	email *mocks.MockEmailSender,
+	registrationNoticeLimiter *mocks.MockRateLimiter,
+) usecases.AuthService {
 	return services.NewAuthService(
 		userRepo,
 		otpRepo,
@@ -90,6 +109,7 @@ func newTestAuthServiceForRegistration(
 		&mocks.MockTokenBlacklist{},
 		&mocks.MockLoginThrottler{},
 		email,
+		registrationNoticeLimiter,
 		15*time.Minute,
 		7*24*time.Hour,
 		15*time.Minute,
@@ -120,9 +140,9 @@ func TestStartRegistration_NewEmail_SavesOTPAndSendsEmail(t *testing.T) {
 	assert.Equal(t, "juan@example.com", email.Sent[0].To)
 }
 
-func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
+func TestStartRegistration_ExistingUser_SendsLocalizedNoticeWithoutOTPOrLink(t *testing.T) {
 	existing, _ := entities.NewUser(entities.CreateUserParams{
-		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "es",
 	})
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
@@ -131,13 +151,51 @@ func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
 	}
 	otpRepo := &mocks.MockOneTimeOTPRepository{}
 	email := &mocks.MockEmailSender{}
-	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, email)
+	var limitedKey string
+	limiter := &mocks.MockRateLimiter{
+		AllowFn: func(key string) bool {
+			limitedKey = key
+			return true
+		},
+	}
+	svc := newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo, otpRepo, &mocks.MockTokenProvider{}, email, limiter,
+	)
 
-	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "en")
 
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
+	require.NoError(t, err)
 	assert.Empty(t, otpRepo.Saved, "no OTP should be created for an existing account")
-	assert.Empty(t, email.Sent, "no email should be sent for an existing account")
+	require.Len(t, email.Sent, 1)
+	assert.Equal(t, "registration-account-exists:juan@example.com", limitedKey)
+	assert.Equal(t, "juan@example.com", email.Sent[0].To)
+	assert.Equal(t, "Ya tienes una cuenta en Ductifact", email.Sent[0].Subject)
+	assert.Contains(t, email.Sent[0].Text, "plataforma que prefieras")
+	assert.NotContains(t, email.Sent[0].HTML, "href=")
+	assert.NotContains(t, email.Sent[0].Text, "http")
+}
+
+func TestStartRegistration_ExistingUser_RecentNoticeDoesNotSendAnother(t *testing.T) {
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "es",
+	})
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existing, nil
+		},
+	}
+	email := &mocks.MockEmailSender{}
+	limiter := &mocks.MockRateLimiter{
+		AllowFn: func(key string) bool { return false },
+	}
+	svc := newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo, &mocks.MockOneTimeOTPRepository{}, &mocks.MockTokenProvider{}, email, limiter,
+	)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "es")
+
+	require.NoError(t, err)
+	assert.Empty(t, email.Sent, "a recent notice must suppress another email")
 }
 
 func TestStartRegistration_PendingOTP_ReturnsErrOTPAlreadyPending(t *testing.T) {

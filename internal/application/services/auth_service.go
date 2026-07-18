@@ -27,16 +27,17 @@ var (
 
 // authService implements usecases.AuthService.
 type authService struct {
-	userRepo             repositories.UserRepository
-	otpRepo              repositories.OneTimeOTPRepository
-	tokenProvider        ports.TokenProvider
-	blacklist            ports.TokenBlacklist
-	loginThrottler       ports.LoginThrottler
-	emailSender          ports.EmailSender
-	accessTokenDuration  time.Duration
-	refreshTokenDuration time.Duration
-	registrationOTPTTL   time.Duration
-	passwordResetTTL     time.Duration
+	userRepo                  repositories.UserRepository
+	otpRepo                   repositories.OneTimeOTPRepository
+	tokenProvider             ports.TokenProvider
+	blacklist                 ports.TokenBlacklist
+	loginThrottler            ports.LoginThrottler
+	emailSender               ports.EmailSender
+	registrationNoticeLimiter ports.RateLimiter
+	accessTokenDuration       time.Duration
+	refreshTokenDuration      time.Duration
+	registrationOTPTTL        time.Duration
+	passwordResetTTL          time.Duration
 }
 
 // NewAuthService creates a new AuthService.
@@ -47,28 +48,31 @@ func NewAuthService(
 	blacklist ports.TokenBlacklist,
 	loginThrottler ports.LoginThrottler,
 	emailSender ports.EmailSender,
+	registrationNoticeLimiter ports.RateLimiter,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 	registrationOTPTTL time.Duration,
 	passwordResetTTL time.Duration,
 ) *authService {
 	return &authService{
-		userRepo:             userRepo,
-		otpRepo:              otpRepo,
-		tokenProvider:        tokenProvider,
-		blacklist:            blacklist,
-		loginThrottler:       loginThrottler,
-		emailSender:          emailSender,
-		accessTokenDuration:  accessTokenDuration,
-		refreshTokenDuration: refreshTokenDuration,
-		registrationOTPTTL:   registrationOTPTTL,
-		passwordResetTTL:     passwordResetTTL,
+		userRepo:                  userRepo,
+		otpRepo:                   otpRepo,
+		tokenProvider:             tokenProvider,
+		blacklist:                 blacklist,
+		loginThrottler:            loginThrottler,
+		emailSender:               emailSender,
+		registrationNoticeLimiter: registrationNoticeLimiter,
+		accessTokenDuration:       accessTokenDuration,
+		refreshTokenDuration:      refreshTokenDuration,
+		registrationOTPTTL:        registrationOTPTTL,
+		passwordResetTTL:          passwordResetTTL,
 	}
 }
 
 // StartRegistration begins the email-first registration flow.
-// It generates a one-time verification code and emails it to the address.
-// No account is created at this stage.
+// For a new address, it generates and sends a one-time verification code.
+// For an existing account, it sends a rate-limited account-exists notice.
+// The caller receives the same result in both cases to prevent enumeration.
 func (s *authService) StartRegistration(ctx context.Context, email, locale string) error {
 	// Validate the email format via the Value Object.
 	validEmail, err := valueobjects.NewEmail(email)
@@ -86,13 +90,28 @@ func (s *authService) StartRegistration(ctx context.Context, email, locale strin
 		emailLocale = valueobjects.DefaultLocale
 	}
 
-	// If an account already exists, return a concrete domain error.
+	// If an account already exists, notify its owner without revealing that fact
+	// to the caller. Use the account's saved locale, not attacker-controlled input.
 	existing, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
 	if err != nil && !errors.Is(err, repositories.ErrNotFound) {
 		return err
 	}
 	if existing != nil {
-		return ErrEmailAlreadyInUse
+		noticeKey := "registration-account-exists:" + existing.Email
+		if s.registrationNoticeLimiter.Allow(noticeKey) {
+			emailLocale, localeErr := valueobjects.NewLocale(existing.Locale)
+			if localeErr != nil {
+				slog.Error(
+					"invariant: user has invalid locale",
+					"locale", existing.Locale,
+					"userID", existing.ID,
+					"error", localeErr,
+				)
+				emailLocale = valueobjects.DefaultLocale
+			}
+			s.sendAccountAlreadyRegisteredEmail(ctx, existing.Email, emailLocale)
+		}
+		return nil
 	}
 
 	// If a valid (non-expired) OTP already exists, don't spam the user.
@@ -429,6 +448,29 @@ func (s *authService) sendRegistrationOTP(
 	}
 
 	slog.Info("registration OTP email sent", "to", email)
+}
+
+// sendAccountAlreadyRegisteredEmail tells the address owner how to recover
+// access without linking to a specific Ductifact platform.
+// Failures are logged but don't alter the generic registration response.
+func (s *authService) sendAccountAlreadyRegisteredEmail(
+	ctx context.Context,
+	email string,
+	locale valueobjects.Locale,
+) {
+	subject, html, text := templates.RenderAccountAlreadyRegistered(locale)
+
+	if err := s.emailSender.Send(ctx, ports.Email{
+		To:      email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+	}); err != nil {
+		slog.Error("failed to send account already registered email", "to", email, "error", err)
+		return
+	}
+
+	slog.Info("account already registered email sent", "to", email)
 }
 
 // sendPasswordResetEmail renders and sends the password reset code email.
