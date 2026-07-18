@@ -251,9 +251,9 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🟡 Soon |
-| 21.2 | `Invoice` entity (linked to Client, basic CRUD) | ⬜ | 🟡 Soon |
-| 21.3 | `Project` entity (linked to Client, status workflow) | ⬜ | 🟡 Soon |
+| 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🔵 Later |
+| 21.2 | `Invoice` entity (linked to Client, basic CRUD) | ⬜ | 🔵 Later |
+| 21.3 | `Project` entity (linked to Client, status workflow) | ⬜ | 🔵 Later |
 | 21.4 | Domain events (event-driven internal communication) | ⬜ | 🔵 Later |
 | 21.5 | Value Object `PhoneNumber` (E.164 validation) | ⬜ | 🔵 Later |
 | 21.6 | Value Object `TaxID` (country-aware validation) | ⬜ | 🔵 Later |
@@ -269,8 +269,8 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 22.1 | Configurable timeouts per operation (context propagation) | ⬜ | 🟡 Soon |
-| 22.2 | Retry with exponential backoff + jitter | ⬜ | 🟡 Soon |
+| 22.1 | Configurable timeouts per operation (context propagation) | ⬜ | 🔵 Later |
+| 22.2 | Retry with exponential backoff + jitter | ⬜ | 🔵 Later |
 | 22.3 | Circuit breaker for external services (email, Redis) | ⬜ | 🔵 Later |
 | 22.4 | Idempotency keys on write endpoints | ⬜ | 🔵 Later |
 | 22.5 | Graceful degradation (fallback to memory if Redis down) | ⬜ | 🔵 Later |
@@ -280,7 +280,7 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 23.1 | Data export: clients to CSV | ⬜ | 🟡 Soon |
+| 23.1 | Data export: clients to CSV | ⬜ | 🔵 Later |
 | 23.2 | Data export: clients to PDF | ⬜ | 🔵 Later |
 | 23.3 | File upload (S3 / MinIO) | ⬜ | 🔵 Later |
 | 23.4 | Bulk import from CSV | ⬜ | 🔵 Later |
