@@ -56,7 +56,7 @@ func TestE2E_StartRegistration_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, registrationStartedMessage, body["message"])
-	assert.Equal(t, float64(900), body["resend_cooldown_seconds"])
+	assert.Equal(t, env.registrationResendCooldown.Seconds(), body["resend_cooldown_seconds"])
 
 	// An OTP row should have been created for the email.
 	var count int64
@@ -78,7 +78,7 @@ func TestE2E_StartRegistration_ExistingUser_ReturnsSameResponseWithoutOTP(t *tes
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, registrationStartedMessage, body["message"])
-	assert.Equal(t, float64(900), body["resend_cooldown_seconds"])
+	assert.Equal(t, env.registrationResendCooldown.Seconds(), body["resend_cooldown_seconds"])
 
 	var count int64
 	err := env.db.Raw(
@@ -441,7 +441,7 @@ func TestE2E_ForgotPassword_WithExistingEmail_Returns200(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, passwordResetStartedMessage, body["message"])
-	assert.Equal(t, float64(900), body["resend_cooldown_seconds"])
+	assert.Equal(t, env.passwordResetResendCooldown.Seconds(), body["resend_cooldown_seconds"])
 
 	// Verify a password-reset OTP was created in DB
 	var count int64
@@ -460,7 +460,7 @@ func TestE2E_ForgotPassword_WithNonExistingEmail_Returns200(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
 	assert.Equal(t, passwordResetStartedMessage, body["message"])
-	assert.Equal(t, float64(900), body["resend_cooldown_seconds"])
+	assert.Equal(t, env.passwordResetResendCooldown.Seconds(), body["resend_cooldown_seconds"])
 }
 
 func TestE2E_ForgotPassword_MissingEmail_Returns400(t *testing.T) {
