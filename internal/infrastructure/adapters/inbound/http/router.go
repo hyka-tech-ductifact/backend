@@ -41,6 +41,7 @@ func SetupRoutes(
 	blacklist ports.TokenBlacklist,
 	ipLimiter ports.RateLimiter,
 	userLimiter ports.RateLimiter,
+	otpCfg config.OTP,
 	corsCfg config.CORS,
 	logLevel string,
 ) *gin.Engine {
@@ -247,7 +248,7 @@ func SetupRoutes(
 	v1.GET("/files/*filepath", fileHandler.ServeFile)
 
 	// Auth routes without authentication
-	authHandler := NewAuthHandler(authService)
+	authHandler := NewAuthHandler(authService, otpCfg.RegistrationTTL, otpCfg.PasswordResetTTL)
 	authRoutes := v1.Group("/auth")
 	{
 		authRoutes.POST("/register", authHandler.StartRegistration)

@@ -346,7 +346,7 @@ func TestRegister_WithExpiredOTP_ReturnsInvalidOTP(t *testing.T) {
 	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
-func TestRegister_WithDuplicateEmail_ReturnsEmailInUse(t *testing.T) {
+func TestRegister_WithDuplicateEmail_ReturnsGenericInvalidOTP(t *testing.T) {
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
 	existing, _ := entities.NewUser(entities.CreateUserParams{
 		Name: "Existing", Email: "juan@example.com", Password: "securepass123", Locale: "en",
@@ -367,11 +367,39 @@ func TestRegister_WithDuplicateEmail_ReturnsEmailInUse(t *testing.T) {
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+}
+
+func TestRegister_ExistingEmailWithoutOTP_DoesNotRevealAccount(t *testing.T) {
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Existing", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existing, nil
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	user, tokens, err := svc.Register(
+		context.Background(), "juan@example.com", "123456", "Juan", "securepass123", "",
+	)
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
 func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	otpChecked := false
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, repositories.ErrNotFound
@@ -379,6 +407,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	}
 	otpRepo := &mocks.MockOneTimeOTPRepository{
 		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			otpChecked = true
 			return otp, nil
 		},
 	}
@@ -389,6 +418,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
+	assert.False(t, otpChecked, "public password validation must happen before checking the secret OTP")
 }
 
 func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
@@ -1174,8 +1204,10 @@ func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
 		Locale: "en",
 	}
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	otpChecked := false
 	otpRepo := &mocks.MockOneTimeOTPRepository{
 		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			otpChecked = true
 			return otp, nil
 		},
 	}
@@ -1190,4 +1222,5 @@ func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
 	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "short")
 
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
+	assert.False(t, otpChecked, "public password validation must happen before checking the secret OTP")
 }

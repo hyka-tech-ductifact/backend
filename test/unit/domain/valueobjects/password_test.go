@@ -60,6 +60,17 @@ func TestNewPassword_Empty_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordEmpty)
 }
 
+func TestValidatePassword_AppliesRulesWithoutHashing(t *testing.T) {
+	assert.NoError(t, valueobjects.ValidatePassword("securepass123"))
+	assert.ErrorIs(t, valueobjects.ValidatePassword("short"), valueobjects.ErrPasswordTooShort)
+	assert.ErrorIs(t, valueobjects.ValidatePassword(""), valueobjects.ErrPasswordEmpty)
+	assert.ErrorIs(
+		t,
+		valueobjects.ValidatePassword(string(make([]byte, 73))),
+		valueobjects.ErrPasswordTooLong,
+	)
+}
+
 func TestPassword_Compare_WithCorrectPassword_ReturnsNil(t *testing.T) {
 	pwd, _ := valueobjects.NewPassword("securepass123")
 

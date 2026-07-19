@@ -21,6 +21,22 @@ type Password struct {
 	hash string
 }
 
+// ValidatePassword checks the public password rules without hashing or storing
+// the raw value. Application services can call it before checking a secret OTP
+// so validation errors don't reveal whether the submitted code was valid.
+func ValidatePassword(raw string) error {
+	if raw == "" {
+		return ErrPasswordEmpty
+	}
+	if utf8.RuneCountInString(raw) < 8 {
+		return ErrPasswordTooShort
+	}
+	if utf8.RuneCountInString(raw) > 72 {
+		return ErrPasswordTooLong
+	}
+	return nil
+}
+
 // NewPassword validates the raw password and returns a Password with the bcrypt hash.
 // The raw password is never stored.
 //
@@ -28,14 +44,8 @@ type Password struct {
 // pre-hash the input with SHA-256 (Dropbox pattern). The resulting
 // 32-byte digest is always within the limit.
 func NewPassword(raw string) (*Password, error) {
-	if raw == "" {
-		return nil, ErrPasswordEmpty
-	}
-	if utf8.RuneCountInString(raw) < 8 {
-		return nil, ErrPasswordTooShort
-	}
-	if utf8.RuneCountInString(raw) > 72 {
-		return nil, ErrPasswordTooLong
+	if err := ValidatePassword(raw); err != nil {
+		return nil, err
 	}
 
 	// SHA-256 pre-hash: produces a fixed 32-byte key, well within

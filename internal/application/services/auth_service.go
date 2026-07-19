@@ -156,13 +156,10 @@ func (s *authService) Register(
 	}
 	normalizedEmail := validEmail.String()
 
-	// Fast path: if the account already exists, return a concrete conflict error.
-	existing, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
-	if err != nil && !errors.Is(err, repositories.ErrNotFound) {
+	// Validate public input before checking the secret code. This keeps password
+	// validation independent from OTP validity and avoids creating a code oracle.
+	if err := valueobjects.ValidatePassword(password); err != nil {
 		return nil, nil, err
-	}
-	if existing != nil {
-		return nil, nil, ErrEmailAlreadyInUse
 	}
 
 	// Step 1: Load the pending OTP for this email.
@@ -195,13 +192,13 @@ func (s *authService) Register(
 	}
 
 	// Step 5: Guard against a race where the email was registered meanwhile.
-	existing, err = s.userRepo.GetByEmail(ctx, normalizedEmail)
+	existing, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
 	if err != nil && !errors.Is(err, repositories.ErrNotFound) {
 		return nil, nil, err
 	}
 	if existing != nil {
 		_ = s.otpRepo.DeleteByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposeRegistration)
-		return nil, nil, ErrEmailAlreadyInUse
+		return nil, nil, entities.ErrInvalidOTP
 	}
 
 	// Step 6: Persist the user.
@@ -378,6 +375,12 @@ func (s *authService) ResetPassword(ctx context.Context, email, code, newPasswor
 		return entities.ErrInvalidOTP
 	}
 	normalizedEmail := validEmail.String()
+
+	// Validate public input before checking the secret code so the response does
+	// not reveal whether an otherwise invalid request contained a valid OTP.
+	if err := valueobjects.ValidatePassword(newPassword); err != nil {
+		return err
+	}
 
 	// Step 2: Load the pending reset OTP for this email.
 	otp, err := s.otpRepo.GetByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset)

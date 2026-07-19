@@ -225,6 +225,7 @@ func main() {
 		blacklist,
 		ipLimiter,
 		userLimiter,
+		cfg.OTP,
 		cfg.CORS,
 		cfg.Log.Level,
 	)
