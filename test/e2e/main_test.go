@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"ductifact/internal/config"
 	"ductifact/test/helpers"
@@ -13,8 +14,10 @@ import (
 
 // e2eEnv holds the shared state for E2E tests, initialized once in TestMain.
 type e2eEnv struct {
-	baseURL string
-	db      *gorm.DB
+	baseURL         string
+	db              *gorm.DB
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 // env is the shared E2E environment, visible to ALL _test.go files in this package.
@@ -40,8 +43,10 @@ func TestMain(m *testing.M) {
 	}
 
 	env = &e2eEnv{
-		baseURL: baseURL,
-		db:      db,
+		baseURL:         baseURL,
+		db:              db,
+		accessTokenTTL:  cfg.JWT.TokenDuration,
+		refreshTokenTTL: cfg.JWT.RefreshTokenDuration,
 	}
 
 	os.Exit(m.Run())

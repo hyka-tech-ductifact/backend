@@ -53,6 +53,9 @@ func TestGenerateTokenPair_ReturnsBothTokens(t *testing.T) {
 	assert.NotEmpty(t, pair.AccessToken)
 	assert.NotEmpty(t, pair.RefreshToken)
 	assert.NotEqual(t, pair.AccessToken, pair.RefreshToken)
+	assert.Equal(t, "Bearer", pair.TokenType)
+	assert.Equal(t, testJWTConfig.TokenDuration, pair.ExpiresIn)
+	assert.Equal(t, testJWTConfig.RefreshTokenDuration, pair.RefreshExpiresIn)
 }
 
 func TestGenerateTokenPair_DifferentUsersGetDifferentTokens(t *testing.T) {

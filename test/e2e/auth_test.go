@@ -15,6 +15,13 @@ import (
 const registrationStartedMessage = "if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email"
 const passwordResetStartedMessage = "if the address is associated with an account, a password reset code has been sent; it may take a few minutes, so check the spam folder before requesting another code"
 
+func assertTokenMetadata(t *testing.T, body map[string]any) {
+	t.Helper()
+	assert.Equal(t, "Bearer", body["token_type"])
+	assert.Equal(t, env.accessTokenTTL.Seconds(), body["expires_in"])
+	assert.Equal(t, env.refreshTokenTTL.Seconds(), body["refresh_expires_in"])
+}
+
 // seedOTP inserts a one-time OTP row with a known plaintext code and purpose,
 // so the OTP-based endpoints can be exercised end-to-end.
 func seedOTP(t *testing.T, email, purpose, code string) {
@@ -117,6 +124,7 @@ func TestE2E_Register_Success(t *testing.T) {
 	body := helpers.ParseBody(t, resp)
 	assert.NotEmpty(t, body["access_token"])
 	assert.NotEmpty(t, body["refresh_token"])
+	assertTokenMetadata(t, body)
 	user := body["user"].(map[string]any)
 	assert.NotEmpty(t, user["id"])
 	assert.Equal(t, "Juan", user["name"])
@@ -243,6 +251,7 @@ func TestE2E_Login_Success(t *testing.T) {
 	body := helpers.ParseBody(t, resp)
 	assert.NotEmpty(t, body["access_token"])
 	assert.NotEmpty(t, body["refresh_token"])
+	assertTokenMetadata(t, body)
 	user := body["user"].(map[string]any)
 	assert.Equal(t, id, user["id"])
 	assert.Equal(t, "Juan", user["name"])
@@ -306,6 +315,31 @@ func TestE2E_Login_EmptyBody_Returns400(t *testing.T) {
 	resp := helpers.PostJSON(t, url("/auth/login"), map[string]string{})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// ─── Refresh ────────────────────────────────────────────────────────────────
+
+func TestE2E_Refresh_Success_ReturnsTokenMetadata(t *testing.T) {
+	clean(t)
+	registerUser(t, "Juan", "juan@example.com", "securepass123")
+
+	loginResp := helpers.PostJSON(t, url("/auth/login"), map[string]string{
+		"email":    "juan@example.com",
+		"password": "securepass123",
+	})
+	require.Equal(t, http.StatusOK, loginResp.StatusCode)
+	loginBody := helpers.ParseBody(t, loginResp)
+	oldRefreshToken := loginBody["refresh_token"].(string)
+
+	resp := helpers.PostJSON(t, url("/auth/refresh"), map[string]string{
+		"refresh_token": oldRefreshToken,
+	})
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body := helpers.ParseBody(t, resp)
+	assert.NotEmpty(t, body["access_token"])
+	assert.NotEmpty(t, body["refresh_token"])
+	assertTokenMetadata(t, body)
 }
 
 // ─── Change Password ─────────────────────────────────────────────────────────

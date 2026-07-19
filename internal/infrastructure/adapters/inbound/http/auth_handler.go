@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -58,14 +59,16 @@ type ResetPasswordRequest struct {
 }
 
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
+	User UserResponse `json:"user"`
+	TokenResponse
 }
 
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	TokenType        string `json:"token_type"`
+	ExpiresIn        int64  `json:"expires_in"`
+	RefreshExpiresIn int64  `json:"refresh_expires_in"`
 }
 
 // CodeRequestResponse describes the public resend policy without exposing
@@ -99,6 +102,16 @@ func codeRequestResponse(message string, cooldown time.Duration) CodeRequestResp
 	return CodeRequestResponse{
 		Message:               message,
 		ResendCooldownSeconds: int64(cooldown.Seconds()),
+	}
+}
+
+func tokenResponse(tokens *ports.TokenPair) TokenResponse {
+	return TokenResponse{
+		AccessToken:      tokens.AccessToken,
+		RefreshToken:     tokens.RefreshToken,
+		TokenType:        tokens.TokenType,
+		ExpiresIn:        int64(tokens.ExpiresIn.Seconds()),
+		RefreshExpiresIn: int64(tokens.RefreshExpiresIn.Seconds()),
 	}
 }
 
@@ -149,9 +162,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, AuthResponse{
-		User:         *toUserResponse(user),
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		User:          *toUserResponse(user),
+		TokenResponse: tokenResponse(tokens),
 	})
 }
 
@@ -169,9 +181,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, AuthResponse{
-		User:         *toUserResponse(user),
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		User:          *toUserResponse(user),
+		TokenResponse: tokenResponse(tokens),
 	})
 }
 
@@ -188,10 +199,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, TokenResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-	})
+	c.JSON(http.StatusOK, tokenResponse(tokens))
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {

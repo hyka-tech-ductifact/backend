@@ -1,6 +1,8 @@
 package mocks
 
 import (
+	"time"
+
 	"ductifact/internal/application/ports"
 
 	"github.com/google/uuid"
@@ -19,8 +21,11 @@ func (m *MockTokenProvider) GenerateTokenPair(userID uuid.UUID, email string) (*
 		return m.GenerateTokenPairFn(userID, email)
 	}
 	return &ports.TokenPair{
-		AccessToken:  "mock-access-token",
-		RefreshToken: "mock-refresh-token",
+		AccessToken:      "mock-access-token",
+		RefreshToken:     "mock-refresh-token",
+		TokenType:        ports.BearerTokenType,
+		ExpiresIn:        15 * time.Minute,
+		RefreshExpiresIn: 7 * 24 * time.Hour,
 	}, nil
 }
 

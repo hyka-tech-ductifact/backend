@@ -67,8 +67,11 @@ func (p *JWTProvider) GenerateTokenPair(userID uuid.UUID, email string) (*ports.
 	}
 
 	return &ports.TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		TokenType:        ports.BearerTokenType,
+		ExpiresIn:        p.tokenDuration,
+		RefreshExpiresIn: p.refreshTokenDuration,
 	}, nil
 }
 
