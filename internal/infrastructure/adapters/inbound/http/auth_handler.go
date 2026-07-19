@@ -110,8 +110,8 @@ func tokenResponse(tokens *ports.TokenPair) TokenResponse {
 		AccessToken:      tokens.AccessToken,
 		RefreshToken:     tokens.RefreshToken,
 		TokenType:        tokens.TokenType,
-		ExpiresIn:        int64(tokens.ExpiresIn.Seconds()),
-		RefreshExpiresIn: int64(tokens.RefreshExpiresIn.Seconds()),
+		ExpiresIn:        int64(tokens.AccessTokenTTL.Seconds()),
+		RefreshExpiresIn: int64(tokens.RefreshTokenTTL.Seconds()),
 	}
 }
 

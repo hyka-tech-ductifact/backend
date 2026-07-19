@@ -34,8 +34,8 @@ type authService struct {
 	loginThrottler            ports.LoginThrottler
 	emailSender               ports.EmailSender
 	registrationNoticeLimiter ports.RateLimiter
-	accessTokenDuration       time.Duration
-	refreshTokenDuration      time.Duration
+	accessTokenTTL            time.Duration
+	refreshTokenTTL           time.Duration
 	registrationOTPTTL        time.Duration
 	passwordResetTTL          time.Duration
 }
@@ -49,8 +49,8 @@ func NewAuthService(
 	loginThrottler ports.LoginThrottler,
 	emailSender ports.EmailSender,
 	registrationNoticeLimiter ports.RateLimiter,
-	accessTokenDuration time.Duration,
-	refreshTokenDuration time.Duration,
+	accessTokenTTL time.Duration,
+	refreshTokenTTL time.Duration,
 	registrationOTPTTL time.Duration,
 	passwordResetTTL time.Duration,
 ) *authService {
@@ -62,8 +62,8 @@ func NewAuthService(
 		loginThrottler:            loginThrottler,
 		emailSender:               emailSender,
 		registrationNoticeLimiter: registrationNoticeLimiter,
-		accessTokenDuration:       accessTokenDuration,
-		refreshTokenDuration:      refreshTokenDuration,
+		accessTokenTTL:            accessTokenTTL,
+		refreshTokenTTL:           refreshTokenTTL,
 		registrationOTPTTL:        registrationOTPTTL,
 		passwordResetTTL:          passwordResetTTL,
 	}
@@ -285,8 +285,8 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*p
 // Logout revokes both the access and refresh tokens by adding them
 // to the blacklist. They will remain blacklisted until they naturally expire.
 func (s *authService) Logout(_ context.Context, accessToken, refreshToken string) error {
-	s.blacklist.Add(accessToken, s.accessTokenDuration)
-	s.blacklist.Add(refreshToken, s.refreshTokenDuration)
+	s.blacklist.Add(accessToken, s.accessTokenTTL)
+	s.blacklist.Add(refreshToken, s.refreshTokenTTL)
 	return nil
 }
 

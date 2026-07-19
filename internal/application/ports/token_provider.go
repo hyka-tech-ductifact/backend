@@ -20,11 +20,11 @@ type TokenProvider interface {
 
 // TokenPair holds the access and refresh tokens returned after authentication.
 type TokenPair struct {
-	AccessToken      string
-	RefreshToken     string
-	TokenType        string
-	ExpiresIn        time.Duration
-	RefreshExpiresIn time.Duration
+	AccessToken     string
+	RefreshToken    string
+	TokenType       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 // TokenClaims holds the data extracted from a valid token.

@@ -21,11 +21,11 @@ func (m *MockTokenProvider) GenerateTokenPair(userID uuid.UUID, email string) (*
 		return m.GenerateTokenPairFn(userID, email)
 	}
 	return &ports.TokenPair{
-		AccessToken:      "mock-access-token",
-		RefreshToken:     "mock-refresh-token",
-		TokenType:        ports.BearerTokenType,
-		ExpiresIn:        15 * time.Minute,
-		RefreshExpiresIn: 7 * 24 * time.Hour,
+		AccessToken:     "mock-access-token",
+		RefreshToken:    "mock-refresh-token",
+		TokenType:       ports.BearerTokenType,
+		AccessTokenTTL:  15 * time.Minute,
+		RefreshTokenTTL: 7 * 24 * time.Hour,
 	}, nil
 }
 

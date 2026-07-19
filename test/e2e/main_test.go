@@ -45,8 +45,8 @@ func TestMain(m *testing.M) {
 	env = &e2eEnv{
 		baseURL:         baseURL,
 		db:              db,
-		accessTokenTTL:  cfg.JWT.TokenDuration,
-		refreshTokenTTL: cfg.JWT.RefreshTokenDuration,
+		accessTokenTTL:  cfg.JWT.AccessTokenTTL,
+		refreshTokenTTL: cfg.JWT.RefreshTokenTTL,
 	}
 
 	os.Exit(m.Run())

@@ -100,9 +100,9 @@ func (d Database) DSN() string {
 
 // JWT holds authentication token settings.
 type JWT struct {
-	Secret               string        // HMAC signing key
-	TokenDuration        time.Duration // How long access tokens remain valid
-	RefreshTokenDuration time.Duration // How long refresh tokens remain valid
+	Secret          string        // HMAC signing key
+	AccessTokenTTL  time.Duration // How long access tokens remain valid
+	RefreshTokenTTL time.Duration // How long refresh tokens remain valid
 }
 
 // Log holds logging configuration.
@@ -155,9 +155,9 @@ func Load() Config {
 			Name:     required("DB_NAME"),
 		},
 		JWT: JWT{
-			Secret:               required("JWT_SECRET"),
-			TokenDuration:        parseSeconds(required("JWT_ACCESS_TOKEN_TTL_SECONDS")),
-			RefreshTokenDuration: parseSeconds(required("JWT_REFRESH_TOKEN_TTL_SECONDS")),
+			Secret:          required("JWT_SECRET"),
+			AccessTokenTTL:  parseSeconds(required("JWT_ACCESS_TOKEN_TTL_SECONDS")),
+			RefreshTokenTTL: parseSeconds(required("JWT_REFRESH_TOKEN_TTL_SECONDS")),
 		},
 		Log: Log{
 			Level:  required("LOG_LEVEL"),

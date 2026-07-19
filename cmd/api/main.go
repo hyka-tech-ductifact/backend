@@ -199,8 +199,8 @@ func main() {
 		loginThrottler,
 		emailSender,
 		registrationNoticeLimiter,
-		cfg.JWT.TokenDuration,
-		cfg.JWT.RefreshTokenDuration,
+		cfg.JWT.AccessTokenTTL,
+		cfg.JWT.RefreshTokenTTL,
 		cfg.OTP.RegistrationTTL,
 		cfg.OTP.PasswordResetTTL,
 	)
