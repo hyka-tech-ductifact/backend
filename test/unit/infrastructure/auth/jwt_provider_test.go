@@ -13,9 +13,9 @@ import (
 )
 
 var testJWTConfig = config.JWT{
-	Secret:               "test-secret-key-at-least-32-chars!!",
-	TokenDuration:        15 * time.Minute,
-	RefreshTokenDuration: 7 * 24 * time.Hour,
+	Secret:          "test-secret-key-at-least-32-chars!!",
+	AccessTokenTTL:  15 * time.Minute,
+	RefreshTokenTTL: 7 * 24 * time.Hour,
 }
 
 // helper creates a JWTProvider with a test secret.
@@ -53,6 +53,9 @@ func TestGenerateTokenPair_ReturnsBothTokens(t *testing.T) {
 	assert.NotEmpty(t, pair.AccessToken)
 	assert.NotEmpty(t, pair.RefreshToken)
 	assert.NotEqual(t, pair.AccessToken, pair.RefreshToken)
+	assert.Equal(t, "Bearer", pair.TokenType)
+	assert.Equal(t, testJWTConfig.AccessTokenTTL, pair.AccessTokenTTL)
+	assert.Equal(t, testJWTConfig.RefreshTokenTTL, pair.RefreshTokenTTL)
 }
 
 func TestGenerateTokenPair_DifferentUsersGetDifferentTokens(t *testing.T) {
@@ -100,9 +103,9 @@ func TestValidateToken_WithRefreshToken_ReturnsError(t *testing.T) {
 func TestValidateToken_WithInvalidSignature_ReturnsError(t *testing.T) {
 	// Generate with one secret
 	provider1 := auth.NewJWTProvider(config.JWT{
-		Secret:               "secret-key-one-at-least-32-chars!",
-		TokenDuration:        15 * time.Minute,
-		RefreshTokenDuration: 168 * time.Hour,
+		Secret:          "secret-key-one-at-least-32-chars!",
+		AccessTokenTTL:  15 * time.Minute,
+		RefreshTokenTTL: 168 * time.Hour,
 	})
 
 	pair, err := provider1.GenerateTokenPair(uuid.New(), "juan@example.com")
@@ -110,9 +113,9 @@ func TestValidateToken_WithInvalidSignature_ReturnsError(t *testing.T) {
 
 	// Validate with a different secret
 	provider2 := auth.NewJWTProvider(config.JWT{
-		Secret:               "secret-key-two-at-least-32-chars!",
-		TokenDuration:        15 * time.Minute,
-		RefreshTokenDuration: 168 * time.Hour,
+		Secret:          "secret-key-two-at-least-32-chars!",
+		AccessTokenTTL:  15 * time.Minute,
+		RefreshTokenTTL: 168 * time.Hour,
 	})
 
 	claims, err := provider2.ValidateToken(pair.AccessToken)

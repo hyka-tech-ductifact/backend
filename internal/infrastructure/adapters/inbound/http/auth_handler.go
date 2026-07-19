@@ -4,7 +4,9 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
+	"ductifact/internal/application/ports"
 	"ductifact/internal/application/services"
 	"ductifact/internal/application/usecases"
 	"ductifact/internal/infrastructure/adapters/inbound/http/helpers"
@@ -57,24 +59,60 @@ type ResetPasswordRequest struct {
 }
 
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
+	User UserResponse `json:"user"`
+	TokenResponse
 }
 
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	TokenType        string `json:"token_type"`
+	ExpiresIn        int64  `json:"expires_in"`
+	RefreshExpiresIn int64  `json:"refresh_expires_in"`
+}
+
+// CodeRequestResponse describes the public resend policy without exposing
+// whether a code exists or how much time remains on any server-side state.
+type CodeRequestResponse struct {
+	Message               string `json:"message"`
+	ResendCooldownSeconds int64  `json:"resend_cooldown_seconds"`
 }
 
 // --- Handler ---
 
 type AuthHandler struct {
-	authService usecases.AuthService
+	authService                 usecases.AuthService
+	registrationResendCooldown  time.Duration
+	passwordResetResendCooldown time.Duration
 }
 
-func NewAuthHandler(authService usecases.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(
+	authService usecases.AuthService,
+	registrationResendCooldown time.Duration,
+	passwordResetResendCooldown time.Duration,
+) *AuthHandler {
+	return &AuthHandler{
+		authService:                 authService,
+		registrationResendCooldown:  registrationResendCooldown,
+		passwordResetResendCooldown: passwordResetResendCooldown,
+	}
+}
+
+func codeRequestResponse(message string, cooldown time.Duration) CodeRequestResponse {
+	return CodeRequestResponse{
+		Message:               message,
+		ResendCooldownSeconds: int64(cooldown.Seconds()),
+	}
+}
+
+func tokenResponse(tokens *ports.TokenPair) TokenResponse {
+	return TokenResponse{
+		AccessToken:      tokens.AccessToken,
+		RefreshToken:     tokens.RefreshToken,
+		TokenType:        tokens.TokenType,
+		ExpiresIn:        int64(tokens.AccessTokenTTL.Seconds()),
+		RefreshExpiresIn: int64(tokens.RefreshTokenTTL.Seconds()),
+	}
 }
 
 func (h *AuthHandler) StartRegistration(c *gin.Context) {
@@ -87,14 +125,20 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	if err := h.authService.StartRegistration(c.Request.Context(), req.Email, req.Locale.String()); err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyInUse) || errors.Is(err, services.ErrOTPAlreadyPending) {
 			// Keep API response generic to avoid account enumeration / code-existence leaks.
-			c.JSON(http.StatusOK, gin.H{"message": "if the email is available, a verification code has been sent"})
+			c.JSON(http.StatusOK, codeRequestResponse(
+				"if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email",
+				h.registrationResendCooldown,
+			))
 			return
 		}
 		helpers.HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "if the email is available, a verification code has been sent"})
+	c.JSON(http.StatusOK, codeRequestResponse(
+		"if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email",
+		h.registrationResendCooldown,
+	))
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -118,9 +162,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, AuthResponse{
-		User:         *toUserResponse(user),
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		User:          *toUserResponse(user),
+		TokenResponse: tokenResponse(tokens),
 	})
 }
 
@@ -138,9 +181,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, AuthResponse{
-		User:         *toUserResponse(user),
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		User:          *toUserResponse(user),
+		TokenResponse: tokenResponse(tokens),
 	})
 }
 
@@ -157,10 +199,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, TokenResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-	})
+	c.JSON(http.StatusOK, tokenResponse(tokens))
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
@@ -214,7 +253,10 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a password reset code has been sent"})
+	c.JSON(http.StatusOK, codeRequestResponse(
+		"if the address is associated with an account, a password reset code has been sent; it may take a few minutes, so check the spam folder before requesting another code",
+		h.passwordResetResendCooldown,
+	))
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {

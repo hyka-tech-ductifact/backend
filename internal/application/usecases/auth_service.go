@@ -11,8 +11,8 @@ import (
 
 // AuthService is the inbound port for authentication operations.
 type AuthService interface {
-	// StartRegistration begins the email-first registration flow: it generates a
-	// one-time verification code and emails it to the address. No account is created yet.
+	// StartRegistration begins the email-first registration flow. Its public result
+	// is intentionally generic whether it sends a code or an account-exists notice.
 	StartRegistration(ctx context.Context, email, locale string) error
 	// Register completes registration: it validates the verification code and, on success,
 	// creates the user account and returns a token pair (auto-login).

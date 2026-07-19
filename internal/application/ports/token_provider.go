@@ -1,6 +1,13 @@
 package ports
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// BearerTokenType is the OAuth-compatible token type returned to API clients.
+const BearerTokenType = "Bearer"
 
 // TokenProvider is the outbound port for JWT operations.
 // It is defined as an interface so the auth service doesn't depend on
@@ -13,8 +20,11 @@ type TokenProvider interface {
 
 // TokenPair holds the access and refresh tokens returned after authentication.
 type TokenPair struct {
-	AccessToken  string
-	RefreshToken string
+	AccessToken     string
+	RefreshToken    string
+	TokenType       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 // TokenClaims holds the data extracted from a valid token.

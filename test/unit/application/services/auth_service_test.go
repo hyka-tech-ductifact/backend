@@ -28,6 +28,7 @@ func newTestAuthService(repo *mocks.MockUserRepository, token *mocks.MockTokenPr
 		&mocks.MockTokenBlacklist{},
 		&mocks.MockLoginThrottler{},
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -48,6 +49,7 @@ func newTestAuthServiceWithBlacklist(
 		blacklist,
 		&mocks.MockLoginThrottler{},
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -68,6 +70,7 @@ func newTestAuthServiceWithThrottler(
 		&mocks.MockTokenBlacklist{},
 		throttler,
 		&mocks.MockEmailSender{},
+		&mocks.MockRateLimiter{},
 		15*time.Minute,
 		7*24*time.Hour,
 		24*time.Hour,
@@ -83,6 +86,22 @@ func newTestAuthServiceForRegistration(
 	token *mocks.MockTokenProvider,
 	email *mocks.MockEmailSender,
 ) usecases.AuthService {
+	return newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo,
+		otpRepo,
+		token,
+		email,
+		&mocks.MockRateLimiter{},
+	)
+}
+
+func newTestAuthServiceForRegistrationWithNoticeLimiter(
+	userRepo *mocks.MockUserRepository,
+	otpRepo *mocks.MockOneTimeOTPRepository,
+	token *mocks.MockTokenProvider,
+	email *mocks.MockEmailSender,
+	registrationNoticeLimiter *mocks.MockRateLimiter,
+) usecases.AuthService {
 	return services.NewAuthService(
 		userRepo,
 		otpRepo,
@@ -90,6 +109,7 @@ func newTestAuthServiceForRegistration(
 		&mocks.MockTokenBlacklist{},
 		&mocks.MockLoginThrottler{},
 		email,
+		registrationNoticeLimiter,
 		15*time.Minute,
 		7*24*time.Hour,
 		15*time.Minute,
@@ -120,9 +140,9 @@ func TestStartRegistration_NewEmail_SavesOTPAndSendsEmail(t *testing.T) {
 	assert.Equal(t, "juan@example.com", email.Sent[0].To)
 }
 
-func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
+func TestStartRegistration_ExistingUser_SendsLocalizedNoticeWithoutOTPOrLink(t *testing.T) {
 	existing, _ := entities.NewUser(entities.CreateUserParams{
-		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "es",
 	})
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
@@ -131,13 +151,51 @@ func TestStartRegistration_ExistingUser_DoesNothing(t *testing.T) {
 	}
 	otpRepo := &mocks.MockOneTimeOTPRepository{}
 	email := &mocks.MockEmailSender{}
-	svc := newTestAuthServiceForRegistration(userRepo, otpRepo, &mocks.MockTokenProvider{}, email)
+	var limitedKey string
+	limiter := &mocks.MockRateLimiter{
+		AllowFn: func(key string) bool {
+			limitedKey = key
+			return true
+		},
+	}
+	svc := newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo, otpRepo, &mocks.MockTokenProvider{}, email, limiter,
+	)
 
-	err := svc.StartRegistration(context.Background(), "juan@example.com", "")
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "en")
 
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
+	require.NoError(t, err)
 	assert.Empty(t, otpRepo.Saved, "no OTP should be created for an existing account")
-	assert.Empty(t, email.Sent, "no email should be sent for an existing account")
+	require.Len(t, email.Sent, 1)
+	assert.Equal(t, "registration-account-exists:juan@example.com", limitedKey)
+	assert.Equal(t, "juan@example.com", email.Sent[0].To)
+	assert.Equal(t, "Ya tienes una cuenta en Ductifact", email.Sent[0].Subject)
+	assert.Contains(t, email.Sent[0].Text, "plataforma que prefieras")
+	assert.NotContains(t, email.Sent[0].HTML, "href=")
+	assert.NotContains(t, email.Sent[0].Text, "http")
+}
+
+func TestStartRegistration_ExistingUser_RecentNoticeDoesNotSendAnother(t *testing.T) {
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Juan", Email: "juan@example.com", Password: "securepass123", Locale: "es",
+	})
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existing, nil
+		},
+	}
+	email := &mocks.MockEmailSender{}
+	limiter := &mocks.MockRateLimiter{
+		AllowFn: func(key string) bool { return false },
+	}
+	svc := newTestAuthServiceForRegistrationWithNoticeLimiter(
+		userRepo, &mocks.MockOneTimeOTPRepository{}, &mocks.MockTokenProvider{}, email, limiter,
+	)
+
+	err := svc.StartRegistration(context.Background(), "juan@example.com", "es")
+
+	require.NoError(t, err)
+	assert.Empty(t, email.Sent, "a recent notice must suppress another email")
 }
 
 func TestStartRegistration_PendingOTP_ReturnsErrOTPAlreadyPending(t *testing.T) {
@@ -288,7 +346,7 @@ func TestRegister_WithExpiredOTP_ReturnsInvalidOTP(t *testing.T) {
 	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
-func TestRegister_WithDuplicateEmail_ReturnsEmailInUse(t *testing.T) {
+func TestRegister_WithDuplicateEmail_ReturnsGenericInvalidOTP(t *testing.T) {
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
 	existing, _ := entities.NewUser(entities.CreateUserParams{
 		Name: "Existing", Email: "juan@example.com", Password: "securepass123", Locale: "en",
@@ -309,11 +367,39 @@ func TestRegister_WithDuplicateEmail_ReturnsEmailInUse(t *testing.T) {
 
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
-	assert.ErrorIs(t, err, services.ErrEmailAlreadyInUse)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+}
+
+func TestRegister_ExistingEmailWithoutOTP_DoesNotRevealAccount(t *testing.T) {
+	existing, _ := entities.NewUser(entities.CreateUserParams{
+		Name: "Existing", Email: "juan@example.com", Password: "securepass123", Locale: "en",
+	})
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
+			return existing, nil
+		},
+	}
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			return nil, repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		userRepo, otpRepo, &mocks.MockTokenProvider{}, &mocks.MockEmailSender{},
+	)
+
+	user, tokens, err := svc.Register(
+		context.Background(), "juan@example.com", "123456", "Juan", "securepass123", "",
+	)
+
+	assert.Nil(t, user)
+	assert.Nil(t, tokens)
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
 }
 
 func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposeRegistration, 15*time.Minute)
+	otpChecked := false
 	userRepo := &mocks.MockUserRepository{
 		GetByEmailFn: func(ctx context.Context, email string) (*entities.User, error) {
 			return nil, repositories.ErrNotFound
@@ -321,6 +407,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	}
 	otpRepo := &mocks.MockOneTimeOTPRepository{
 		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			otpChecked = true
 			return otp, nil
 		},
 	}
@@ -331,6 +418,7 @@ func TestRegister_WithShortPassword_ReturnsError(t *testing.T) {
 	assert.Nil(t, user)
 	assert.Nil(t, tokens)
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
+	assert.False(t, otpChecked, "public password validation must happen before checking the secret OTP")
 }
 
 func TestRegister_WithEmptyName_ReturnsError(t *testing.T) {
@@ -1116,8 +1204,10 @@ func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
 		Locale: "en",
 	}
 	otp, code, _ := entities.NewOneTimeOTP("juan@example.com", entities.OTPPurposePasswordReset, time.Hour)
+	otpChecked := false
 	otpRepo := &mocks.MockOneTimeOTPRepository{
 		GetByEmailAndPurposeFn: func(ctx context.Context, email string, purpose entities.OTPPurpose) (*entities.OneTimeOTP, error) {
+			otpChecked = true
 			return otp, nil
 		},
 	}
@@ -1132,4 +1222,5 @@ func TestResetPassword_WithInvalidNewPassword_ReturnsError(t *testing.T) {
 	err := svc.ResetPassword(context.Background(), "juan@example.com", code, "short")
 
 	assert.ErrorIs(t, err, valueobjects.ErrPasswordTooShort)
+	assert.False(t, otpChecked, "public password validation must happen before checking the secret OTP")
 }

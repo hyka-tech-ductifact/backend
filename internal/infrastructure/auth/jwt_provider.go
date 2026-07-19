@@ -25,9 +25,9 @@ var (
 
 // JWTProvider implements ports.TokenProvider using golang-jwt.
 type JWTProvider struct {
-	secretKey            []byte
-	tokenDuration        time.Duration
-	refreshTokenDuration time.Duration
+	secretKey       []byte
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 // NewJWTProvider creates a new JWTProvider.
@@ -39,9 +39,9 @@ func NewJWTProvider(cfg config.JWT) *JWTProvider {
 	}
 
 	return &JWTProvider{
-		secretKey:            []byte(cfg.Secret),
-		tokenDuration:        cfg.TokenDuration,
-		refreshTokenDuration: cfg.RefreshTokenDuration,
+		secretKey:       []byte(cfg.Secret),
+		accessTokenTTL:  cfg.AccessTokenTTL,
+		refreshTokenTTL: cfg.RefreshTokenTTL,
 	}
 }
 
@@ -56,19 +56,22 @@ type jwtClaims struct {
 // The access token is short-lived; the refresh token is long-lived.
 // Both contain a "type" claim to prevent misuse (e.g. using a refresh token as access).
 func (p *JWTProvider) GenerateTokenPair(userID uuid.UUID, email string) (*ports.TokenPair, error) {
-	accessToken, err := p.generateToken(userID, email, tokenTypeAccess, p.tokenDuration)
+	accessToken, err := p.generateToken(userID, email, tokenTypeAccess, p.accessTokenTTL)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := p.generateToken(userID, email, tokenTypeRefresh, p.refreshTokenDuration)
+	refreshToken, err := p.generateToken(userID, email, tokenTypeRefresh, p.refreshTokenTTL)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ports.TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:     accessToken,
+		RefreshToken:    refreshToken,
+		TokenType:       ports.BearerTokenType,
+		AccessTokenTTL:  p.accessTokenTTL,
+		RefreshTokenTTL: p.refreshTokenTTL,
 	}, nil
 }
 
