@@ -3,7 +3,7 @@
 > **Stack**: Go 1.26 · Gin · GORM · PostgreSQL · JWT · Docker · Caddy · GitHub Actions · Prometheus
 > **Architecture**: Hexagonal (Ports & Adapters)
 > **Started**: March 2026
-> **Last updated**: April 2026
+> **Last updated**: July 2026
 
 ---
 
@@ -163,9 +163,9 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | # | Task | Status | Priority |
 |---|------|--------|----------|
 | 14.1 | Filtering and sorting on list endpoints (query params) | ✅ |
-| 14.2 | Pagination on all existing list endpoints (admin users deferred to §18) | ✅ |
+| 14.2 | Pagination on all existing list endpoints | ✅ |
 | 14.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🟡 Soon |
-| 14.4 | Request body validation middleware (against OpenAPI) | ⬜ | 🟡 Soon |
+| 14.4 | Request body validation against OpenAPI, including media-type-specific JSON/multipart size limits | ⬜ | 🟡 Soon |
 | 14.5 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
 | 14.6 | Full-text search (PostgreSQL `tsvector`) | ⬜ | 🔵 Later |
 | 14.7 | Partial responses (field selection) | ⬜ | ⚪ Maybe never |
@@ -206,25 +206,38 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 17.2 | Alertmanager rules (error spikes, latency, downtime) | ⬜ | 🟡 Soon |
 | 17.3 | Log aggregation with Loki + Grafana | ⬜ | 🟡 Soon |
 | 17.4 | Distributed tracing with OpenTelemetry | ⬜ | 🟡 Soon |
-| 17.5 | Audit log (user action tracking, stored in DB) | ⬜ | 🟡 Soon |
+| 17.5 | Append-only audit infrastructure for user actions and future privileged operator actions | ⬜ | 🟡 Soon |
 | 17.6 | Health check aggregation (DB + Redis + external deps) | ⬜ | 🟡 Soon |
 
 ---
 
 ## Phase 5 — Business Features
 
-> **Goal**: Add the features that drive real product value — roles, emails,
-> background processing, and richer domain entities.
+> **Goal**: Add the features that drive real product value — project
+> collaboration, emails, background processing, and richer domain entities.
 
-### 18. Roles & Permissions
+### 18. Project Collaboration & Scoped Authorization
+
+Collaboration roles belong to the relationship between a user and one project;
+they are not global roles on `User`. A person may own one project, edit another,
+and only view a third. Orders and pieces inherit access from their project.
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 18.1 | `Role` entity (admin, user, readonly) | ⬜ | 🔴 Now |
-| 18.2 | Role assignment on registration (default: user) | ⬜ | 🔴 Now |
-| 18.3 | RBAC middleware (role-based route protection) | ⬜ | 🔴 Now |
-| 18.4 | Admin endpoints (`GET /admin/users`, `PUT /admin/users/:id/role`) | ⬜ | 🔴 Now |
-| 18.5 | Permission-based access control (fine-grained) | ⬜ | ⚪ Maybe never |
+| 18.1 | Authorization ADR: project boundary, `owner`/`editor`/`viewer` matrix, 403/404 policy, and sharing limits | ⬜ | 🟡 Soon |
+| 18.2 | `ProjectRole` value object and `ProjectMembership` entity with unique `(project_id, user_id)` membership | ⬜ | 🟡 Soon |
+| 18.3 | Make each project creator its first `owner`; backfill existing projects from their client owner transactionally | ⬜ | 🟡 Soon |
+| 18.4 | Central project policy used by Project, Order, and Piece use cases; do not rely only on route middleware | ⬜ | 🟡 Soon |
+| 18.5 | Access-aware `GET /projects` collection and member API: list, add, change role, and remove members | ⬜ | 🔵 Later |
+| 18.6 | Membership invariants: at least one owner, ownership transfer, leave-project rules, and concurrency safety | ⬜ | 🔵 Later |
+| 18.7 | Invitations with expiring/revocable tokens, idempotent acceptance, and email delivery (uses §19) | ⬜ | 🔵 Later |
+| 18.8 | OpenAPI contract, API documentation, generated types, and compatibility review | ⬜ | 🔵 Later |
+| 18.9 | Unit, integration, E2E, contract, concurrency, and cross-project isolation tests | ⬜ | 🔵 Later |
+
+Sharing a project exposes its project data, orders, and pieces. It must not
+implicitly expose the owner's client record or private piece-definition library;
+collaborators receive only the minimum referenced data needed to understand a
+shared piece. See [GUIDE_AUTHORIZATION_BOUNDARIES.md](GUIDE_AUTHORIZATION_BOUNDARIES.md).
 
 ### 19. Email & Notifications
 
@@ -253,7 +266,7 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 |---|------|--------|----------|
 | 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🔵 Later |
 | 21.2 | `Invoice` entity (linked to Client, basic CRUD) | ⬜ | 🔵 Later |
-| 21.3 | `Project` entity (linked to Client, status workflow) | ⬜ | 🔵 Later |
+| 21.3 | Enrich the existing `Project` entity with a status workflow | ⬜ | 🔵 Later |
 | 21.4 | Domain events (event-driven internal communication) | ⬜ | 🔵 Later |
 | 21.5 | Value Object `PhoneNumber` (E.164 validation) | ⬜ | 🔵 Later |
 | 21.6 | Value Object `TaxID` (country-aware validation) | ⬜ | 🔵 Later |
@@ -293,7 +306,33 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 24.2 | API changelog (public, consumer-facing) | ⬜ | 🔵 Later |
 | 24.3 | SDK generation (Go client library) | ⬜ | 🔵 Later |
 | 24.4 | Real-time updates (WebSocket or SSE) | ⬜ | 🔵 Later |
-| 24.5 | Multi-tenancy | ⬜ | ⚪ Maybe never |
+| 24.5 | Organizations / multi-tenancy with organization-scoped memberships | ⬜ | ⚪ Maybe never |
+
+---
+
+## Phase 7 — Internal Platform Operations
+
+> **Goal**: Provide narrowly scoped, auditable tools for support and data repair
+> without turning product users into global administrators or bypassing business
+> invariants.
+
+### 25. Internal Platform Operations
+
+This is a separate control plane for trusted operators. Start inside the modular
+monolith with a distinct entry point and identity boundary; extract a service
+only when deployment, security, scale, or team ownership creates a real need.
+
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 25.1 | Catalogue recurring operational cases and write a threat model; avoid a generic `write:any` capability | ⬜ | 🔵 Later |
+| 25.2 | Separate operator identity from product users (SSO, MFA, dedicated token audience, revocation) | ⬜ | 🔵 Later |
+| 25.3 | Append-only privileged audit events with actor, target, reason/ticket, and before/after data (depends on §17.5) | ⬜ | 🔵 Later |
+| 25.4 | Transactional repair commands/jobs with dry-run, idempotency, explicit scope, and runbooks | ⬜ | 🔵 Later |
+| 25.5 | Internal Admin/Support API on a separate router or binary and private network boundary, reusing application rules | ⬜ | 🔵 Later |
+| 25.6 | Least-privilege support reads with purpose checks and PII masking | ⬜ | 🔵 Later |
+| 25.7 | Explicit operational mutations with approval or break-glass controls, executed by the owning business module | ⬜ | ⚪ Maybe never |
+| 25.8 | Backoffice UI only after operational workflows become recurring and stable | ⬜ | ⚪ Maybe never |
+| 25.9 | Evaluate microservice extraction; never let a separate operations service write another service's tables directly | ⬜ | ⚪ Maybe never |
 
 ---
 
@@ -326,7 +365,7 @@ Phase 4 — Horizontal Scaling & Observability
   Production Observability   ░░░░░░░░░░░░░░░░░░░░  0/6
 
 Phase 5 — Business Features
-  Roles & Permissions        ░░░░░░░░░░░░░░░░░░░░  0/5
+  Project Collaboration     ░░░░░░░░░░░░░░░░░░░░  0/9
   Email & Notifications      ████████████████░░░░  5/6
   Background Processing      ░░░░░░░░░░░░░░░░░░░░  0/5
   Domain Enrichment          ░░░░░░░░░░░░░░░░░░░░  0/6
@@ -335,26 +374,29 @@ Phase 6 — Resilience & Polish
   Resilience Patterns        ░░░░░░░░░░░░░░░░░░░░  0/6
   Data & Export              ░░░░░░░░░░░░░░░░░░░░  0/4
   API Governance             ░░░░░░░░░░░░░░░░░░░░  0/5
+
+Phase 7 — Internal Platform Operations
+  Internal Operations        ░░░░░░░░░░░░░░░░░░░░  0/9
 ```
 
-> **Total progress**: 76/76 (Phase 1+2) + 18/59 (Phase 3–6) = 94/135 tasks (~70%) -> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
+> **Total progress**: 66/66 (Phase 1+2) + 17/79 (Phase 3–7) = 83/145 tasks (~57%) -> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
 > **Phase 3**: Account Management ✅, API Maturity in progress.
 > **Phase 4**: Redis ✅ (5/6), Observability pending.
+> **Phase 5**: Email foundations are in place; project-scoped collaboration remains planned.
+> **Phase 7**: Internal operations are deliberately deferred until concrete, recurring support needs exist.
 
 ### Suggested execution order
 
 | Order | Section | Why first |
 |-------|---------|-----------|
-| 1st | 13. Account Management | Users need password change + deletion (GDPR) |
-| 2nd | 14. Advanced API | Filtering/sorting is the most requested API feature |
-| 3rd | 15. Performance | Establish baselines before adding Redis/complexity |
-| 4th | 16. Redis | Required before deploying multiple instances |
-| 5th | 17. Observability | Production monitoring before adding business features |
-| 6th | 19. Email & Notifications | Enables password reset, verification, and user communication |
-| 7th | 20. Background Processing | Async emails, scheduled cleanup tasks |
-| 8th | 21. Domain Enrichment | Richer entities drive real product value |
-| 9th | 22–24 | Resilience, data export, and API governance — polish and scale |
-| Later | 18. Roles & Permissions | When the app becomes multi-user or needs an admin panel |
+| 1st | 14. Advanced API | Finish conditional requests and request validation |
+| 2nd | 15. Performance | Establish baselines before adding more complexity |
+| 3rd | 17. Observability | Production monitoring before expanding business workflows |
+| 4th | 20. Background Processing | Async emails and scheduled cleanup tasks |
+| 5th | 21. Domain Enrichment | Richer entities drive real product value |
+| When sharing is needed | 18. Project Collaboration | Add resource-scoped membership instead of global user roles |
+| Later | 22–24 | Resilience, data export, organizations, and API governance |
+| Only on demonstrated need | 25. Internal Platform Operations | Begin with audited commands; extract a service only for a real boundary |
 
 ### Priority Legend
 

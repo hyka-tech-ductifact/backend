@@ -1006,6 +1006,28 @@ func TestChangePassword_WithNonExistentUser_ReturnsError(t *testing.T) {
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
 }
 
+func TestChangePassword_WhenUserDisappearsDuringWrite_ReturnsUserNotFound(t *testing.T) {
+	pwd, err := valueobjects.NewPassword("oldpass123")
+	require.NoError(t, err)
+	user := &entities.User{
+		ID:           uuid.New(),
+		PasswordHash: pwd.Hash(),
+	}
+	mockRepo := &mocks.MockUserRepository{
+		GetByIDFn: func(context.Context, uuid.UUID) (*entities.User, error) {
+			return user, nil
+		},
+		UpdateFn: func(context.Context, *entities.User) error {
+			return repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthService(mockRepo, &mocks.MockTokenProvider{})
+
+	err = svc.ChangePassword(context.Background(), user.ID, "oldpass123", "newpass456")
+
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
 // =============================================================================
 // ForgotPassword
 // =============================================================================
@@ -1128,6 +1150,55 @@ func TestResetPassword_WithValidCode_ResetsPassword(t *testing.T) {
 	newPwd := valueobjects.NewPasswordFromHash(updatedUser.PasswordHash)
 	assert.NoError(t, newPwd.Compare("newpass456"))
 	assert.Error(t, newPwd.Compare("oldpass123"))
+}
+
+func TestResetPassword_WhenUserDisappearsDuringWrite_ReturnsInvalidOTP(t *testing.T) {
+	pwd, err := valueobjects.NewPassword("oldpass123")
+	require.NoError(t, err)
+	user := &entities.User{
+		ID:           uuid.New(),
+		Email:        "juan@example.com",
+		PasswordHash: pwd.Hash(),
+	}
+	otp, code, err := entities.NewOneTimeOTP(
+		"juan@example.com",
+		entities.OTPPurposePasswordReset,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	otpDeleted := false
+	otpRepo := &mocks.MockOneTimeOTPRepository{
+		GetByEmailAndPurposeFn: func(
+			context.Context,
+			string,
+			entities.OTPPurpose,
+		) (*entities.OneTimeOTP, error) {
+			return otp, nil
+		},
+		DeleteByEmailAndPurposeFn: func(context.Context, string, entities.OTPPurpose) error {
+			otpDeleted = true
+			return nil
+		},
+	}
+	userRepo := &mocks.MockUserRepository{
+		GetByEmailFn: func(context.Context, string) (*entities.User, error) {
+			return user, nil
+		},
+		UpdateFn: func(context.Context, *entities.User) error {
+			return repositories.ErrNotFound
+		},
+	}
+	svc := newTestAuthServiceForRegistration(
+		userRepo,
+		otpRepo,
+		&mocks.MockTokenProvider{},
+		&mocks.MockEmailSender{},
+	)
+
+	err = svc.ResetPassword(context.Background(), "juan@example.com", code, "newpass456")
+
+	assert.ErrorIs(t, err, entities.ErrInvalidOTP)
+	assert.True(t, otpDeleted)
 }
 
 func TestResetPassword_WithNoOTP_ReturnsInvalidOTP(t *testing.T) {

@@ -5,10 +5,10 @@ package config
 //
 // This is the SINGLE SOURCE OF TRUTH for the contract version.
 // When you bump the contract in the contracts repo, update this
-// constant and run `make fetch-contract` to download the new spec.
+// constant and run `make ensure-contract` to resolve the new spec.
 //
 // Used by:
 //   - /readyz endpoint (reported as "contract_version")
-//   - Makefile fetch-contract (extracted via grep)
+//   - Makefile ensure-contract (extracted via grep)
 //   - CI pipeline (extracted via grep)
 const ContractVersion = "0.13.0"

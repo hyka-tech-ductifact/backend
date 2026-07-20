@@ -2,7 +2,7 @@
 
 Go REST API following **Hexagonal Architecture** (Ports & Adapters) with PostgreSQL and Docker.
 
-> See [docs/GUIDE_HEXAGONAL_ARCH.md](docs/GUIDE_HEXAGONAL_ARCH.md) for an explanation of the architecture.
+> See [docs/GUIDE_HEXAGONAL_ARCH.md](docs/GUIDE_HEXAGONAL_ARCH.md) for an explanation of the architecture and [docs/GUIDE_AUTHORIZATION_BOUNDARIES.md](docs/GUIDE_AUTHORIZATION_BOUNDARIES.md) for the distinction between ownership, project collaboration, and internal operations.
 
 ## Prerequisites
 
@@ -59,22 +59,30 @@ make docker-stop     # stop Docker services
 
 Infrastructure endpoints (`/healthz`, `/readyz`, `/metrics`, `/docs`) are at the root level. All business endpoints are prefixed with `/v1`.
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
+| Method | Endpoint | Authorization | Description |
+|--------|----------|---------------|-------------|
 | GET | `/healthz` | No | Liveness probe |
 | GET | `/readyz` | No | Readiness probe |
 | GET | `/metrics` | No | Prometheus metrics |
 | GET | `/docs` | No | Swagger UI (interactive docs) |
 | GET | `/docs/openapi.yaml` | No | Raw OpenAPI spec |
-| POST | `/auth/register` | No | Register user |
+| POST | `/auth/register` | No | Start user registration |
 | POST | `/auth/login` | No | Login |
-| GET | `/users/me` | Yes | Get current user |
-| PUT | `/users/me` | Yes | Update current user |
-| POST | `/clients` | Yes | Create client |
-| GET | `/clients` | Yes | List clients |
-| GET | `/clients/:client_id` | Yes | Get client |
-| PUT | `/clients/:client_id` | Yes | Update client |
-| DELETE | `/clients/:client_id` | Yes | Delete client |
+| GET | `/users/me` | JWT (self) | Get the current user |
+| PUT | `/users/me` | JWT (self) | Update the current user |
+| POST | `/clients` | JWT | Create a client owned by the current user |
+| GET | `/clients` | JWT + ownership | List the current user's clients |
+| GET | `/clients/:client_id` | JWT + ownership | Get an owned client |
+| PUT | `/clients/:client_id` | JWT + ownership | Update an owned client |
+| DELETE | `/clients/:client_id` | JWT + ownership | Delete an owned client |
+
+The versioned paths in this table are served below `/v1`; for example, the
+authenticated profile endpoint is `GET /v1/users/me`.
+
+The current authorization model is intentionally limited to authentication and
+resource ownership. Product collaboration (`owner`, `editor`, `viewer`) and
+internal support operations are separate future capabilities; see the
+[authorization boundaries guide](docs/GUIDE_AUTHORIZATION_BOUNDARIES.md).
 
 ### List query convention
 
@@ -108,7 +116,7 @@ See [test/api.http](test/api.http) for request examples.
 ```bash
 make help              # list all available commands
 make app-build         # compile binary to bin/api
-make fetch-contract    # download OpenAPI spec matching ContractVersion
+make ensure-contract   # use local OpenAPI bundle or download ContractVersion
 make fmt               # format code
 make lint              # lint code
 make clean             # remove build artifacts
@@ -117,11 +125,12 @@ make clean             # remove build artifacts
 ## Updating the API contract
 
 The contract version is defined as a Go constant in `internal/config/contract_version.go`.
-When the contracts repo publishes a new release:
+When a contract change is ready to release:
 
-1. Update the constant: `const ContractVersion = "0.4.0"`
-2. Run `make fetch-contract` to download the matching spec
-3. Commit both changes in the same PR
+1. Commit the source changes in the contracts repository and publish its new tag.
+2. Update the backend constant, for example `const ContractVersion = "0.14.0"`.
+3. Run `make ensure-contract` and validate the reported version.
+4. Commit the contract source and backend version bump in their respective repositories.
 
 ## Contributing
 

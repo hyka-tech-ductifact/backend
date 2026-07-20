@@ -71,8 +71,23 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 
 func (r *PostgresUserRepository) Update(ctx context.Context, user *entities.User) error {
 	user.UpdatedAt = time.Now()
-	model := toUserModel(user)
-	return r.db.WithContext(ctx).Save(model).Error
+	result := r.db.WithContext(ctx).
+		Model(&UserModel{}).
+		Where("id = ?", user.ID).
+		Updates(map[string]any{
+			"name":          user.Name,
+			"email":         user.Email,
+			"password_hash": user.PasswordHash,
+			"locale":        user.Locale,
+			"updated_at":    user.UpdatedAt,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return repositories.ErrNotFound
+	}
+	return nil
 }
 
 // Delete permanently removes a user from the database (hard delete).

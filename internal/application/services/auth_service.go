@@ -312,6 +312,9 @@ func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 
 	// Step 4: Persist updated user
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return ErrUserNotFound
+		}
 		return err
 	}
 
@@ -414,6 +417,10 @@ func (s *authService) ResetPassword(ctx context.Context, email, code, newPasswor
 
 	// Step 7: Persist.
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			_ = s.otpRepo.DeleteByEmailAndPurpose(ctx, normalizedEmail, entities.OTPPurposePasswordReset)
+			return entities.ErrInvalidOTP
+		}
 		return err
 	}
 

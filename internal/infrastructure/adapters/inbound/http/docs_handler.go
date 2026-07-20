@@ -70,7 +70,7 @@ func (h *DocsHandler) Spec(c *gin.Context) {
 	data, err := h.loadSpec()
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "OpenAPI spec not available — run: make fetch-contract",
+			"error": "OpenAPI spec not available — run: make ensure-contract",
 		})
 		return
 	}
