@@ -17,15 +17,14 @@ import (
 //   - GET /healthz  → liveness  (is the process alive?)
 //   - GET /readyz   → readiness (can it serve traffic?)
 type HealthHandler struct {
-	healthChecker   ports.HealthChecker
-	storageChecker  storagePinger
-	emailChecker    emailPinger
-	redisChecker    redisPinger
-	startTime       time.Time
-	contractVersion string
-	commit          string
-	buildTime       string
-	logLevel        string
+	healthChecker  ports.HealthChecker
+	storageChecker storagePinger
+	emailChecker   emailPinger
+	redisChecker   redisPinger
+	startTime      time.Time
+	commit         string
+	buildTime      string
+	logLevel       string
 }
 
 const readinessCheckTimeout = 3 * time.Second
@@ -56,21 +55,19 @@ func NewHealthHandler(
 	emailChecker ports.EmailSender,
 	redisChecker redisPinger,
 	startTime time.Time,
-	contractVersion string,
 	commit string,
 	buildTime string,
 	logLevel string,
 ) *HealthHandler {
 	return &HealthHandler{
-		healthChecker:   healthChecker,
-		storageChecker:  storageChecker,
-		emailChecker:    emailChecker,
-		redisChecker:    redisChecker,
-		startTime:       startTime,
-		contractVersion: contractVersion,
-		commit:          commit,
-		buildTime:       buildTime,
-		logLevel:        logLevel,
+		healthChecker:  healthChecker,
+		storageChecker: storageChecker,
+		emailChecker:   emailChecker,
+		redisChecker:   redisChecker,
+		startTime:      startTime,
+		commit:         commit,
+		buildTime:      buildTime,
+		logLevel:       logLevel,
 	}
 }
 
@@ -105,8 +102,7 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "storage": "connected",
 //	  "email": "connected",
 //	  "commit": "abc1234",
-//	  "build_time": "2026-05-27T14:30:00Z",
-//	  "contract_version": "1.0.0"
+//	  "build_time": "2026-05-27T14:30:00Z"
 //	}
 //
 // Response 200 (degraded — non-critical dependency down):
@@ -119,8 +115,7 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "email": "unavailable",
 //	  "warnings": ["email: unavailable"],
 //	  "commit": "abc1234",
-//	  "build_time": "2026-05-27T14:30:00Z",
-//	  "contract_version": "1.0.0"
+//	  "build_time": "2026-05-27T14:30:00Z"
 //	}
 //
 // Response 503 (not ready — critical dependency down):
@@ -133,23 +128,21 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 //	  "email": "connected",
 //	  "errors": ["database: unavailable"],
 //	  "commit": "abc1234",
-//	  "build_time": "2026-05-27T14:30:00Z",
-//	  "contract_version": "1.0.0"
+//	  "build_time": "2026-05-27T14:30:00Z"
 //	}
 //
 // readyzResponse defines the JSON field order for the readiness endpoint.
 type readyzResponse struct {
-	Status          string   `json:"status"`
-	Uptime          string   `json:"uptime"`
-	Database        string   `json:"database"`
-	Storage         string   `json:"storage"`
-	Redis           string   `json:"redis"`
-	Email           string   `json:"email"`
-	Commit          string   `json:"commit"`
-	BuildTime       string   `json:"build_time"`
-	ContractVersion string   `json:"contract_version"`
-	Errors          []string `json:"errors,omitempty"`
-	Warnings        []string `json:"warnings,omitempty"`
+	Status    string   `json:"status"`
+	Uptime    string   `json:"uptime"`
+	Database  string   `json:"database"`
+	Storage   string   `json:"storage"`
+	Redis     string   `json:"redis"`
+	Email     string   `json:"email"`
+	Commit    string   `json:"commit"`
+	BuildTime string   `json:"build_time"`
+	Errors    []string `json:"errors,omitempty"`
+	Warnings  []string `json:"warnings,omitempty"`
 }
 
 func (h *HealthHandler) Readyz(c *gin.Context) {
@@ -232,15 +225,14 @@ func (h *HealthHandler) Readyz(c *gin.Context) {
 	}
 
 	body := readyzResponse{
-		Status:          status,
-		Uptime:          uptime,
-		Database:        dbStatus,
-		Storage:         storageStatus,
-		Redis:           redisStatus,
-		Email:           emailStatus,
-		Commit:          h.commit,
-		BuildTime:       h.buildTime,
-		ContractVersion: h.contractVersion,
+		Status:    status,
+		Uptime:    uptime,
+		Database:  dbStatus,
+		Storage:   storageStatus,
+		Redis:     redisStatus,
+		Email:     emailStatus,
+		Commit:    h.commit,
+		BuildTime: h.buildTime,
 	}
 	if len(errs) > 0 {
 		body.Errors = errs

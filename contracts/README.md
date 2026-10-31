@@ -25,24 +25,19 @@ Run from the backend root. All tooling runs in Docker.
 make contract-validate   # Lint and validate the spec (redocly)
 make contract-bundle     # Generate openapi/bundled.yaml
 make contract-breaking   # Detect breaking changes vs main (oasdiff)
-make contract-ui         # Standalone Swagger UI at http://localhost:8081
 ```
 
 ## Versioning
 
-`info.version` in `openapi.yaml` is a placeholder. The real value is
-`ContractVersion` in `internal/config/contract_version.go`, injected into the
-bundle at build time and reported by `/readyz`. Bump it when the spec changes:
-
-| Change | Bump |
-|---|---|
-| Descriptions, examples, typos | PATCH |
-| New endpoint or optional field | MINOR |
-| Removed/renamed field or endpoint, changed response shape | MAJOR |
+The contract has no version of its own: it is versioned by the backend commit.
+`info.version` is `dev` in the source and is stamped with the build commit in
+the Docker image; `/readyz` reports the same `commit`. Compatibility is enforced
+by `make contract-breaking` (and the `Contract Spec` CI job), not by a number.
+A breaking change that must ship goes through a new path prefix (`/v2`).
 
 ## Workflow
 
 1. Edit the source files under `openapi/` (never `bundled.yaml`).
 2. `make contract-validate && make contract-breaking`.
-3. Implement the change in Go and bump `ContractVersion`.
+3. Implement the change in Go.
 4. Open a single PR with contract and implementation.

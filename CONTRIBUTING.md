@@ -101,16 +101,11 @@ a PR that changes the API must change the spec and the implementation together.
 
 - Edit the source files under `contracts/openapi/`, never `bundled.yaml`.
 - Run `make contract-validate` and `make contract-breaking` before pushing.
-- Bump `ContractVersion` in `internal/config/contract_version.go`:
-
-| Change | Example | Bump |
-|--------|---------|------|
-| Descriptions, examples, typos | Fix a field description | PATCH |
-| New endpoint or optional field | Add `GET /invoices` | MINOR |
-| Removed/renamed field or endpoint, changed response shape | Drop `clients[].phone` | MAJOR + `!` in the PR title |
-
-CI runs the same checks on every PR (`Contract Spec` job) and fails on breaking
-changes against the target branch.
+- The contract has no version of its own; it is identified by the backend
+  commit. CI runs the same checks on every PR (`Contract Spec` job) and fails
+  on breaking changes against the target branch.
+- A breaking change that must ship is a `feat(api)!` PR and goes through a new
+  path prefix (`/v2`), keeping `/v1` until consumers migrate.
 
 ---
 

@@ -2,7 +2,7 @@ openapi: 3.1.1
 info:
   title: Ductifact API
   description: Backend API for Ductifact platform
-  version: 0.0.0 # Replaced automatically by CI on release
+  version: dev # Stamped with the backend commit in the Docker image
   license:
     name: CC BY-NC 4.0
     identifier: CC-BY-NC-4.0

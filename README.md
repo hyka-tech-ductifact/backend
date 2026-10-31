@@ -130,15 +130,15 @@ The OpenAPI spec lives in [contracts/openapi/](contracts/openapi/) and ships wit
 the code that implements it: one PR changes both. `bundled.yaml` is generated
 (git-ignored) by `make contract-bundle` and by the Docker build.
 
-The contract version is the Go constant `ContractVersion` in
-`internal/config/contract_version.go`; it is stamped into the bundle and reported
-by `/readyz`. To change the API:
+The contract has no version of its own: it is versioned by the backend commit,
+stamped into `info.version` in the Docker image and reported by `/readyz`.
+To change the API:
 
 1. Edit the source files under `contracts/openapi/` (never `bundled.yaml`).
 2. Run `make contract-validate` and `make contract-breaking`.
-3. Implement the change and bump `ContractVersion` (PATCH/MINOR/MAJOR, see
-   [contracts/README.md](contracts/README.md)).
+3. Implement the change.
 4. Open a single PR; CI validates the spec and blocks breaking changes.
+   A breaking change that must ship goes through a new path prefix (`/v2`).
 
 ## Contributing
 

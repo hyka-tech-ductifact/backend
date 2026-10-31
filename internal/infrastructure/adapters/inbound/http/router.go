@@ -226,7 +226,6 @@ func SetupRoutes(
 		emailSender,
 		redisChecker,
 		time.Now(),
-		config.ContractVersion,
 		config.Commit,
 		config.BuildTime,
 		logLevel,

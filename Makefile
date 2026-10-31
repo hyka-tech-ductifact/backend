@@ -24,8 +24,7 @@ COVERAGE ?= 0
 CONTRACT_DIR     := contracts/openapi
 CONTRACT_SPEC    := $(CONTRACT_DIR)/openapi.yaml
 CONTRACT_BUNDLE  := $(CONTRACT_DIR)/bundled.yaml
-CONTRACT_SOURCES := $(shell find $(CONTRACT_DIR) -name '*.yaml' ! -name bundled.yaml) internal/config/contract_version.go
-CONTRACT_VERSION  = $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/')
+CONTRACT_SOURCES := $(shell find $(CONTRACT_DIR) -name '*.yaml' ! -name bundled.yaml)
 REDOCLY_IMAGE    ?= redocly/cli:2.20.5
 OASDIFF_IMAGE    ?= tufin/oasdiff:v1.35.0
 BASE_REF         ?= main
@@ -78,7 +77,7 @@ help:
 	@echo "      ST_MAX_EXAMPLES   - Override examples per operation:     make test-contract ST_MAX_EXAMPLES=200"
 	@echo "      ST_SEED           - Reproduce a test run with a seed:     make test-contract ST_SEED=<seed>"
 	@echo ""
-	@echo "  Contracts (source: contracts/openapi/, version: internal/config/contract_version.go):"
+	@echo "  Contracts (source: contracts/openapi/):"
 	@echo "    contract-validate - Lint the OpenAPI spec (redocly)"
 	@echo "    contract-bundle   - Generate contracts/openapi/bundled.yaml (only if sources changed)"
 	@echo "    contract-breaking - Detect breaking changes vs BASE_REF (default: main)"
@@ -248,7 +247,8 @@ test-clean:
 # ═══════════════════════════════════════════════════════════════
 # Contracts (OpenAPI)
 # ═══════════════════════════════════════════════════════════════
-# Source of truth: contracts/openapi/ + ContractVersion (Go const).
+# Source of truth: contracts/openapi/. The contract is versioned by the
+# backend commit: the Docker image stamps info.version with APP_COMMIT.
 # bundled.yaml is a generated artifact (git-ignored), consumed by
 # /docs, Schemathesis and the Docker image.
 
@@ -257,15 +257,13 @@ contract-validate:
 	@echo "Validating OpenAPI spec..."
 	docker run --rm -v $(CURDIR)/$(CONTRACT_DIR):/spec:ro $(REDOCLY_IMAGE) lint /spec/openapi.yaml
 
-# Resolve all $ref into bundled.yaml and stamp it with ContractVersion.
-# Rebuilt only when a spec file or contract_version.go changes.
+# Resolve all $ref into bundled.yaml. Rebuilt only when a spec file changes.
 contract-bundle: $(CONTRACT_BUNDLE)
 
 $(CONTRACT_BUNDLE): $(CONTRACT_SOURCES)
-	@echo "Bundling OpenAPI spec v$(CONTRACT_VERSION)..."
+	@echo "Bundling OpenAPI spec..."
 	@docker run --rm -v $(CURDIR)/$(CONTRACT_DIR):/spec $(REDOCLY_IMAGE) bundle /spec/openapi.yaml -o /spec/bundled.yaml
-	@sed -i '1,/^  version: .*/s/^  version: .*/  version: $(CONTRACT_VERSION)/' $@
-	@echo "✅ $@ (v$(CONTRACT_VERSION))"
+	@echo "✅ $@"
 
 # Detect breaking changes against BASE_REF (branch, tag or commit).
 # Skips when BASE_REF has no contract yet (first PR after the move).

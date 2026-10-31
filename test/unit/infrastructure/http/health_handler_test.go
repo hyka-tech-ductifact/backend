@@ -3,13 +3,11 @@ package http_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"ductifact/internal/config"
 	handler "ductifact/internal/infrastructure/adapters/inbound/http"
 	"ductifact/test/unit/mocks"
 
@@ -29,7 +27,6 @@ func setupLivezRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.Mo
 		&mocks.MockEmailSender{},
 		nil,
 		time.Now(),
-		config.ContractVersion,
 		"v1.0.0-test",
 		"abc1234",
 		"debug",
@@ -46,7 +43,6 @@ func setupReadyzRouter(healthMock *mocks.MockHealthChecker, storageMock *mocks.M
 		&mocks.MockEmailSender{},
 		nil,
 		time.Now(),
-		config.ContractVersion,
 		"abc1234",
 		"2026-05-27T14:30:00Z",
 		"debug",
@@ -67,7 +63,6 @@ func setupReadyzRouterWithEmail(
 		emailMock,
 		nil,
 		time.Now(),
-		config.ContractVersion,
 		"abc1234",
 		"2026-05-27T14:30:00Z",
 		"debug",
@@ -88,7 +83,6 @@ func setupReadyzRouterProd(
 		emailMock,
 		nil,
 		time.Now(),
-		config.ContractVersion,
 		"abc1234",
 		"2026-05-27T14:30:00Z",
 		"info",
@@ -137,7 +131,6 @@ func TestHealthHandler_Readyz_Ready(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"commit":"abc1234"`)
 	assert.Contains(t, w.Body.String(), `"build_time":"2026-05-27T14:30:00Z"`)
 	assert.Contains(t, w.Body.String(), `"uptime"`)
-	assert.Contains(t, w.Body.String(), fmt.Sprintf(`"contract_version":"%s"`, config.ContractVersion))
 }
 
 func TestHealthHandler_Readyz_DatabaseDown(t *testing.T) {

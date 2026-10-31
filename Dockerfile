@@ -4,12 +4,11 @@ FROM docker.io/redocly/cli:2.20.5 AS spec
 WORKDIR /spec
 
 COPY contracts/openapi ./
-COPY internal/config/contract_version.go /tmp/contract_version.go
 
-# Resolve $ref and stamp info.version with ContractVersion (mirrors make contract-bundle)
+# Resolve $ref and stamp info.version with the build commit (the contract is versioned by the backend commit)
+ARG APP_COMMIT=unknown
 RUN redocly bundle openapi.yaml -o bundled.yaml \
- && V=$(sed -n 's/^const ContractVersion = "\(.*\)"/\1/p' /tmp/contract_version.go) \
- && sed -i "1,/^  version: .*/s/^  version: .*/  version: $V/" bundled.yaml
+ && sed -i "1,/^  version: .*/s/^  version: .*/  version: ${APP_COMMIT}/" bundled.yaml
 # ── Stage 1: Build ──────────────────────────────────────────
 FROM docker.io/library/golang:1.26-alpine AS builder
 
