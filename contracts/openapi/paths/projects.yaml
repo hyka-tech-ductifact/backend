@@ -1,0 +1,326 @@
+# ─── Project Endpoints ────────────────────────────────────────
+
+# GET + POST /clients/{client_id}/projects
+collection:
+  get:
+    summary: List all projects for a client
+    operationId: listProjects
+    tags:
+      - Projects
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        description: The client's UUID
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        description: Page number (1-based). Defaults to 1.
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          example: 1
+      - name: page_size
+        in: query
+        required: false
+        description: Number of items per page. Defaults to 20, max 100.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          example: 20
+      - name: search
+        in: query
+        required: false
+        description: >-
+          Case-insensitive literal partial match against project name, address,
+          or manager name. Surrounding whitespace is ignored and wildcard
+          characters are treated literally.
+        schema:
+          type: string
+          maxLength: 200
+          pattern: '^[^\u0000]*$'
+          example: "tower"
+      - name: sort_by
+        in: query
+        required: false
+        description: >-
+          Field used for sorting. When omitted, the existing default order
+          (created_at descending) is preserved.
+        schema:
+          type: string
+          enum: [name, address, manager_name, created_at, updated_at]
+          example: "name"
+      - name: sort_order
+        in: query
+        required: false
+        description: >-
+          Direction applied when sort_by is provided. Defaults to asc when
+          sort_by is present and is ignored when sort_by is omitted.
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: asc
+          example: "asc"
+    responses:
+      "200":
+        description: Paginated list of projects
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/project.yaml#/PaginatedProjectResponse"
+      "400":
+        description: Invalid list parameters (pagination, filtering, or sorting)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "page_size must be between 1 and 100"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Client not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "client not found"
+
+  post:
+    summary: Create a new project for a client
+    operationId: createProject
+    tags:
+      - Projects
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        description: The client's UUID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/project.yaml#/CreateProjectRequest"
+          example:
+            name: "Residential Tower B"
+            address: "Calle Mayor 12, Madrid"
+            manager_name: "Carlos Pérez"
+            phone: "+34 699 111 222"
+            description: "14-storey residential building, phase 1"
+    responses:
+      "201":
+        description: Project created successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/project.yaml#/ProjectResponse"
+      "400":
+        description: Invalid request body
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid request body"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Client not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "client not found"
+
+# GET/PUT/DELETE /projects/{project_id}
+item:
+  get:
+    summary: Get a project by ID
+    operationId: getProject
+    tags:
+      - Projects
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The project's UUID
+        schema:
+          type: string
+          format: uuid
+    responses:
+      "200":
+        description: Project found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/project.yaml#/ProjectResponse"
+      "400":
+        description: Invalid ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid project ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Project not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project not found"
+
+  put:
+    summary: Update a project
+    operationId: updateProject
+    tags:
+      - Projects
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The project's UUID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/project.yaml#/UpdateProjectRequest"
+          example:
+            name: "Residential Tower B - Phase 2"
+    responses:
+      "200":
+        description: Project updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/project.yaml#/ProjectResponse"
+      "400":
+        description: Invalid request body or ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid project ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Project not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project not found"
+
+  delete:
+    summary: Delete a project
+    operationId: deleteProject
+    tags:
+      - Projects
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The project's UUID
+        schema:
+          type: string
+          format: uuid
+      - name: cascade
+        in: query
+        required: false
+        description: >
+          If true, deletes the project and all its associated orders and
+          pieces. If false (default), returns 409 if the project has
+          associated orders.
+        schema:
+          type: boolean
+          default: false
+    responses:
+      "204":
+        description: Project deleted successfully
+      "400":
+        description: Invalid ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid project ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Project not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project not found"
+      "409":
+        description: Project has associated orders (use cascade=true to force)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project has associated orders; set cascade=true to delete"

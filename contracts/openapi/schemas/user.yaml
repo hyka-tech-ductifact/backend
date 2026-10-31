@@ -1,0 +1,34 @@
+# ─── User Schemas ────────────────────────────────────────────
+UpdateUserRequest:
+  type: object
+  additionalProperties: false
+  description: Request body for updating a user. All fields are optional.
+  properties:
+    name:
+      $ref: "_fields.yaml#/UserName"
+      description: The user's new name
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+      description: The user's new email (must be unique)
+    locale:
+      $ref: "_fields.yaml#/Locale"
+      description: The user's preferred language
+
+UserResponse:
+  type: object
+  description: User data returned by the API
+  required:
+    - id
+    - name
+    - email
+    - locale
+  properties:
+    id:
+      $ref: "_fields.yaml#/UUID"
+      description: Unique user identifier
+    name:
+      $ref: "_fields.yaml#/UserName"
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+    locale:
+      $ref: "_fields.yaml#/Locale"

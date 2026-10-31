@@ -1,0 +1,291 @@
+# ─── Client Endpoints ────────────────────────────────────────
+
+# GET + POST /clients
+collection:
+  get:
+    summary: List all clients for the authenticated user
+    operationId: listClients
+    tags:
+      - Clients
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (1-based). Defaults to 1.
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          example: 1
+      - name: page_size
+        in: query
+        required: false
+        description: Number of items per page. Defaults to 20, max 100.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          example: 20
+      - name: search
+        in: query
+        required: false
+        description: >-
+          Case-insensitive literal partial match against client name or email.
+          Surrounding whitespace is ignored and wildcard characters are treated
+          literally.
+        schema:
+          type: string
+          maxLength: 200
+          pattern: '^[^\u0000]*$'
+          example: "acme"
+      - name: sort_by
+        in: query
+        required: false
+        description: >-
+          Field used for sorting. When omitted, the existing default order
+          (created_at descending) is preserved.
+        schema:
+          type: string
+          enum: [name, email, created_at, updated_at]
+          example: "name"
+      - name: sort_order
+        in: query
+        required: false
+        description: >-
+          Direction applied when sort_by is provided. Defaults to asc when
+          sort_by is present and is ignored when sort_by is omitted.
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: asc
+          example: "asc"
+    responses:
+      "200":
+        description: Paginated list of clients
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/client.yaml#/PaginatedClientResponse"
+      "400":
+        description: Invalid list parameters (pagination, filtering, or sorting)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "page_size must be between 1 and 100"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+  post:
+    summary: Create a new client
+    operationId: createClient
+    tags:
+      - Clients
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/client.yaml#/CreateClientRequest"
+          example:
+            name: "Acme Corp"
+    responses:
+      "201":
+        description: Client created successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/client.yaml#/ClientResponse"
+      "400":
+        description: Invalid request body (missing or empty name)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+# GET/PUT/DELETE /clients/{client_id}
+item:
+  get:
+    summary: Get a client by ID
+    operationId: getClient
+    tags:
+      - Clients
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        description: The client's UUID
+        schema:
+          type: string
+          format: uuid
+    responses:
+      "200":
+        description: Client found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/client.yaml#/ClientResponse"
+      "400":
+        description: Invalid client ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid client ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "403":
+        description: Client does not belong to this user
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "client does not belong to this user"
+      "404":
+        description: Client not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "client not found"
+
+  put:
+    summary: Update a client
+    operationId: updateClient
+    tags:
+      - Clients
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        description: The client's UUID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/client.yaml#/UpdateClientRequest"
+          example:
+            name: "Acme Corp Updated"
+    responses:
+      "200":
+        description: Client updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/client.yaml#/ClientResponse"
+      "400":
+        description: Invalid request body or client ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "403":
+        description: Client does not belong to this user
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "404":
+        description: Client not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+  delete:
+    summary: Delete a client
+    operationId: deleteClient
+    tags:
+      - Clients
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        description: The client's UUID
+        schema:
+          type: string
+          format: uuid
+      - name: cascade
+        in: query
+        required: false
+        description: >
+          If true, deletes the client and all its associated projects, orders,
+          and pieces. If false (default), returns 409 if the client has
+          associated projects.
+        schema:
+          type: boolean
+          default: false
+    responses:
+      "204":
+        description: Client deleted successfully
+      "400":
+        description: Invalid client ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "403":
+        description: Client does not belong to this user
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "404":
+        description: Client not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "409":
+        description: Client has associated projects (use cascade=true to force)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "client has associated projects; set cascade=true to delete"

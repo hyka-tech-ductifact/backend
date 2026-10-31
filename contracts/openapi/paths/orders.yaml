@@ -1,0 +1,326 @@
+# ─── Order Endpoints ──────────────────────────────────────────
+
+# GET + POST /projects/{project_id}/orders
+collection:
+  get:
+    summary: List all orders for a project
+    operationId: listOrders
+    tags:
+      - Orders
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The project's UUID
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        description: Page number (1-based). Defaults to 1.
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          example: 1
+      - name: page_size
+        in: query
+        required: false
+        description: Number of items per page. Defaults to 20, max 100.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          example: 20
+      - name: search
+        in: query
+        required: false
+        description: >-
+          Case-insensitive literal partial match against order title. Surrounding
+          whitespace is ignored and wildcard characters are treated literally.
+        schema:
+          type: string
+          maxLength: 200
+          pattern: '^[^\u0000]*$'
+          example: "steel"
+      - name: status
+        in: query
+        required: false
+        description: Exact order status filter.
+        schema:
+          $ref: "../schemas/order.yaml#/OrderStatus"
+      - name: sort_by
+        in: query
+        required: false
+        description: >-
+          Field used for sorting. When omitted, the existing default order
+          (created_at descending) is preserved.
+        schema:
+          type: string
+          enum: [title, status, created_at, updated_at]
+          example: "title"
+      - name: sort_order
+        in: query
+        required: false
+        description: >-
+          Direction applied when sort_by is provided. Defaults to asc when
+          sort_by is present and is ignored when sort_by is omitted.
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: asc
+          example: "asc"
+    responses:
+      "200":
+        description: Paginated list of orders
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/order.yaml#/PaginatedOrderResponse"
+      "400":
+        description: Invalid list parameters (pagination, filtering, or sorting)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "page_size must be between 1 and 100"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Project not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project not found"
+
+  post:
+    summary: Create a new order for a project
+    operationId: createOrder
+    tags:
+      - Orders
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The project's UUID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/order.yaml#/CreateOrderRequest"
+          example:
+            title: "Steel beams – lot 3"
+    responses:
+      "201":
+        description: Order created successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/order.yaml#/OrderResponse"
+      "400":
+        description: Invalid request body
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid request body"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Project not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "project not found"
+
+# GET/PUT/DELETE /orders/{order_id}
+item:
+  get:
+    summary: Get an order by ID
+    operationId: getOrder
+    tags:
+      - Orders
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: order_id
+        in: path
+        required: true
+        description: The order's UUID
+        schema:
+          type: string
+          format: uuid
+    responses:
+      "200":
+        description: Order found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/order.yaml#/OrderResponse"
+      "400":
+        description: Invalid ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid order ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Order not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "order not found"
+
+  put:
+    summary: Update an order
+    operationId: updateOrder
+    tags:
+      - Orders
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: order_id
+        in: path
+        required: true
+        description: The order's UUID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/order.yaml#/UpdateOrderRequest"
+          example:
+            status: "completed"
+    responses:
+      "200":
+        description: Order updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/order.yaml#/OrderResponse"
+      "400":
+        description: Invalid request body or ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid order ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Order not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "order not found"
+
+  delete:
+    summary: Delete an order
+    operationId: deleteOrder
+    tags:
+      - Orders
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: order_id
+        in: path
+        required: true
+        description: The order's UUID
+        schema:
+          type: string
+          format: uuid
+      - name: cascade
+        in: query
+        required: false
+        description: >
+          If true, deletes the order and all its associated pieces.
+          If false (default), returns 409 if the order has associated pieces.
+        schema:
+          type: boolean
+          default: false
+    responses:
+      "204":
+        description: Order deleted successfully
+      "400":
+        description: Invalid ID format
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid order ID format"
+      "401":
+        description: Missing or invalid token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "authorization header required"
+      "404":
+        description: Order not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "order not found"
+      "409":
+        description: Order has associated pieces (use cascade=true to force)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "order has associated pieces; set cascade=true to delete"

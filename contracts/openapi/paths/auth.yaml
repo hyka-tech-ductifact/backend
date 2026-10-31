@@ -1,0 +1,307 @@
+# ─── Auth Endpoints ──────────────────────────────────────────
+
+# POST /auth/register
+register:
+  post:
+    summary: Start registration by requesting a verification code
+    description: >-
+      First step of the email-first registration flow. Only an email address is
+      required. A new address receives a numeric one-time verification code;
+      an existing account may receive recovery guidance. The response and fixed
+      resend policy are intentionally generic to avoid disclosing either state.
+    operationId: startRegistration
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/StartRegistrationRequest"
+          example:
+            email: "juan@example.com"
+    responses:
+      "200":
+        description: Generic email-dispatch response with a fixed resend policy
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/CodeRequestResponse"
+            example:
+              message: "if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email"
+              resend_cooldown_seconds: 900
+      "400":
+        description: Invalid request body (missing or invalid email)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+# POST /auth/register/verify
+register-verify:
+  post:
+    summary: Complete registration by verifying the code and creating the account
+    description: >-
+      Second step of the email-first registration flow. The user submits the
+      numeric verification code (OTP) received by email together with their name
+      and password. On success the account is created and an authentication
+      token pair is returned. OTP failures are intentionally indistinguishable;
+      the response does not reveal account existence, code existence, expiry,
+      remaining lifetime, or remaining attempts.
+    operationId: register
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/RegisterRequest"
+          example:
+            email: "juan@example.com"
+            code: "123456"
+            name: "Juan García"
+            password: "securepass123"
+    responses:
+      "201":
+        description: User registered successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/AuthResponse"
+      "400":
+        description: >-
+          Invalid request body (missing fields, short password) or an invalid or
+          expired verification code
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid or expired verification code"
+# POST /auth/login
+login:
+  post:
+    summary: Log in with email and password
+    operationId: login
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/LoginRequest"
+          example:
+            email: "juan@example.com"
+            password: "securepass123"
+    responses:
+      "200":
+        description: Login successful
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/AuthResponse"
+      "400":
+        description: Invalid request body (missing fields)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Invalid credentials
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid email or password"
+
+# POST /auth/refresh
+refresh:
+  post:
+    summary: Refresh an access token using a refresh token
+    operationId: refreshToken
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/RefreshRequest"
+          example:
+            refresh_token: "eyJhbGciOiJIUzI1NiIs..."
+    responses:
+      "200":
+        description: Token refreshed successfully, with effective lifetimes in seconds
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/TokenResponse"
+      "400":
+        description: Invalid request body (missing refresh_token)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Invalid or expired refresh token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid or expired refresh token"
+
+# POST /auth/logout
+logout:
+  post:
+    summary: Log out by revoking the current tokens
+    operationId: logout
+    tags:
+      - Auth
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/LogoutRequest"
+          example:
+            refresh_token: "eyJhbGciOiJIUzI1NiIs..."
+    responses:
+      "200":
+        description: Logged out successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/MessageResponse"
+            example:
+              message: "logged out successfully"
+      "400":
+        description: Invalid request body (missing refresh_token)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Missing or invalid access token
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+# PUT /auth/password
+change-password:
+  put:
+    summary: Change the authenticated user's password
+    operationId: changePassword
+    tags:
+      - Auth
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/ChangePasswordRequest"
+          example:
+            current_password: "oldpass123"
+            new_password: "newpass456"
+    responses:
+      "200":
+        description: Password changed successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/MessageResponse"
+            example:
+              message: "password changed successfully"
+      "400":
+        description: Invalid request body (missing fields, new password too short)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "401":
+        description: Missing/invalid access token or current password is incorrect
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "current password is incorrect"
+
+# POST /auth/password/reset
+password-reset:
+  post:
+    summary: Request a password reset code by email
+    operationId: startPasswordReset
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/ForgotPasswordRequest"
+          example:
+            email: "juan@example.com"
+    responses:
+      "200":
+        description: Generic reset-code response with a fixed resend policy
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/CodeRequestResponse"
+            example:
+              message: "if the address is associated with an account, a password reset code has been sent; it may take a few minutes, so check the spam folder before requesting another code"
+              resend_cooldown_seconds: 900
+      "400":
+        description: Invalid request body (missing email)
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+
+# POST /auth/password/reset/verify
+password-reset-verify:
+  post:
+    summary: Reset password using the numeric verification code (OTP)
+    description: >-
+      Verifies the reset code and applies a new password. OTP failures are
+      intentionally indistinguishable; the response does not reveal account
+      existence, code existence, expiry, remaining lifetime, or remaining attempts.
+    operationId: verifyPasswordReset
+    tags:
+      - Auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/auth.yaml#/ResetPasswordRequest"
+          example:
+            email: "juan@example.com"
+            code: "123456"
+            new_password: "newpass456"
+    responses:
+      "200":
+        description: Password reset successfully
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/auth.yaml#/MessageResponse"
+            example:
+              message: "password reset successfully"
+      "400":
+        description: Invalid or expired reset code, or new password too short
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+            example:
+              error: "invalid or expired verification code"

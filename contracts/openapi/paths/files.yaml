@@ -1,0 +1,61 @@
+# File proxy — serves images from storage
+#
+# This endpoint acts as a reverse proxy to the object storage (MinIO).
+# image_url and thumbnail_url fields in responses point here.
+# Files are immutable (keys contain UUIDs) so aggressive caching is safe.
+
+serve:
+  get:
+    operationId: serveFile
+    summary: Serve a file from storage
+    description: |
+      Streams a file from object storage to the client.
+      Used by `image_url` and `thumbnail_url` fields in piece definition responses.
+      Keys contain UUIDs so files are immutable — cache aggressively.
+    tags: [Files]
+    parameters:
+      - name: filepath
+        in: path
+        required: true
+        description: The storage key of the file (e.g. `piece-definitions/{uuid}/original.png`)
+        schema:
+          type: string
+          pattern: "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_/-]+\\.[a-zA-Z]{2,4}$"
+          example: "piece-definitions/550e8400-e29b-41d4-a716-446655440000/original.png"
+    responses:
+      "200":
+        description: File content streamed successfully
+        headers:
+          Content-Type:
+            description: MIME type of the file (e.g. image/png, image/jpeg)
+            schema:
+              type: string
+          Cache-Control:
+            description: Caching directive (public, max-age=31536000, immutable)
+            schema:
+              type: string
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      "400":
+        description: Missing file path
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"
+      "404":
+        description: File not found
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/error.yaml#/ErrorResponse"

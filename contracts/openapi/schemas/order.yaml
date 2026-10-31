@@ -1,0 +1,74 @@
+# ─── Order Schemas ───────────────────────────────────────────
+OrderStatus:
+  type: string
+  description: Whether the order has been completed
+  enum:
+    - pending
+    - completed
+  example: "pending"
+
+CreateOrderRequest:
+  type: object
+  description: Request body for creating a new order
+  required:
+    - title
+  properties:
+    title:
+      $ref: "_fields.yaml#/OrderTitle"
+    status:
+      $ref: "#/OrderStatus"
+
+UpdateOrderRequest:
+  type: object
+  description: Request body for updating an order. All fields are optional.
+  properties:
+    title:
+      $ref: "_fields.yaml#/OrderTitle"
+      example: "Steel beams – lot 3 (revised)"
+    status:
+      $ref: "#/OrderStatus"
+
+OrderResponse:
+  type: object
+  description: Order data returned by the API
+  required:
+    - id
+    - title
+    - status
+    - project_id
+  properties:
+    id:
+      $ref: "_fields.yaml#/UUID"
+      description: Unique order identifier
+    title:
+      $ref: "_fields.yaml#/OrderTitle"
+    status:
+      $ref: "#/OrderStatus"
+    project_id:
+      $ref: "_fields.yaml#/UUID"
+      description: ID of the project this order belongs to
+
+PaginatedOrderResponse:
+  type: object
+  description: Paginated list of orders with navigation metadata
+  required:
+    - data
+    - page
+    - page_size
+    - total_items
+    - total_pages
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/OrderResponse"
+    page:
+      $ref: "_fields.yaml#/Page"
+    page_size:
+      $ref: "_fields.yaml#/PageSize"
+    total_items:
+      $ref: "_fields.yaml#/TotalItems"
+      example: 12
+    total_pages:
+      $ref: "_fields.yaml#/TotalPages"
+      example: 1

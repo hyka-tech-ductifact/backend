@@ -1,0 +1,102 @@
+# ─── Project Schemas ─────────────────────────────────────────
+CreateProjectRequest:
+  type: object
+  description: Request body for creating a new project
+  required:
+    - name
+  properties:
+    name:
+      $ref: "_fields.yaml#/ProjectName"
+    address:
+      $ref: "_fields.yaml#/Address"
+      description: Physical address of the project site
+    manager_name:
+      $ref: "_fields.yaml#/ManagerName"
+      description: Name of the on-site manager
+    phone:
+      $ref: "_fields.yaml#/Phone"
+      description: Contact phone for the project
+      example: "+34 699 111 222"
+    description:
+      $ref: "_fields.yaml#/Description"
+      description: Additional details about the project
+      example: "14-storey residential building, phase 1"
+
+UpdateProjectRequest:
+  type: object
+  description: Request body for updating a project. All fields are optional.
+  properties:
+    name:
+      $ref: "_fields.yaml#/ProjectName"
+      description: The project's new name
+      example: "Residential Tower B - Phase 2"
+    address:
+      $ref: "_fields.yaml#/Address"
+      description: Physical address of the project site
+    manager_name:
+      $ref: "_fields.yaml#/ManagerName"
+      description: Name of the on-site manager
+    phone:
+      $ref: "_fields.yaml#/Phone"
+      description: Contact phone for the project
+      example: "+34 699 111 222"
+    description:
+      $ref: "_fields.yaml#/Description"
+      description: Additional details about the project
+      example: "14-storey residential building, phase 2"
+
+ProjectResponse:
+  type: object
+  description: Project data returned by the API
+  required:
+    - id
+    - name
+    - client_id
+  properties:
+    id:
+      $ref: "_fields.yaml#/UUID"
+      description: Unique project identifier
+    name:
+      $ref: "_fields.yaml#/ProjectName"
+    address:
+      $ref: "_fields.yaml#/Address"
+      description: Physical address of the project site
+    manager_name:
+      $ref: "_fields.yaml#/ManagerName"
+      description: Name of the on-site manager
+    phone:
+      $ref: "_fields.yaml#/Phone"
+      description: Contact phone for the project
+      example: "+34 699 111 222"
+    description:
+      $ref: "_fields.yaml#/Description"
+      description: Additional details about the project
+      example: "14-storey residential building, phase 1"
+    client_id:
+      $ref: "_fields.yaml#/UUID"
+      description: ID of the client that owns this project
+
+PaginatedProjectResponse:
+  type: object
+  description: Paginated list of projects with navigation metadata
+  required:
+    - data
+    - page
+    - page_size
+    - total_items
+    - total_pages
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/ProjectResponse"
+    page:
+      $ref: "_fields.yaml#/Page"
+    page_size:
+      $ref: "_fields.yaml#/PageSize"
+    total_items:
+      $ref: "_fields.yaml#/TotalItems"
+      example: 5
+    total_pages:
+      $ref: "_fields.yaml#/TotalPages"
+      example: 1
