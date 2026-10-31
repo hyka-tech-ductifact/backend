@@ -263,7 +263,7 @@ contract-bundle: $(CONTRACT_BUNDLE)
 $(CONTRACT_BUNDLE): $(CONTRACT_SOURCES)
 	@echo "Bundling OpenAPI spec v$(CONTRACT_VERSION)..."
 	@docker run --rm -v $(CURDIR)/$(CONTRACT_DIR):/spec $(REDOCLY_IMAGE) bundle /spec/openapi.yaml -o /spec/bundled.yaml
-	@sed -i '0,/^  version: .*/s//  version: $(CONTRACT_VERSION)/' $@
+	@sed -i '1,/^  version: .*/s/^  version: .*/  version: $(CONTRACT_VERSION)/' $@
 	@echo "✅ $@ (v$(CONTRACT_VERSION))"
 
 # Detect breaking changes against BASE_REF (branch, tag or commit).
@@ -288,8 +288,8 @@ contract-breaking: contract-bundle
 # Docker (validates Dockerfile builds and app starts)
 # ═══════════════════════════════════════════════════════════════
 
-# Build Docker image
-docker-build: contract-bundle
+# Build Docker image (the Dockerfile bundles the spec itself)
+docker-build:
 	@echo "Building Docker image..."
 	docker compose --profile smoke build \
 		--build-arg APP_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) \

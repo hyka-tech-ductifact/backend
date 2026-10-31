@@ -40,9 +40,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ensure contract spec
-        run: make ensure-contract
-
       - name: Build and push
         uses: docker/build-push-action@v7
         with:

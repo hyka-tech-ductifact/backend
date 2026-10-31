@@ -1,3 +1,15 @@
+# ── Stage 0: Bundle OpenAPI spec ───────────────────────────────────
+FROM docker.io/redocly/cli:2.20.5 AS spec
+
+WORKDIR /spec
+
+COPY contracts/openapi ./
+COPY internal/config/contract_version.go /tmp/contract_version.go
+
+# Resolve $ref and stamp info.version with ContractVersion (mirrors make contract-bundle)
+RUN redocly bundle openapi.yaml -o bundled.yaml \
+ && V=$(sed -n 's/^const ContractVersion = "\(.*\)"/\1/p' /tmp/contract_version.go) \
+ && sed -i "1,/^  version: .*/s/^  version: .*/  version: $V/" bundled.yaml
 # ── Stage 1: Build ──────────────────────────────────────────
 FROM docker.io/library/golang:1.26-alpine AS builder
 
@@ -26,10 +38,8 @@ RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/app .
 
-# Copy OpenAPI spec for /docs endpoint.
-# The spec must exist — run `make ensure-contract` before building.
-# CI does this automatically; locally `make docker-build` handles it.
-COPY contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml
+# OpenAPI spec for /docs, bundled in the spec stage from contracts/openapi/
+COPY --from=spec /spec/bundled.yaml contracts/openapi/bundled.yaml
 
 ARG BACKEND_PORT=8080
 EXPOSE ${BACKEND_PORT}
