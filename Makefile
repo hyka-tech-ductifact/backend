@@ -125,11 +125,12 @@ app-build:
 	@echo "Building ductifact..."
 	go build -o bin/api ./cmd/api
 
-# Build and start API in background (used in CI and local testing)
+# Build and start API in background (used in CI and local testing).
+# Output goes to api.log so a piped `make app-start | ...` is not held open by the server.
 app-start: contract-bundle app-build services-start
-	./bin/api &
+	./bin/api > api.log 2>&1 &
 	@sleep 3
-	@echo "✅ API running in background"
+	@echo "✅ API running in background (logs: api.log)"
 
 # Seed the database with development data if the users table is empty.
 # Runs automatically as part of `make dev` — no manual invocation needed.

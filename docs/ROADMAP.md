@@ -41,14 +41,14 @@ stays in Ductifact.
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| T.1 | Move `contracts` into the backend repository (`git subtree` to keep history); point `ensure-contract`, Dockerfile, and CI at `./contracts`; publish `bundled.yaml` from backend releases; archive the `contracts` repo | ⬜ | 🔴 Now · 🧱 |
+| T.1 | Move `contracts` into the backend repository; bundle at build time (Makefile + Dockerfile), validate and detect breaking changes in backend CI; archive the `contracts` repo | ✅ | 🧱 |
 | T.2 | Remove domain dependencies from core services (e.g. `UserService` must not depend on `ClientRepository`; use a user-deletion hook) | ⬜ | 🔴 Now · 🧱 |
 | T.3 | Per-module route registration instead of positional services in `SetupRoutes` | ⬜ | 🔴 Now · 🧱 |
 | T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
 | T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
 | T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
 
-T.1 makes 24.4 largely obsolete: the contract and the implementation ship in the same commit.
+T.1 made 24.4 obsolete: the contract and the implementation ship in the same commit.
 
 ---
 
@@ -115,7 +115,7 @@ T.1 makes 24.4 largely obsolete: the contract and the implementation ship in the
 | 6.2 | Contract tests across infrastructure, account, and business endpoints | ✅ |
 | 6.3 | Spec validation in CI (`redocly lint`) | ✅ |
 | 6.4 | Swagger UI embedded in API (`/docs`) | ✅ |
-| 6.5 | Versioned bundled OpenAPI release artifact consumed by the backend | ✅ |
+| 6.5 | OpenAPI bundled at build time from `contracts/openapi/` (Makefile + Dockerfile); breaking-change detection in CI | ✅ |
 
 ### 7. Observability
 
@@ -359,7 +359,7 @@ shared piece. See [GUIDE_AUTHORIZATION_BOUNDARIES.md](GUIDE_AUTHORIZATION_BOUNDA
 | 24.1 | API versioning strategy (v1 deprecation plan) | ⬜ | 🔵 Later · 🧱 |
 | 24.2 | API changelog (public, consumer-facing) | ⬜ | 🔵 Later |
 | 24.3 | Generate TypeScript API types/client and consume them from the frontend | ⬜ | 🟡 Next · 🧱 |
-| 24.4 | Automate contract release/version drift checks and coordinated backend update PRs | ⬜ | 🟡 Next |
+| 24.4 | ~~Automate contract release/version drift checks and coordinated backend update PRs~~ Obsolete since T.1 (contract lives in this repo) | ➖ | — |
 | 24.5 | Real-time updates (WebSocket or SSE) | ⬜ | ⚪ Need-driven |
 | 24.6 | Organizations / multi-tenancy with organization-scoped memberships | ⬜ | ⚪ Need-driven |
 
@@ -395,7 +395,7 @@ only when deployment, security, scale, or team ownership creates a real need.
 
 ```
 Template Baseline
-  Template Readiness         ░░░░░░░░░░░░░░░░░░░░  0/6
+  Template Readiness         ███░░░░░░░░░░░░░░░░░  1/6
 
 Phase 1 — Foundation
   Domain & Entities          ████████████████████  6/6   ✅

@@ -94,10 +94,30 @@ feat(api)!: change pagination response format
 
 ---
 
-## 5) PR rules
+## 5) API contract changes
+
+The OpenAPI spec lives in `contracts/openapi/` and is part of this repository:
+a PR that changes the API must change the spec and the implementation together.
+
+- Edit the source files under `contracts/openapi/`, never `bundled.yaml`.
+- Run `make contract-validate` and `make contract-breaking` before pushing.
+- Bump `ContractVersion` in `internal/config/contract_version.go`:
+
+| Change | Example | Bump |
+|--------|---------|------|
+| Descriptions, examples, typos | Fix a field description | PATCH |
+| New endpoint or optional field | Add `GET /invoices` | MINOR |
+| Removed/renamed field or endpoint, changed response shape | Drop `clients[].phone` | MAJOR + `!` in the PR title |
+
+CI runs the same checks on every PR (`Contract Spec` job) and fails on breaking
+changes against the target branch.
+
+---
+
+## 6) PR rules
 
 - No direct pushes to `main`
-- CI must pass (tests, lint, build, **PR title validation**)
-- PR title must follow Conventional Commits format (see §5)
+- CI must pass (tests, lint, build, contract spec, **PR title validation**)
+- PR title must follow Conventional Commits format (see §4)
 - Keep PRs small and focused
 - Use **squash merge** (1 PR = 1 commit)

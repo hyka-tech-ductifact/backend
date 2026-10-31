@@ -41,7 +41,7 @@ make test                       # run all tests
 For contract/E2E tests, start the server first:
 
 ```bash
-make app-start      # starts DB + fetches contract + builds + runs API
+make app-start      # starts services + bundles the OpenAPI spec + builds + runs API (logs: api.log)
 make test-e2e
 ```
 
@@ -116,21 +116,29 @@ See [test/api.http](test/api.http) for request examples.
 ```bash
 make help              # list all available commands
 make app-build         # compile binary to bin/api
-make ensure-contract   # use local OpenAPI bundle or download ContractVersion
+make contract-validate # lint the OpenAPI spec
+make contract-bundle   # generate contracts/openapi/bundled.yaml
+make contract-breaking # detect breaking API changes vs main
 make fmt               # format code
-make lint              # lint code
+make lint              # lint code and OpenAPI spec
 make clean             # remove build artifacts
 ```
 
-## Updating the API contract
+## API contract
 
-The contract version is defined as a Go constant in `internal/config/contract_version.go`.
-When a contract change is ready to release:
+The OpenAPI spec lives in [contracts/openapi/](contracts/openapi/) and ships with
+the code that implements it: one PR changes both. `bundled.yaml` is generated
+(git-ignored) by `make contract-bundle` and by the Docker build.
 
-1. Commit the source changes in the contracts repository and publish its new tag.
-2. Update the backend constant, for example `const ContractVersion = "0.14.0"`.
-3. Run `make ensure-contract` and validate the reported version.
-4. Commit the contract source and backend version bump in their respective repositories.
+The contract version is the Go constant `ContractVersion` in
+`internal/config/contract_version.go`; it is stamped into the bundle and reported
+by `/readyz`. To change the API:
+
+1. Edit the source files under `contracts/openapi/` (never `bundled.yaml`).
+2. Run `make contract-validate` and `make contract-breaking`.
+3. Implement the change and bump `ContractVersion` (PATCH/MINOR/MAJOR, see
+   [contracts/README.md](contracts/README.md)).
+4. Open a single PR; CI validates the spec and blocks breaking changes.
 
 ## Contributing
 
