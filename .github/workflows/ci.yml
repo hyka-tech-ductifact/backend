@@ -111,6 +111,22 @@ jobs:
       - name: Lint
         run: make lint
 
+  # ── 1b. OpenAPI contract (PRs only: needs the base branch) ───
+  contract-spec:
+    name: Contract Spec
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate spec
+        run: make contract-validate
+
+      - name: Detect breaking changes
+        run: make contract-breaking BASE_REF=origin/${{ github.base_ref }}
+
   # ── 2. Unit tests ─────────────────────────────────────────
   unit-tests:
     name: Unit Tests
