@@ -35,7 +35,7 @@ stays in Ductifact.
 | Background processing | 20.1, 20.2, 20.3, 20.4, 20.5, 20.6 |
 | Resilience | 22.1, 22.2, 22.4, 22.5 |
 | API governance | 24.1, 24.3 |
-| Template readiness | T.1 – T.6 (below) |
+| Template readiness | T.1 – T.8 (below) |
 
 ### Template Readiness
 
@@ -47,6 +47,8 @@ stays in Ductifact.
 | T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
 | T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
 | T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
+| T.7 | Replace the archived `minio-go` client with `aws-sdk-go-v2` in the storage adapter (server-agnostic S3) | ⬜ | 🟡 Next · 🧱 |
+| T.8 | Rename `MINIO_*` settings to vendor-neutral `S3_*` in config, compose, CI and infra | ⬜ | 🟡 Next · 🧱 |
 
 T.1 made 24.4 obsolete: the contract and the implementation ship in the same commit.
 
@@ -395,7 +397,7 @@ only when deployment, security, scale, or team ownership creates a real need.
 
 ```
 Template Baseline
-  Template Readiness         ███░░░░░░░░░░░░░░░░░  1/6
+  Template Readiness         ███░░░░░░░░░░░░░░░░░  1/8
 
 Phase 1 — Foundation
   Domain & Entities          ████████████████████  6/6   ✅
