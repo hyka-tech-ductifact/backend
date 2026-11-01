@@ -35,7 +35,7 @@ stays in Ductifact.
 | Background processing | 20.1, 20.2, 20.3, 20.4, 20.5, 20.6 |
 | Resilience | 22.1, 22.2, 22.4, 22.5 |
 | API governance | 24.1, 24.3 |
-| Template readiness | T.1 – T.8 (below) |
+| Template readiness | T.1 – T.10 (below) |
 
 ### Template Readiness
 
@@ -47,8 +47,10 @@ stays in Ductifact.
 | T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
 | T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
 | T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
-| T.7 | Replace the archived `minio-go` client with `aws-sdk-go-v2` in the storage adapter (server-agnostic S3) | ⬜ | 🟡 Next · 🧱 |
-| T.8 | Rename `MINIO_*` settings to vendor-neutral `S3_*` in config, compose, CI and infra | ⬜ | 🟡 Next · 🧱 |
+| T.7 | Replace the archived `minio-go` client with `aws-sdk-go-v2` in the storage adapter (server-agnostic S3); rename `MinIOStorage` to `S3Storage` | ⬜ | 🟡 Next · 🧱 |
+| T.8 | Vendor-neutral `S3_*` settings in backend config, compose and CI | ✅ | 🧱 |
+| T.9 | Infra: replace the withdrawn MinIO image with RustFS, pass `S3_*` to the backend, rename `MINIO_*` secrets/vars, migrate staging and production objects (`rclone sync`), update `smoke.sh` health check | ⬜ | 🔴 Now |
+| T.10 | Dedicated app access key scoped to its bucket instead of the S3 server root credentials (staging/production) | ⬜ | 🟡 Next · 🧱 |
 
 T.1 made 24.4 obsolete: the contract and the implementation ship in the same commit.
 
@@ -255,7 +257,7 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 17.4 | Log aggregation with Loki + Grafana | ⬜ | 🔵 Later · 🧱 |
 | 17.5 | Distributed tracing with OpenTelemetry | ⬜ | ⚪ Need-driven |
 | 17.6 | Append-only audit infrastructure for user actions and future privileged operator actions | ⬜ | 🔵 Later |
-| 17.7 | Aggregated readiness for DB, Redis, MinIO, and SMTP, with critical/degraded states | ✅ |
+| 17.7 | Aggregated readiness for DB, Redis, S3 object storage, and SMTP, with critical/degraded states | ✅ |
 
 ---
 
@@ -351,7 +353,7 @@ shared piece. See [GUIDE_AUTHORIZATION_BOUNDARIES.md](GUIDE_AUTHORIZATION_BOUNDA
 |---|------|--------|----------|
 | 23.1 | Data export: clients to CSV | ⬜ | 🔵 Later |
 | 23.2 | Data export: clients to PDF | ⬜ | 🔵 Later |
-| 23.3 | Piece-definition image upload, validation, thumbnails, and MinIO storage | ✅ |
+| 23.3 | Piece-definition image upload, validation, thumbnails, and S3 object storage | ✅ |
 | 23.4 | Bulk import from CSV | ⬜ | 🔵 Later |
 
 ### 24. API Governance
@@ -397,7 +399,7 @@ only when deployment, security, scale, or team ownership creates a real need.
 
 ```
 Template Baseline
-  Template Readiness         ███░░░░░░░░░░░░░░░░░  1/8
+  Template Readiness         ████░░░░░░░░░░░░░░░░  2/10
 
 Phase 1 — Foundation
   Domain & Entities          ████████████████████  6/6   ✅

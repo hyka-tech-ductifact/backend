@@ -167,7 +167,7 @@ func TestHealthHandler_Readyz_StorageDown(t *testing.T) {
 	}
 	storageMock := &mocks.MockFileStorage{
 		PingFn: func(ctx context.Context) error {
-			return errors.New("minio unreachable")
+			return errors.New("s3 unreachable")
 		},
 	}
 
@@ -181,7 +181,7 @@ func TestHealthHandler_Readyz_StorageDown(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"not_ready"`)
 	assert.Contains(t, w.Body.String(), `"database":"connected"`)
 	assert.Contains(t, w.Body.String(), `"storage":"disconnected"`)
-	assert.Contains(t, w.Body.String(), `storage: minio unreachable`)
+	assert.Contains(t, w.Body.String(), `storage: s3 unreachable`)
 }
 
 func TestHealthHandler_Readyz_AllDown(t *testing.T) {
@@ -192,7 +192,7 @@ func TestHealthHandler_Readyz_AllDown(t *testing.T) {
 	}
 	storageMock := &mocks.MockFileStorage{
 		PingFn: func(ctx context.Context) error {
-			return errors.New("minio unreachable")
+			return errors.New("s3 unreachable")
 		},
 	}
 	emailMock := &mocks.MockEmailSender{

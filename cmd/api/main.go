@@ -59,14 +59,14 @@ func main() {
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
 
 	fileStorage, err := storage.NewMinIOStorage(
-		cfg.MinIO.Endpoint,
-		cfg.MinIO.AccessKey,
-		cfg.MinIO.SecretKey,
-		cfg.MinIO.Bucket,
-		cfg.MinIO.UseSSL,
+		cfg.S3.Endpoint,
+		cfg.S3.AccessKey,
+		cfg.S3.SecretKey,
+		cfg.S3.Bucket,
+		cfg.S3.UseSSL,
 	)
 	if err != nil {
-		slog.Error("failed to connect to MinIO", "error", err)
+		slog.Error("failed to connect to S3 object storage", "error", err)
 		os.Exit(1)
 	}
 
