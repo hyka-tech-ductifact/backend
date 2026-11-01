@@ -47,7 +47,7 @@ stays in Ductifact.
 | T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
 | T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
 | T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
-| T.7 | Replace the archived `minio-go` client with `aws-sdk-go-v2` in the storage adapter (server-agnostic S3); rename `MinIOStorage` to `S3Storage` | ⬜ | 🟡 Next · 🧱 |
+| T.7 | Vendor-neutral storage adapter (`S3Storage`); `minio-go` kept as a generic, maintained S3 client. Swap to `aws-sdk-go-v2` only if `minio-go` stops being maintained | ✅ | 🧱 |
 | T.8 | Vendor-neutral `S3_*` settings in backend config, compose and CI | ✅ | 🧱 |
 | T.9 | Infra: replace the withdrawn MinIO image with RustFS, pass `S3_*` to the backend, rename `MINIO_*` secrets/vars, migrate staging and production objects (`rclone sync`), update `smoke.sh` health check | ⬜ | 🔴 Now |
 | T.10 | Dedicated app access key scoped to its bucket instead of the S3 server root credentials (staging/production) | ⬜ | 🟡 Next · 🧱 |
@@ -399,7 +399,7 @@ only when deployment, security, scale, or team ownership creates a real need.
 
 ```
 Template Baseline
-  Template Readiness         ████░░░░░░░░░░░░░░░░  2/10
+  Template Readiness         ██████░░░░░░░░░░░░░░  3/10
 
 Phase 1 — Foundation
   Domain & Entities          ████████████████████  6/6   ✅

@@ -58,7 +58,7 @@ func main() {
 	// --- Piece Definition wiring ---
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
 
-	fileStorage, err := storage.NewMinIOStorage(
+	fileStorage, err := storage.NewS3Storage(
 		cfg.S3.Endpoint,
 		cfg.S3.AccessKey,
 		cfg.S3.SecretKey,
