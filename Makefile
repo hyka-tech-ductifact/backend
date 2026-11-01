@@ -38,7 +38,7 @@ BASE_REF         ?= main
 	test-contract \
 	contract-validate contract-bundle contract-breaking \
 	docker-build docker-start docker-stop \
-	fmt lint deps clean \
+	fmt lint vulncheck deps clean \
 	validate-branch \
 	changelog
 
@@ -91,6 +91,7 @@ help:
 	@echo "  Code quality:"
 	@echo "    fmt              - Format code"
 	@echo "    lint             - Lint code"
+	@echo "    vulncheck        - Scan dependencies for known vulnerabilities (govulncheck)"
 	@echo "    deps             - Install dependencies and dev tools"
 	@echo ""
 	@echo "  CI:"
@@ -335,6 +336,11 @@ lint: contract-validate
 	go vet ./...
 	golangci-lint run
 
+# Report known vulnerabilities in dependencies that the code actually calls
+vulncheck:
+	@echo "Checking dependencies for known vulnerabilities..."
+	govulncheck ./...
+
 # Install dependencies and dev tools
 deps:
 	@echo "Installing dependencies..."
@@ -344,6 +350,7 @@ deps:
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install gotest.tools/gotestsum@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 # ═══════════════════════════════════════════════════════════════
 # CI

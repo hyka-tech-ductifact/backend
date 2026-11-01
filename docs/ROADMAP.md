@@ -187,6 +187,7 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 12.4 | Makefile targets for all operations | ✅ |
 | 12.5 | Hot reload in development (`air`) | ✅ |
 | 12.6 | Coverage report (HTML) | ✅ |
+| 12.7 | Dependency vulnerability scanning (`govulncheck` in CI, `make vulncheck`) | ✅ |
 
 ---
 
@@ -355,6 +356,7 @@ shared piece. See [GUIDE_AUTHORIZATION_BOUNDARIES.md](GUIDE_AUTHORIZATION_BOUNDA
 | 23.2 | Data export: clients to PDF | ⬜ | 🔵 Later |
 | 23.3 | Piece-definition image upload, validation, thumbnails, and S3 object storage | ✅ |
 | 23.4 | Bulk import from CSV | ⬜ | 🔵 Later |
+| 23.5 | Replace the unmaintained `disintegration/imaging` (pins a 2019 `golang.org/x/image`, overridden in `go.mod`) with a maintained thumbnail library or `golang.org/x/image/draw` | ⬜ | 🟡 Next |
 
 ### 24. API Governance
 
@@ -415,7 +417,7 @@ Phase 1 — Foundation
 Phase 2 — Hardening
   Security                   ████████████████████  6/6   ✅
   Database                   ████████████████████  4/4   ✅
-  Developer Experience       ████████████████████  6/6   ✅
+  Developer Experience       ████████████████████  7/7   ✅
 
 Phase 3 — Account & API Maturity
   Account Management         ████████████████████  5/5   ✅
@@ -434,7 +436,7 @@ Phase 5 — Business Features
 
 Phase 6 — Resilience & Polish
   Resilience Patterns        ░░░░░░░░░░░░░░░░░░░░  0/6
-  Data & Export              █████░░░░░░░░░░░░░░░  1/4
+  Data & Export              ████░░░░░░░░░░░░░░░░  1/5
   API Governance             ░░░░░░░░░░░░░░░░░░░░  0/6
 
 Phase 7 — Internal Platform Operations
