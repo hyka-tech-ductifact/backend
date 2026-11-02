@@ -2,12 +2,12 @@
 
 Go REST API following **Hexagonal Architecture** (Ports & Adapters) with PostgreSQL and Docker.
 
-> See [docs/GUIDE_HEXAGONAL_ARCH.md](docs/GUIDE_HEXAGONAL_ARCH.md) for an explanation of the architecture.
+> See [docs/GUIDE_HEXAGONAL_ARCH.md](docs/GUIDE_HEXAGONAL_ARCH.md) for an explanation of the architecture and [docs/GUIDE_AUTHORIZATION_BOUNDARIES.md](docs/GUIDE_AUTHORIZATION_BOUNDARIES.md) for the distinction between ownership, project collaboration, and internal operations.
 
 ## Prerequisites
 
 - Go 1.26+
-- Docker + Compose plugin v2+ (starts PostgreSQL, Redis, MinIO, Mailpit)
+- Docker + Compose plugin v2+ (starts PostgreSQL, Redis, RustFS (S3), Mailpit)
 
 ## Setup
 
@@ -41,7 +41,7 @@ make test                       # run all tests
 For contract/E2E tests, start the server first:
 
 ```bash
-make app-start      # starts DB + fetches contract + builds + runs API
+make app-start      # starts services + bundles the OpenAPI spec + builds + runs API (logs: api.log)
 make test-e2e
 ```
 
@@ -59,22 +59,30 @@ make docker-stop     # stop Docker services
 
 Infrastructure endpoints (`/healthz`, `/readyz`, `/metrics`, `/docs`) are at the root level. All business endpoints are prefixed with `/v1`.
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
+| Method | Endpoint | Authorization | Description |
+|--------|----------|---------------|-------------|
 | GET | `/healthz` | No | Liveness probe |
 | GET | `/readyz` | No | Readiness probe |
 | GET | `/metrics` | No | Prometheus metrics |
 | GET | `/docs` | No | Swagger UI (interactive docs) |
 | GET | `/docs/openapi.yaml` | No | Raw OpenAPI spec |
-| POST | `/auth/register` | No | Register user |
+| POST | `/auth/register` | No | Start user registration |
 | POST | `/auth/login` | No | Login |
-| GET | `/users/me` | Yes | Get current user |
-| PUT | `/users/me` | Yes | Update current user |
-| POST | `/clients` | Yes | Create client |
-| GET | `/clients` | Yes | List clients |
-| GET | `/clients/:client_id` | Yes | Get client |
-| PUT | `/clients/:client_id` | Yes | Update client |
-| DELETE | `/clients/:client_id` | Yes | Delete client |
+| GET | `/users/me` | JWT (self) | Get the current user |
+| PUT | `/users/me` | JWT (self) | Update the current user |
+| POST | `/clients` | JWT | Create a client owned by the current user |
+| GET | `/clients` | JWT + ownership | List the current user's clients |
+| GET | `/clients/:client_id` | JWT + ownership | Get an owned client |
+| PUT | `/clients/:client_id` | JWT + ownership | Update an owned client |
+| DELETE | `/clients/:client_id` | JWT + ownership | Delete an owned client |
+
+The versioned paths in this table are served below `/v1`; for example, the
+authenticated profile endpoint is `GET /v1/users/me`.
+
+The current authorization model is intentionally limited to authentication and
+resource ownership. Product collaboration (`owner`, `editor`, `viewer`) and
+internal support operations are separate future capabilities; see the
+[authorization boundaries guide](docs/GUIDE_AUTHORIZATION_BOUNDARIES.md).
 
 ### List query convention
 
@@ -108,20 +116,29 @@ See [test/api.http](test/api.http) for request examples.
 ```bash
 make help              # list all available commands
 make app-build         # compile binary to bin/api
-make fetch-contract    # download OpenAPI spec matching ContractVersion
+make contract-validate # lint the OpenAPI spec
+make contract-bundle   # generate contracts/openapi/bundled.yaml
+make contract-breaking # detect breaking API changes vs main
 make fmt               # format code
-make lint              # lint code
+make lint              # lint code and OpenAPI spec
 make clean             # remove build artifacts
 ```
 
-## Updating the API contract
+## API contract
 
-The contract version is defined as a Go constant in `internal/config/contract_version.go`.
-When the contracts repo publishes a new release:
+The OpenAPI spec lives in [contracts/openapi/](contracts/openapi/) and ships with
+the code that implements it: one PR changes both. `bundled.yaml` is generated
+(git-ignored) by `make contract-bundle` and by the Docker build.
 
-1. Update the constant: `const ContractVersion = "0.4.0"`
-2. Run `make fetch-contract` to download the matching spec
-3. Commit both changes in the same PR
+The contract has no version of its own: it is versioned by the backend commit,
+stamped into `info.version` in the Docker image and reported by `/readyz`.
+To change the API:
+
+1. Edit the source files under `contracts/openapi/` (never `bundled.yaml`).
+2. Run `make contract-validate` and `make contract-breaking`.
+3. Implement the change.
+4. Open a single PR; CI validates the spec and blocks breaking changes.
+   A breaking change that must ship goes through a new path prefix (`/v2`).
 
 ## Contributing
 

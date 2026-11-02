@@ -124,6 +124,20 @@ func TestUpdateUser_WhenRepoFails_ReturnsError(t *testing.T) {
 	assert.EqualError(t, err, "db write failed")
 }
 
+func TestUpdateUser_WhenUserDisappearsDuringWrite_ReturnsUserNotFound(t *testing.T) {
+	user := newTestUser()
+	repo := userRepoReturning(user)
+	repo.UpdateFn = func(context.Context, *entities.User) error {
+		return repositories.ErrNotFound
+	}
+	svc := services.NewUserService(repo, &mocks.MockClientRepository{})
+
+	result, err := svc.UpdateUser(context.Background(), user.ID, strPtr("Pedro"), nil, nil)
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
 func TestUpdateUser_UpdatesTimestamp(t *testing.T) {
 	user := newTestUser()
 	oldTime := user.UpdatedAt

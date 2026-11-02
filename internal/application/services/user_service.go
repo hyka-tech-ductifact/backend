@@ -96,6 +96,9 @@ func (s *userService) UpdateUser(
 	// Step 4: Update timestamp and persist
 	user.UpdatedAt = time.Now()
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
 		return nil, err
 	}
 

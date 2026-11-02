@@ -1,0 +1,213 @@
+# ─── Auth Schemas ────────────────────────────────────────────
+StartRegistrationRequest:
+  type: object
+  description: Request body for starting registration (email-first, step 1)
+  additionalProperties: false
+  required:
+    - email
+  properties:
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+      description: The user's email address (must be unique)
+    locale:
+      $ref: "_fields.yaml#/Locale"
+      description: Preferred language (optional, defaults to 'en')
+
+RegisterRequest:
+  type: object
+  description: >-
+    Request body for completing registration (step 2). Includes the numeric
+    verification code (OTP) received by email plus the account details.
+  additionalProperties: false
+  required:
+    - email
+    - code
+    - name
+    - password
+  properties:
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+      description: The email address the verification code was sent to
+    code:
+      type: string
+      description: The 6-digit numeric verification code received by email
+      example: "123456"
+    name:
+      $ref: "_fields.yaml#/UserName"
+    password:
+      $ref: "_fields.yaml#/Password"
+      description: Password (minimum 8 characters)
+      minLength: 8
+    locale:
+      $ref: "_fields.yaml#/Locale"
+      description: Preferred language (optional, defaults to 'en')
+
+LoginRequest:
+  type: object
+  description: Request body for logging in
+  additionalProperties: false
+  required:
+    - email
+    - password
+  properties:
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+    password:
+      $ref: "_fields.yaml#/Password"
+      description: The user's password
+      minLength: 1
+
+AuthResponse:
+  type: object
+  description: >-
+    Response returned after successful register or login, including the
+    effective token lifetimes in seconds.
+  required:
+    - user
+    - access_token
+    - refresh_token
+    - token_type
+    - expires_in
+    - refresh_expires_in
+  properties:
+    user:
+      $ref: "user.yaml#/UserResponse"
+    access_token:
+      $ref: "_fields.yaml#/AccessToken"
+    refresh_token:
+      $ref: "_fields.yaml#/RefreshToken"
+    token_type:
+      $ref: "_fields.yaml#/TokenType"
+    expires_in:
+      $ref: "_fields.yaml#/ExpiresIn"
+    refresh_expires_in:
+      $ref: "_fields.yaml#/RefreshExpiresIn"
+
+RefreshRequest:
+  type: object
+  description: Request body for refreshing an access token
+  additionalProperties: false
+  required:
+    - refresh_token
+  properties:
+    refresh_token:
+      $ref: "_fields.yaml#/RefreshToken"
+      description: The refresh token obtained from register or login
+      minLength: 1
+
+TokenResponse:
+  type: object
+  description: >-
+    Response containing a new token pair and its effective lifetimes in
+    seconds.
+  required:
+    - access_token
+    - refresh_token
+    - token_type
+    - expires_in
+    - refresh_expires_in
+  properties:
+    access_token:
+      $ref: "_fields.yaml#/AccessToken"
+    refresh_token:
+      $ref: "_fields.yaml#/RefreshToken"
+    token_type:
+      $ref: "_fields.yaml#/TokenType"
+    expires_in:
+      $ref: "_fields.yaml#/ExpiresIn"
+    refresh_expires_in:
+      $ref: "_fields.yaml#/RefreshExpiresIn"
+
+LogoutRequest:
+  type: object
+  description: Request body for logging out (revoking tokens)
+  additionalProperties: false
+  required:
+    - refresh_token
+  properties:
+    refresh_token:
+      $ref: "_fields.yaml#/RefreshToken"
+      description: The refresh token to revoke
+      minLength: 1
+
+MessageResponse:
+  type: object
+  description: Generic success message
+  required:
+    - message
+  properties:
+    message:
+      type: string
+      description: Human-readable success message
+      example: "logged out successfully"
+
+CodeRequestResponse:
+  type: object
+  description: >-
+    Generic response for requesting a verification code. The cooldown is the
+    public resend policy, not the remaining lifetime or existence of a code.
+  additionalProperties: false
+  required:
+    - message
+    - resend_cooldown_seconds
+  properties:
+    message:
+      type: string
+      description: Generic message that does not disclose account or code state
+    resend_cooldown_seconds:
+      type: integer
+      format: int64
+      minimum: 1
+      description: Fixed policy duration the client may use for a local resend countdown
+      example: 900
+
+ChangePasswordRequest:
+  type: object
+  description: Request body for changing the user's password
+  additionalProperties: false
+  required:
+    - current_password
+    - new_password
+  properties:
+    current_password:
+      $ref: "_fields.yaml#/Password"
+      description: The user's current password
+      minLength: 1
+    new_password:
+      $ref: "_fields.yaml#/Password"
+      description: The new password (minimum 8 characters)
+      minLength: 8
+
+ForgotPasswordRequest:
+  type: object
+  description: Request body for requesting a password reset email
+  additionalProperties: false
+  required:
+    - email
+  properties:
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+      description: The email address associated with the account
+
+ResetPasswordRequest:
+  type: object
+  description: >-
+    Request body for resetting a password with the numeric verification code
+    (OTP) received by email.
+  additionalProperties: false
+  required:
+    - email
+    - code
+    - new_password
+  properties:
+    email:
+      $ref: "_fields.yaml#/UserEmail"
+      description: The email address the verification code was sent to
+    code:
+      type: string
+      description: The 6-digit numeric verification code received by email
+      example: "123456"
+    new_password:
+      $ref: "_fields.yaml#/Password"
+      description: The new password (minimum 8 characters)
+      minLength: 8

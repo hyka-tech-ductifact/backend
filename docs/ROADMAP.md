@@ -3,7 +3,56 @@
 > **Stack**: Go 1.26 · Gin · GORM · PostgreSQL · JWT · Docker · Caddy · GitHub Actions · Prometheus
 > **Architecture**: Hexagonal (Ports & Adapters)
 > **Started**: March 2026
-> **Last updated**: April 2026
+> **Last updated**: October 2026
+
+---
+
+## Planning Principles
+
+- Protect data and security boundaries before adding convenience features.
+- Deliver and consume complete vertical product flows before expanding the domain.
+- Measure before adding caches, indexes, queues, or distributed-system patterns.
+- Keep the modular monolith until deployment, scale, security, or team ownership proves a service boundary.
+- Treat `🔴 Now` as the current engineering queue; `🟡 Next` is not a commitment until the preceding safety work is complete.
+
+---
+
+## Template Baseline
+
+> **Goal**: Finish the domain-independent capabilities that almost every backend
+> needs, then extract a reusable app template (backend + infra) from Ductifact.
+
+Items marked **🧱** in the priority column are generic and must be done before
+extracting the template. Everything else is domain-specific or need-driven and
+stays in Ductifact.
+
+| Area | Items |
+|------|-------|
+| API hardening | 14.3 |
+| Test safety & diagnostics | 15.1, 15.2, 15.4 |
+| Distributed state | 16.7 |
+| Observability | 17.3, 17.4 |
+| Background processing | 20.1, 20.2, 20.3, 20.4, 20.5, 20.6 |
+| Resilience | 22.1, 22.2, 22.4, 22.5 |
+| API governance | 24.1, 24.3 |
+| Template readiness | T.1 – T.10 (below) |
+
+### Template Readiness
+
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| T.1 | Move `contracts` into the backend repository; bundle at build time (Makefile + Dockerfile), validate and detect breaking changes in backend CI; archive the `contracts` repo | ✅ | 🧱 |
+| T.2 | Remove domain dependencies from core services (e.g. `UserService` must not depend on `ClientRepository`; use a user-deletion hook) | ⬜ | 🔴 Now · 🧱 |
+| T.3 | Per-module route registration instead of positional services in `SetupRoutes` | ⬜ | 🔴 Now · 🧱 |
+| T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
+| T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
+| T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
+| T.7 | Vendor-neutral storage adapter (`S3Storage`); `minio-go` kept as a generic, maintained S3 client. Swap to `aws-sdk-go-v2` only if `minio-go` stops being maintained | ✅ | 🧱 |
+| T.8 | Vendor-neutral `S3_*` settings in backend config, compose and CI | ✅ | 🧱 |
+| T.9 | Infra: replace the withdrawn MinIO image with RustFS, pass `S3_*` to the backend, rename `MINIO_*` secrets/vars, migrate staging and production objects (`rclone sync`), update `smoke.sh` health check | ⬜ | 🔴 Now |
+| T.10 | Dedicated app access key scoped to its bucket instead of the S3 server root credentials (staging/production) | ⬜ | 🟡 Next · 🧱 |
+
+T.1 made 24.4 obsolete: the contract and the implementation ship in the same commit.
 
 ---
 
@@ -14,7 +63,7 @@
 | # | Task | Status |
 |---|------|--------|
 | 1.1 | `User` entity (full CRUD) | ✅ |
-| 1.2 | `Client` entity (CRUD, 1:N relationship with User) | ✅ |
+| 1.2 | Core business entities: `Client`, `Project`, `Order`, `PieceDefinition`, and `Piece` | ✅ |
 | 1.3 | Value Object `Email` (validation) | ✅ |
 | 1.4 | Value Object `Password` (bcrypt hash, validation) | ✅ |
 | 1.5 | Repository interfaces (ports) | ✅ |
@@ -25,7 +74,7 @@
 | # | Task | Status |
 |---|------|--------|
 | 2.1 | `UserService` (create, get, update) | ✅ |
-| 2.2 | `ClientService` (CRUD with ownership) | ✅ |
+| 2.2 | Business services for Client → Project → Order → Piece, including piece definitions and ownership | ✅ |
 | 2.3 | `AuthService` (register, login, refresh, logout) | ✅ |
 
 ### 3. HTTP Infrastructure
@@ -33,7 +82,7 @@
 | # | Task | Status |
 |---|------|--------|
 | 3.1 | Gin router + versioned `/v1/` | ✅ |
-| 3.2 | Handlers (User, Client, Auth, Health, Docs) | ✅ |
+| 3.2 | Handlers for Auth, User, Client, Project, Order, PieceDefinition, Piece, Health, Files, and Docs | ✅ |
 | 3.3 | Middleware: Logging (structured) | ✅ |
 | 3.4 | Middleware: Recovery (panic → 500) | ✅ |
 | 3.5 | Middleware: CORS | ✅ |
@@ -50,7 +99,7 @@
 | 4.1 | JWT (signing, expiration, validation) | ✅ |
 | 4.2 | `POST /auth/register` + `POST /auth/login` | ✅ |
 | 4.3 | Protected routes (JWT middleware) | ✅ |
-| 4.4 | Ownership: `/users/me`, `/users/me/clients` | ✅ |
+| 4.4 | Ownership across `/users/me` and the Client → Project → Order → Piece resource chain | ✅ |
 | 4.5 | Password hashing with bcrypt | ✅ |
 
 ### 5. Persistence
@@ -59,7 +108,7 @@
 |---|------|--------|
 | 5.1 | PostgreSQL with GORM | ✅ |
 | 5.2 | `PostgresUserRepository` | ✅ |
-| 5.3 | `PostgresClientRepository` | ✅ |
+| 5.3 | PostgreSQL repositories for business resources and one-time OTPs | ✅ |
 | 5.4 | Health checker (DB ping) | ✅ |
 
 ### 6. API Contracts
@@ -67,10 +116,10 @@
 | # | Task | Status |
 |---|------|--------|
 | 6.1 | OpenAPI spec (`contracts/openapi/`) | ✅ |
-| 6.2 | Contract tests (auth, user, client, health) | ✅ |
+| 6.2 | Contract tests across infrastructure, account, and business endpoints | ✅ |
 | 6.3 | Spec validation in CI (`redocly lint`) | ✅ |
 | 6.4 | Swagger UI embedded in API (`/docs`) | ✅ |
-| 6.5 | TypeScript type generation for frontend | ✅ |
+| 6.5 | OpenAPI bundled at build time from `contracts/openapi/` (Makefile + Dockerfile); breaking-change detection in CI | ✅ |
 
 ### 7. Observability
 
@@ -79,8 +128,6 @@
 | 7.1 | Structured logging with `slog` (JSON) | ✅ |
 | 7.2 | Health check with DB verification | ✅ |
 | 7.3 | Prometheus metrics endpoint | ✅ |
-| 7.4 | Prometheus server (scraping + alerts) | ✅ |
-| 7.5 | Grafana dashboards | ✅ |
 
 ### 8. Testing
 
@@ -128,7 +175,7 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 11.1 | Versioned migrations (`golang-migrate`) | ✅ |
 | 11.2 | Development data seeders | ✅ |
 | 11.3 | Soft delete (`deleted_at` logical deletion) | ✅ |
-| 11.6 | Automated database backups (`pg_dump` + offsite) | ✅ |
+| 11.4 | Backup/restore tooling with retention and an operational runbook | ✅ |
 
 ### 12. Developer Experience
 
@@ -140,13 +187,14 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 12.4 | Makefile targets for all operations | ✅ |
 | 12.5 | Hot reload in development (`air`) | ✅ |
 | 12.6 | Coverage report (HTML) | ✅ |
+| 12.7 | Dependency vulnerability scanning (`govulncheck` in CI, `make vulncheck`) | ✅ |
 
 ---
 
 ## Phase 3 — Account & API Maturity
 
-> **Goal**: Complete the user account lifecycle, enrich the API with filtering/sorting,
-> and establish performance baselines before scaling.
+> **Goal**: Complete the account lifecycle, enforce safe test/migration boundaries,
+> and add measured API/performance improvements before product expansion.
 
 ### 13. Account Management
 
@@ -154,31 +202,32 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 |---|------|--------|----------|
 | 13.1 | `PUT /auth/password` (change password, requires current) | ✅ | 
 | 13.2 | `DELETE /users/me` (account self-deletion, GDPR) | ✅ |
-| 13.3 | Email verification on registration (token-based) | ✅ |
-| 13.4 | `POST /auth/password/reset` (reset via email token) | ✅ |
-| 13.5 | `POST /auth/password/reset/verify` (confirm reset with token) | ✅ |
+| 13.3 | Email verification during registration (OTP-based) | ✅ |
+| 13.4 | `POST /auth/password/reset` (request password-reset OTP) | ✅ |
+| 13.5 | `POST /auth/password/reset/verify` (confirm reset with OTP) | ✅ |
 
 ### 14. Advanced API
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
 | 14.1 | Filtering and sorting on list endpoints (query params) | ✅ |
-| 14.2 | Pagination on all existing list endpoints (admin users deferred to §18) | ✅ |
-| 14.3 | Resource versioning (ETags / `If-Modified-Since`) | ⬜ | 🟡 Soon |
-| 14.4 | Request body validation middleware (against OpenAPI) | ⬜ | 🟡 Soon |
-| 14.5 | Bulk operations (batch create/update) | ⬜ | 🔵 Later |
-| 14.6 | Full-text search (PostgreSQL `tsvector`) | ⬜ | 🔵 Later |
+| 14.2 | Pagination on all existing list endpoints | ✅ |
+| 14.3 | Central request-body and content-type limits for JSON and multipart (`413`/`415`) | ⬜ | 🔴 Now · 🧱 |
+| 14.4 | Conditional requests and caching (`ETag`, `If-None-Match`, `Last-Modified`) on measured read paths | ⬜ | 🔵 Later |
+| 14.5 | Bulk operations (batch create/update) | ⬜ | ⚪ Need-driven |
+| 14.6 | Full-text search (PostgreSQL `tsvector`) | ⬜ | ⚪ Need-driven |
 | 14.7 | Partial responses (field selection) | ⬜ | ⚪ Maybe never |
 
-### 15. Performance & Baselines
+### 15. Test Safety & Performance Baselines
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 15.1 | Load testing with k6 (establish baselines) | ⬜ | 🟡 Soon |
-| 15.2 | Profiling with `pprof` (identify bottlenecks) | ⬜ | 🟡 Soon |
-| 15.3 | Optimized indexes for frequent queries | ⬜ | 🟡 Soon |
-| 15.4 | Connection pooling tuning (GORM pool settings) | ⬜ | 🟡 Soon |
-| 15.5 | Cache-Control headers on GET responses | ⬜ | 🔵 Later |
+| 15.1 | Dedicated test database/container plus a guard that refuses destructive cleanup outside test environments | ⬜ | 🔴 Now · 🧱 |
+| 15.2 | Migration verification from both an empty DB and the last released schema; document roll-forward/rollback procedure | ⬜ | 🔴 Now · 🧱 |
+| 15.3 | Load-test a representative Client → Project → Order → Piece flow with k6 and record a baseline | ⬜ | 🟡 Next |
+| 15.4 | Reproducible `pprof` workflow for CPU, memory, goroutines, and blocking analysis | ⬜ | 🔵 Later · 🧱 |
+| 15.5 | Review slow queries with `EXPLAIN (ANALYZE, BUFFERS)` and add indexes only from evidence | ⬜ | 🟡 Next |
+| 15.6 | Tune PostgreSQL connection-pool limits and timeouts from the load-test baseline | ⬜ | 🟡 Next |
 
 ---
 
@@ -195,36 +244,55 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 | 16.2 | Redis adapter for rate limiter (IP + user) | ✅ |
 | 16.3 | Redis adapter for login throttler | ✅ |
 | 16.4 | Redis health check in `/readyz` endpoint | ✅ |
-| 16.5 | Redis-backed session cache (frequent user data) | ⬜ | 🔵 Later |
-| 16.6 | Graceful fallback: Redis primary, memory if unavailable | ✅ |
+| 16.5 | Shared read cache only after profiling identifies a hot path and an invalidation strategy | ⬜ | ⚪ Need-driven |
+| 16.6 | Memory fallback exists; acceptable for local development and single-instance environments | ✅ |
+| 16.7 | Production policy for Redis failure: fail closed or leave readiness, with cross-instance security tests | ⬜ | 🔴 Now · 🧱 |
 
 ### 17. Production Observability
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 17.1 | Grafana dashboards (latency p50/p95/p99, error rate, throughput) | ⬜ | 🟡 Soon |
-| 17.2 | Alertmanager rules (error spikes, latency, downtime) | ⬜ | 🟡 Soon |
-| 17.3 | Log aggregation with Loki + Grafana | ⬜ | 🟡 Soon |
-| 17.4 | Distributed tracing with OpenTelemetry | ⬜ | 🟡 Soon |
-| 17.5 | Audit log (user action tracking, stored in DB) | ⬜ | 🟡 Soon |
-| 17.6 | Health check aggregation (DB + Redis + external deps) | ⬜ | 🟡 Soon |
+| 17.1 | Grafana dashboard for latency, error rate, throughput, and service health | ✅ |
+| 17.2 | Prometheus alert rules for error spikes, latency, and downtime | ✅ |
+| 17.3 | Alertmanager notification routing, tested receivers, and linked response runbooks | ⬜ | 🟡 Next · 🧱 |
+| 17.4 | Log aggregation with Loki + Grafana | ⬜ | 🔵 Later · 🧱 |
+| 17.5 | Distributed tracing with OpenTelemetry | ⬜ | ⚪ Need-driven |
+| 17.6 | Append-only audit infrastructure for user actions and future privileged operator actions | ⬜ | 🔵 Later |
+| 17.7 | Aggregated readiness for DB, Redis, S3 object storage, and SMTP, with critical/degraded states | ✅ |
 
 ---
 
 ## Phase 5 — Business Features
 
-> **Goal**: Add the features that drive real product value — roles, emails,
-> background processing, and richer domain entities.
+> **Goal**: Add the features that drive real product value — project
+> collaboration, emails, background processing, and richer domain entities.
 
-### 18. Roles & Permissions
+> **Product validation gate**: before adding more entities, consume the existing
+> Client → Project → Order → Piece flow from the frontend with generated contract
+> types. Use that end-to-end flow to decide which business feature comes next.
+
+### 18. Project Collaboration & Scoped Authorization
+
+Collaboration roles belong to the relationship between a user and one project;
+they are not global roles on `User`. A person may own one project, edit another,
+and only view a third. Orders and pieces inherit access from their project.
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 18.1 | `Role` entity (admin, user, readonly) | ⬜ | 🔴 Now |
-| 18.2 | Role assignment on registration (default: user) | ⬜ | 🔴 Now |
-| 18.3 | RBAC middleware (role-based route protection) | ⬜ | 🔴 Now |
-| 18.4 | Admin endpoints (`GET /admin/users`, `PUT /admin/users/:id/role`) | ⬜ | 🔴 Now |
-| 18.5 | Permission-based access control (fine-grained) | ⬜ | ⚪ Maybe never |
+| 18.1 | Authorization ADR: project boundary, `owner`/`editor`/`viewer` matrix, 403/404 policy, and sharing limits | ⬜ | 🟡 Next |
+| 18.2 | `ProjectRole` value object and `ProjectMembership` entity with unique `(project_id, user_id)` membership | ⬜ | 🟡 Next |
+| 18.3 | Make each project creator its first `owner`; backfill existing projects from their client owner transactionally | ⬜ | 🟡 Next |
+| 18.4 | Central project policy used by Project, Order, and Piece use cases; do not rely only on route middleware | ⬜ | 🟡 Next |
+| 18.5 | Access-aware `GET /projects` collection and member API: list, add, change role, and remove members | ⬜ | 🔵 Later |
+| 18.6 | Membership invariants: at least one owner, ownership transfer, leave-project rules, and concurrency safety | ⬜ | 🔵 Later |
+| 18.7 | Invitations with expiring/revocable tokens, idempotent acceptance, and email delivery (uses §19) | ⬜ | 🔵 Later |
+| 18.8 | OpenAPI contract, API documentation, generated types, and compatibility review | ⬜ | 🔵 Later |
+| 18.9 | Unit, integration, E2E, contract, concurrency, and cross-project isolation tests | ⬜ | 🔵 Later |
+
+Sharing a project exposes its project data, orders, and pieces. It must not
+implicitly expose the owner's client record or private piece-definition library;
+collaborators receive only the minimum referenced data needed to understand a
+shared piece. See [GUIDE_AUTHORIZATION_BOUNDARIES.md](GUIDE_AUTHORIZATION_BOUNDARIES.md).
 
 ### 19. Email & Notifications
 
@@ -232,31 +300,35 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 |---|------|--------|----------|
 | 19.1 | Email service port (adapter-agnostic) | ✅ |
 | 19.2 | SMTP adapter (SendGrid / Mailgun / SES) | ✅ |
-| 19.3 | Welcome email on registration | ✅ |
-| 19.4 | Password reset email with secure token | ✅ |
-| 19.5 | Email verification link | ✅ |
+| 19.3 | Localized registration OTP email in HTML and plain text | ✅ |
+| 19.4 | Localized password-reset OTP email in HTML and plain text | ✅ |
+| 19.5 | Rate-limited account-already-registered notice without account enumeration | ✅ |
 | 19.6 | Notification preferences (opt-in/out per type) | ⬜ | 🔵 Later |
 
 ### 20. Background Processing
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 20.1 | Task queue port (adapter-agnostic interface) | ⬜ | 🟡 Soon |
-| 20.2 | In-process worker pool adapter (goroutines + channels) | ⬜ | 🟡 Soon |
-| 20.3 | Async email delivery via task queue | ⬜ | 🟡 Soon |
-| 20.4 | Scheduled tasks (token cleanup, expired blacklist purge) | ⬜ | 🟡 Soon |
-| 20.5 | Redis-backed task queue (Asynq or similar) | ⬜ | 🔵 Later |
+| 20.1 | Background-delivery ADR: guarantees, retries, idempotency, ordering, and dead-letter policy | ⬜ | 🟡 Next · 🧱 |
+| 20.2 | Task queue port (adapter-agnostic interface) | ⬜ | 🟡 Next · 🧱 |
+| 20.3 | In-process adapter for local development and explicitly non-critical tasks | ⬜ | 🟡 Next · 🧱 |
+| 20.4 | Durable outbox/queue with retry backoff, dead-letter handling, and observable job state | ⬜ | 🔵 Later · 🧱 |
+| 20.5 | Move transactional emails to the durable path; recover cleanly from SMTP failure | ⬜ | 🔵 Later · 🧱 |
+| 20.6 | Scheduled cleanup tasks for expired OTPs and blacklist entries | ⬜ | 🔵 Later · 🧱 |
+| 20.7 | Redis-backed task queue (for example Asynq) only when throughput or multi-instance workers require it | ⬜ | ⚪ Need-driven |
 
 ### 21. Domain Enrichment
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 21.1 | Enrich `Client` entity (address, phone, tax ID, notes) | ⬜ | 🔵 Later |
-| 21.2 | `Invoice` entity (linked to Client, basic CRUD) | ⬜ | 🔵 Later |
-| 21.3 | `Project` entity (linked to Client, status workflow) | ⬜ | 🔵 Later |
-| 21.4 | Domain events (event-driven internal communication) | ⬜ | 🔵 Later |
-| 21.5 | Value Object `PhoneNumber` (E.164 validation) | ⬜ | 🔵 Later |
-| 21.6 | Value Object `TaxID` (country-aware validation) | ⬜ | 🔵 Later |
+| 21.1 | Measurement/Unit ADR and value objects: mm/cm/in, decimal precision, conversion, and rounding policy | ⬜ | 🔴 Now |
+| 21.2 | Complete the existing `Client` profile with address, tax ID, and notes where product flows require them | ⬜ | 🔵 Later |
+| 21.3 | Enrich the existing `Project` entity with a status workflow | ⬜ | 🔵 Later |
+| 21.4 | Extend the current `Order` pending/completed workflow only from validated business requirements | ⬜ | 🔵 Later |
+| 21.5 | Discover and document Quote/Invoice lifecycle, numbering, taxes, and immutability before creating CRUD | ⬜ | 🔵 Later |
+| 21.6 | Strengthen the existing `Phone` value object with E.164 normalization when international data requires it | ⬜ | 🔵 Later |
+| 21.7 | Country-aware `TaxID` value object | ⬜ | ⚪ Need-driven |
+| 21.8 | Domain events only after a real internal consumer exists | ⬜ | ⚪ Need-driven |
 
 ---
 
@@ -269,11 +341,11 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 22.1 | Configurable timeouts per operation (context propagation) | ⬜ | 🔵 Later |
-| 22.2 | Retry with exponential backoff + jitter | ⬜ | 🔵 Later |
-| 22.3 | Circuit breaker for external services (email, Redis) | ⬜ | 🔵 Later |
-| 22.4 | Idempotency keys on write endpoints | ⬜ | 🔵 Later |
-| 22.5 | Graceful degradation (fallback to memory if Redis down) | ⬜ | 🔵 Later |
+| 22.1 | Per-operation time budgets and context propagation for DB, SMTP, and object storage calls | ⬜ | 🟡 Next · 🧱 |
+| 22.2 | Retry with exponential backoff and jitter only for classified, idempotent external operations | ⬜ | 🔵 Later · 🧱 |
+| 22.3 | Circuit breakers only after observed external-dependency failure patterns | ⬜ | ⚪ Need-driven |
+| 22.4 | Idempotency keys for externally retried write endpoints | ⬜ | 🔵 Later · 🧱 |
+| 22.5 | Scheduled encrypted offsite backups, retention monitoring, and a periodic restore drill | ⬜ | 🔴 Now · 🧱 |
 | 22.6 | Feature flags | ⬜ | ⚪ Maybe never |
 
 ### 23. Data & Export
@@ -282,24 +354,55 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 |---|------|--------|----------|
 | 23.1 | Data export: clients to CSV | ⬜ | 🔵 Later |
 | 23.2 | Data export: clients to PDF | ⬜ | 🔵 Later |
-| 23.3 | File upload (S3 / MinIO) | ⬜ | 🔵 Later |
+| 23.3 | Piece-definition image upload, validation, thumbnails, and S3 object storage | ✅ |
 | 23.4 | Bulk import from CSV | ⬜ | 🔵 Later |
+| 23.5 | Replace the unmaintained `disintegration/imaging` (pins a 2019 `golang.org/x/image`, overridden in `go.mod`) with a maintained thumbnail library or `golang.org/x/image/draw` | ⬜ | 🟡 Next |
 
 ### 24. API Governance
 
 | # | Task | Status | Priority |
 |---|------|--------|----------|
-| 24.1 | API versioning strategy (v1 deprecation plan) | ⬜ | 🔵 Later |
+| 24.1 | API versioning strategy (v1 deprecation plan) | ⬜ | 🔵 Later · 🧱 |
 | 24.2 | API changelog (public, consumer-facing) | ⬜ | 🔵 Later |
-| 24.3 | SDK generation (Go client library) | ⬜ | 🔵 Later |
-| 24.4 | Real-time updates (WebSocket or SSE) | ⬜ | 🔵 Later |
-| 24.5 | Multi-tenancy | ⬜ | ⚪ Maybe never |
+| 24.3 | Generate TypeScript API types/client and consume them from the frontend | ⬜ | 🟡 Next · 🧱 |
+| 24.4 | ~~Automate contract release/version drift checks and coordinated backend update PRs~~ Obsolete since T.1 (contract lives in this repo) | ➖ | — |
+| 24.5 | Real-time updates (WebSocket or SSE) | ⬜ | ⚪ Need-driven |
+| 24.6 | Organizations / multi-tenancy with organization-scoped memberships | ⬜ | ⚪ Need-driven |
+
+---
+
+## Phase 7 — Internal Platform Operations
+
+> **Goal**: Provide narrowly scoped, auditable tools for support and data repair
+> without turning product users into global administrators or bypassing business
+> invariants.
+
+### 25. Internal Platform Operations
+
+This is a separate control plane for trusted operators. Start inside the modular
+monolith with a distinct entry point and identity boundary; extract a service
+only when deployment, security, scale, or team ownership creates a real need.
+
+| # | Task | Status | Priority |
+|---|------|--------|----------|
+| 25.1 | Catalogue recurring operational cases and write a threat model; avoid a generic `write:any` capability | ⬜ | 🔵 Later |
+| 25.2 | Separate operator identity from product users (SSO, MFA, dedicated token audience, revocation) | ⬜ | 🔵 Later |
+| 25.3 | Append-only privileged audit events with actor, target, reason/ticket, and before/after data (depends on §17.6) | ⬜ | 🔵 Later |
+| 25.4 | Transactional repair commands/jobs with dry-run, idempotency, explicit scope, and runbooks | ⬜ | 🔵 Later |
+| 25.5 | Internal Admin/Support API on a separate router or binary and private network boundary, reusing application rules | ⬜ | 🔵 Later |
+| 25.6 | Least-privilege support reads with purpose checks and PII masking | ⬜ | 🔵 Later |
+| 25.7 | Explicit operational mutations with approval or break-glass controls, executed by the owning business module | ⬜ | ⚪ Maybe never |
+| 25.8 | Backoffice UI only after operational workflows become recurring and stable | ⬜ | ⚪ Maybe never |
+| 25.9 | Evaluate microservice extraction; never let a separate operations service write another service's tables directly | ⬜ | ⚪ Maybe never |
 
 ---
 
 ## Summary
 
 ```
+Template Baseline
+  Template Readiness         ██████░░░░░░░░░░░░░░  3/10
+
 Phase 1 — Foundation
   Domain & Entities          ████████████████████  6/6   ✅
   Use Cases                  ████████████████████  3/3   ✅
@@ -307,60 +410,76 @@ Phase 1 — Foundation
   Authentication             ████████████████████  5/5   ✅
   Persistence                ████████████████████  4/4   ✅
   API Contracts              ████████████████████  5/5   ✅
-  Observability              ████████████████████  5/5   ✅
+  Observability              ████████████████████  3/3   ✅
   Testing                    ████████████████████  6/6   ✅
   CI/CD & DevOps             ████████████████████  6/6   ✅
 
 Phase 2 — Hardening
   Security                   ████████████████████  6/6   ✅
   Database                   ████████████████████  4/4   ✅
-  Developer Experience       ████████████████████  6/6   ✅
+  Developer Experience       ████████████████████  7/7   ✅
 
 Phase 3 — Account & API Maturity
   Account Management         ████████████████████  5/5   ✅
   Advanced API               ██████░░░░░░░░░░░░░░  2/7
-  Performance & Baselines    ░░░░░░░░░░░░░░░░░░░░  0/5
+  Test Safety & Performance  ░░░░░░░░░░░░░░░░░░░░  0/6
 
 Phase 4 — Horizontal Scaling & Observability
-  Redis & Distributed State  ████████████████░░░░  5/6
-  Production Observability   ░░░░░░░░░░░░░░░░░░░░  0/6
+  Redis & Distributed State  ██████████████░░░░░░  5/7
+  Production Observability   █████████░░░░░░░░░░░  3/7
 
 Phase 5 — Business Features
-  Roles & Permissions        ░░░░░░░░░░░░░░░░░░░░  0/5
+  Project Collaboration      ░░░░░░░░░░░░░░░░░░░░  0/9
   Email & Notifications      ████████████████░░░░  5/6
-  Background Processing      ░░░░░░░░░░░░░░░░░░░░  0/5
-  Domain Enrichment          ░░░░░░░░░░░░░░░░░░░░  0/6
+  Background Processing      ░░░░░░░░░░░░░░░░░░░░  0/7
+  Domain Enrichment          ░░░░░░░░░░░░░░░░░░░░  0/8
 
 Phase 6 — Resilience & Polish
   Resilience Patterns        ░░░░░░░░░░░░░░░░░░░░  0/6
-  Data & Export              ░░░░░░░░░░░░░░░░░░░░  0/4
-  API Governance             ░░░░░░░░░░░░░░░░░░░░  0/5
+  Data & Export              ████░░░░░░░░░░░░░░░░  1/5
+  API Governance             ░░░░░░░░░░░░░░░░░░░░  0/6
+
+Phase 7 — Internal Platform Operations
+  Internal Operations        ░░░░░░░░░░░░░░░░░░░░  0/9
 ```
 
-> **Total progress**: 76/76 (Phase 1+2) + 18/59 (Phase 3–6) = 94/135 tasks (~70%) -> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
+> **Total progress**: 64/64 (Phase 1+2) + 21/87 (Phase 3–7) = 85/151 tasks (~56%) -> **Phases 1 & 2 complete** — solid production foundation, security, and DX.
 > **Phase 3**: Account Management ✅, API Maturity in progress.
-> **Phase 4**: Redis ✅ (5/6), Observability pending.
+> **Phase 4**: Distributed Redis adapters are in place; production failure policy and notification routing remain pending.
+> **Phase 5**: Email foundations are in place; project-scoped collaboration remains planned.
+> **Phase 7**: Internal operations are deliberately deferred until concrete, recurring support needs exist.
 
 ### Suggested execution order
 
 | Order | Section | Why first |
 |-------|---------|-----------|
-| 1st | 13. Account Management | Users need password change + deletion (GDPR) |
-| 2nd | 14. Advanced API | Filtering/sorting is the most requested API feature |
-| 3rd | 15. Performance | Establish baselines before adding Redis/complexity |
-| 4th | 16. Redis | Required before deploying multiple instances |
-| 5th | 17. Observability | Production monitoring before adding business features |
-| 6th | 19. Email & Notifications | Enables password reset, verification, and user communication |
-| 7th | 20. Background Processing | Async emails, scheduled cleanup tasks |
-| 8th | 21. Domain Enrichment | Richer entities drive real product value |
-| 9th | 22–24 | Resilience, data export, and API governance — polish and scale |
-| Later | 18. Roles & Permissions | When the app becomes multi-user or needs an admin panel |
+| 1st | 15.1–15.2 Test and migration safety | Prevent destructive tests from touching development data and prove schema upgrades safely |
+| 2nd | 22.5 Recovery | Automate offsite backups and prove that a restore actually works |
+| 3rd | 14.3 + 16.7 Runtime boundaries | Limit request bodies and define secure Redis failure behavior in production |
+| 4th | 21.1 Measurements | Decide units and decimal precision before more piece data depends on the current representation |
+| Product gate | 24.3 + frontend vertical slice | Consume the existing Client → Project → Order → Piece API before expanding it |
+| If sharing is validated | 18.1–18.6 Project Collaboration | Implement scoped membership and owner invariants; invitations can follow later |
+| Then | 20.1–20.5 Background Processing | Make email delivery durable only after its guarantees are explicit |
+| After measurement | 15.3–15.6 Performance | Load-test, profile, inspect SQL, and tune the pool from evidence |
+| Only on demonstrated need | 25. Internal Platform Operations | Begin with audited commands; extract a service only for a real boundary |
+
+### Explicitly Deferred Until a Trigger Exists
+
+| Capability | Trigger to reconsider it |
+|------------|--------------------------|
+| Shared read cache | Profiling shows a stable, expensive hot read and there is a clear invalidation policy |
+| Loki or OpenTelemetry | Metrics and structured logs cannot diagnose real production incidents efficiently |
+| Full-text search, bulk operations, partial responses | A consumer has a concrete dataset and workflow that needs them |
+| Circuit breakers | External dependency failures are recurring and retries/timeouts are insufficient |
+| WebSocket/SSE | The product requires time-sensitive server-driven updates |
+| Organizations / multi-tenancy | Customers need shared billing, membership, or isolation above the project level |
+| Internal operations microservice | Security, deployment, scale, or team ownership requires process-level separation |
 
 ### Priority Legend
 
 | Flag | Meaning |
 |------|---------|
-| 🔴 Now | High impact, implement within this phase |
-| 🟡 Soon | Important, implement before moving to the next phase |
-| 🔵 Later | Low priority, wait until the feature is needed |
-| ⚪ Maybe never | Likely unnecessary for this project |
+| 🔴 Now | Current safety, data-integrity, or security queue |
+| 🟡 Next | High-value work after the current safety queue |
+| 🔵 Later | Wait for product evidence or measured technical need |
+| ⚪ Need-driven / Maybe never | Do not schedule without an explicit trigger |

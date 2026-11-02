@@ -1,0 +1,111 @@
+# ─── Piece Definition Schemas ────────────────────────────────
+
+CreatePieceDefinitionRequest:
+  type: object
+  description: |
+    Multipart request for creating a new piece definition.
+    Send as multipart/form-data with two parts:
+    - "data": a JSON string with the fields (name, dimension_schema).
+    - "image": optional binary image file (JPEG, PNG, or WebP, max 5MB).
+  required:
+    - data
+  properties:
+    data:
+      type: string
+      format: json
+      description: |
+        JSON string containing the piece definition fields.
+        Required keys: name (string), dimension_schema (string[], 1–10 items).
+      example: '{"name":"Custom L-Shape","dimension_schema":["Length","Width"]}'
+    image:
+      type: string
+      format: binary
+      description: Optional image file (JPEG, PNG, or WebP). Maximum size 5MB.
+
+UpdatePieceDefinitionRequest:
+  type: object
+  description: |
+    Multipart request for updating a piece definition.
+    Send as multipart/form-data with two parts (both optional, but at least one must be present):
+    - "data": a JSON string with the fields to update (name, dimension_schema).
+    - "image": binary image file to replace the current one (JPEG, PNG, or WebP, max 5MB).
+  properties:
+    data:
+      type: string
+      format: json
+      description: |
+        JSON string containing the fields to update. All keys are optional:
+        name (string), dimension_schema (string[], 1–10 items).
+      example: '{"name":"Custom L-Shape (revised)"}'
+    image:
+      type: string
+      format: binary
+      description: Optional replacement image file (JPEG, PNG, or WebP). Maximum size 5MB.
+
+PieceDefinitionResponse:
+  type: object
+  description: Piece definition data returned by the API
+  required:
+    - id
+    - name
+    - image_url
+    - thumbnail_url
+    - dimension_schema
+    - predefined
+  properties:
+    id:
+      $ref: "_fields.yaml#/UUID"
+      description: Unique piece definition identifier
+    name:
+      $ref: "_fields.yaml#/PieceDefinitionName"
+      example: "Rectangular"
+    image_url:
+      $ref: "_fields.yaml#/ImageUrl"
+      description: URL of the original piece definition image
+    thumbnail_url:
+      $ref: "_fields.yaml#/ThumbnailUrl"
+      description: URL of the piece definition thumbnail (200x150, JPEG)
+    dimension_schema:
+      type: array
+      items:
+        type: string
+      description: Dimension labels this piece type requires
+      example:
+        - "Length"
+        - "Width"
+    predefined:
+      type: boolean
+      description: Whether this is a system-defined piece type
+      example: true
+    archived_at:
+      type:
+        - "string"
+        - "null"
+      format: date-time
+      description: When the piece definition was archived (null if active)
+      example: null
+
+PaginatedPieceDefinitionResponse:
+  type: object
+  description: Paginated list of piece definitions with navigation metadata
+  required:
+    - data
+    - page
+    - page_size
+    - total_items
+    - total_pages
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/PieceDefinitionResponse"
+    page:
+      $ref: "_fields.yaml#/Page"
+    page_size:
+      $ref: "_fields.yaml#/PageSize"
+    total_items:
+      $ref: "_fields.yaml#/TotalItems"
+      example: 6
+    total_pages:
+      $ref: "_fields.yaml#/TotalPages"
+      example: 1

@@ -36,7 +36,6 @@ func TestE2E_Readyz(t *testing.T) {
 	assert.NotEmpty(t, body["commit"])
 	assert.NotEmpty(t, body["build_time"])
 	assert.NotEmpty(t, body["uptime"])
-	assert.NotEmpty(t, body["contract_version"])
 }
 
 // registerUser is a helper that provisions a verified user and returns (id, token).

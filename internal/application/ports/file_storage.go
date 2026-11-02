@@ -15,7 +15,7 @@ type FileObject struct {
 }
 
 // FileStorage is the outbound port for storing and retrieving files.
-// The implementation (MinIO, S3, local disk, etc.) lives in infrastructure.
+// The implementation (S3, local disk, etc.) lives in infrastructure.
 type FileStorage interface {
 	// Upload stores a file and returns the object key (relative path).
 	// The caller provides the key, a reader with the file content, the

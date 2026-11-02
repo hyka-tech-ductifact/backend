@@ -29,6 +29,9 @@ coverage.out
 coverage.html
 *.test
 
+# Generated in the Dockerfile spec stage; never take a stale local copy
+contracts/openapi/bundled.yaml
+
 # Documentation
 docs/
 README.md

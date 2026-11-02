@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"ductifact/internal/domain/entities"
+	"ductifact/internal/domain/repositories"
 	"ductifact/internal/infrastructure/adapters/outbound/persistence"
 	"ductifact/test/helpers"
 
@@ -101,6 +102,22 @@ func TestPostgresUserRepository_Update(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Pedro", found.Name)
 	assert.Equal(t, "pedro@example.com", found.Email)
+}
+
+func TestPostgresUserRepository_Update_MissingUser_ReturnsNotFound(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	user, err := entities.NewUser(entities.CreateUserParams{
+		Name: "Missing", Email: "missing@example.com", Password: "securepass123", Locale: "en",
+	})
+	require.NoError(t, err)
+
+	err = repo.Update(ctx, user)
+
+	assert.ErrorIs(t, err, repositories.ErrNotFound)
+	_, err = repo.GetByID(ctx, user.ID)
+	assert.ErrorIs(t, err, repositories.ErrNotFound, "Update must not recreate a missing user")
 }
 
 // =============================================================================

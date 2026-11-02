@@ -27,7 +27,7 @@ type Config struct {
 	CORS          CORS
 	RateLimit     RateLimit
 	LoginThrottle LoginThrottle
-	MinIO         MinIO
+	S3            S3
 	SMTP          SMTP
 	OTP           OTP
 }
@@ -38,8 +38,8 @@ type OTP struct {
 	PasswordResetTTL time.Duration // How long a password reset verification code remains valid (e.g. "1h")
 }
 
-// MinIO holds S3-compatible object storage settings.
-type MinIO struct {
+// S3 holds object storage settings for any S3-compatible server or provider.
+type S3 struct {
 	Endpoint  string // e.g. "localhost:9000"
 	AccessKey string
 	SecretKey string
@@ -177,12 +177,12 @@ func Load() Config {
 			Window:          parseSeconds(required("LOGIN_THROTTLE_WINDOW_SECONDS")),
 			LockoutDuration: parseSeconds(required("LOGIN_THROTTLE_LOCKOUT_SECONDS")),
 		},
-		MinIO: MinIO{
-			Endpoint:  required("MINIO_HOST") + ":" + required("MINIO_API_PORT"),
-			AccessKey: required("MINIO_ROOT_USER"),
-			SecretKey: required("MINIO_ROOT_PASSWORD"),
-			Bucket:    required("MINIO_BUCKET"),
-			UseSSL:    parseBool(required("MINIO_USE_SSL")),
+		S3: S3{
+			Endpoint:  required("S3_HOST") + ":" + required("S3_PORT"),
+			AccessKey: required("S3_ACCESS_KEY"),
+			SecretKey: required("S3_SECRET_KEY"),
+			Bucket:    required("S3_BUCKET"),
+			UseSSL:    parseBool(required("S3_USE_SSL")),
 		},
 		SMTP: SMTP{
 			Host:     required("SMTP_HOST"),

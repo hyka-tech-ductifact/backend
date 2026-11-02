@@ -1,0 +1,177 @@
+# ─── Reusable field definitions ──────────────────────────────
+# Single source of truth for properties shared across schemas.
+# In OpenAPI 3.1 you can add siblings alongside $ref to override
+# description, example, or add extra constraints (e.g. minLength).
+
+# ── Auth tokens ──────────────────────────────────────────────
+AccessToken:
+  type: string
+  description: Short-lived JWT for authenticating API requests
+  example: "eyJhbGciOiJIUzI1NiIs..."
+
+RefreshToken:
+  type: string
+  description: Long-lived JWT for obtaining new access tokens
+  example: "eyJhbGciOiJIUzI1NiIs..."
+
+TokenType:
+  type: string
+  enum: [Bearer]
+  description: OAuth-compatible access token type
+  example: Bearer
+
+ExpiresIn:
+  type: integer
+  format: int64
+  minimum: 1
+  description: Access token lifetime in seconds from issuance, as defined by OAuth 2.0
+  example: 900
+
+RefreshExpiresIn:
+  type: integer
+  format: int64
+  minimum: 1
+  description: Refresh token lifetime in seconds from issuance (API extension)
+  example: 604800
+
+Password:
+  type: string
+  minLength: 8
+  maxLength: 72
+  description: User password (8–72 bytes; bcrypt limit)
+  example: "securepass123"
+
+# ── User fields ──────────────────────────────────────────────
+UserName:
+  type: string
+  minLength: 1
+  description: The user's full name
+  example: "Juan García"
+
+UserEmail:
+  type: string
+  format: email
+  maxLength: 254
+  pattern: "^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]{0,252}[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\\.[a-zA-Z]{2,63}$"
+  description: The user's email address
+  example: "juan@example.com"
+
+Locale:
+  type: string
+  enum: [en, es]
+  description: "User's preferred language (BCP 47 tag)"
+  example: "en"
+
+# ── Entity names ─────────────────────────────────────────────
+ClientName:
+  type: string
+  minLength: 1
+  description: The client's name
+  example: "Acme Corp"
+
+ProjectName:
+  type: string
+  minLength: 1
+  description: The project's name
+  example: "Residential Tower B"
+
+OrderTitle:
+  type: string
+  minLength: 1
+  description: Title of the order
+  example: "Steel beams – lot 3"
+
+# ── Shared optional fields ───────────────────────────────────
+Phone:
+  type: string
+  description: Phone number
+  example: "+34 612 345 678"
+
+ContactEmail:
+  type: string
+  format: email
+  description: Contact email address
+  example: "contact@acme.com"
+
+Description:
+  type: string
+  description: Additional notes or details
+  example: "Additional information"
+
+Address:
+  type: string
+  description: Physical address
+  example: "Calle Mayor 12, Madrid"
+
+ManagerName:
+  type: string
+  description: Name of the responsible manager
+  example: "Carlos Pérez"
+
+ImageUrl:
+  type: string
+  description: |
+    URL of the original image, served via the file proxy.
+    Empty string when no image has been uploaded.
+  example: "/v1/files/piece-definitions/550e8400-e29b-41d4-a716-446655440000/original.png"
+
+ThumbnailUrl:
+  type: string
+  description: |
+    URL of the thumbnail (200×150 JPEG), derived by convention from the original.
+    Empty string when no image has been uploaded.
+  example: "/v1/files/piece-definitions/550e8400-e29b-41d4-a716-446655440000/thumb.png"
+
+PieceTitle:
+  type: string
+  minLength: 1
+  description: Title of the piece
+  example: "Side panel"
+
+PieceDefinitionName:
+  type: string
+  minLength: 1
+  description: Name of the piece definition
+  example: "Custom L-Shape"
+
+Quantity:
+  type: integer
+  minimum: 1
+  description: Number of items
+  example: 15
+
+Dimensions:
+  type: object
+  additionalProperties:
+    type: number
+  description: Dimension values keyed by dimension label (must match the definition schema)
+  example:
+    Length: 150.5
+    Width: 80.0
+
+# ── Common ───────────────────────────────────────────────────
+UUID:
+  type: string
+  format: uuid
+  example: "550e8400-e29b-41d4-a716-446655440000"
+
+# ── Pagination ───────────────────────────────────────────────
+Page:
+  type: integer
+  description: Current page number (1-based)
+  example: 1
+
+PageSize:
+  type: integer
+  description: Number of items per page
+  example: 20
+
+TotalItems:
+  type: integer
+  description: Total number of items across all pages
+  example: 47
+
+TotalPages:
+  type: integer
+  description: Total number of pages
+  example: 3

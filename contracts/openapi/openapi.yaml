@@ -1,0 +1,194 @@
+openapi: 3.1.1
+info:
+  title: Ductifact API
+  description: Backend API for Ductifact platform
+  version: dev # Stamped with the backend commit in the Docker image
+  license:
+    name: CC BY-NC 4.0
+    identifier: CC-BY-NC-4.0
+    url: https://creativecommons.org/licenses/by-nc/4.0/
+
+servers:
+  - url: "{protocol}://{host}/v1"
+    description: API v1
+    variables:
+      protocol:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost:8080
+
+security: []
+
+# ─── Tags (controls display order in Swagger UI) ─────────────
+tags:
+  - name: Auth
+    description: Registration, login, token refresh and logout
+  - name: Users
+    description: Authenticated user profile
+  - name: Clients
+    description: Client management
+  - name: Projects
+    description: Project management (nested under clients)
+  - name: Orders
+    description: Order management (nested under projects)
+  - name: Pieces
+    description: Piece management (nested under orders)
+  - name: Piece Definitions
+    description: Piece definition catalog (predefined + custom)
+  - name: Files
+    description: Static file serving (images from storage)
+
+# ─── Paths (alphabetical by resource) ─────────────────────────
+paths:
+  # Auth
+  /auth/login:
+    $ref: "paths/auth.yaml#/login"
+  /auth/logout:
+    $ref: "paths/auth.yaml#/logout"
+  /auth/refresh:
+    $ref: "paths/auth.yaml#/refresh"
+  /auth/register:
+    $ref: "paths/auth.yaml#/register"
+  /auth/register/verify:
+    $ref: "paths/auth.yaml#/register-verify"
+  /auth/password:
+    $ref: "paths/auth.yaml#/change-password"
+  /auth/password/reset:
+    $ref: "paths/auth.yaml#/password-reset"
+  /auth/password/reset/verify:
+    $ref: "paths/auth.yaml#/password-reset-verify"
+
+  # Clients
+  /clients:
+    $ref: "paths/clients.yaml#/collection"
+  /clients/{client_id}:
+    $ref: "paths/clients.yaml#/item"
+
+  # Files
+  /files/{filepath}:
+    $ref: "paths/files.yaml#/serve"
+
+  # Orders
+  /projects/{project_id}/orders:
+    $ref: "paths/orders.yaml#/collection"
+  /orders/{order_id}:
+    $ref: "paths/orders.yaml#/item"
+
+  # Piece Definitions
+  /piece-definitions:
+    $ref: "paths/piece_definitions.yaml#/collection"
+  /piece-definitions/{piece_definition_id}:
+    $ref: "paths/piece_definitions.yaml#/item"
+  /piece-definitions/{piece_definition_id}/archive:
+    $ref: "paths/piece_definitions.yaml#/archive"
+  /piece-definitions/{piece_definition_id}/unarchive:
+    $ref: "paths/piece_definitions.yaml#/unarchive"
+
+  # Pieces
+  /orders/{order_id}/pieces:
+    $ref: "paths/pieces.yaml#/collection"
+  /orders/{order_id}/pieces/{piece_id}:
+    $ref: "paths/pieces.yaml#/item"
+
+  # Projects
+  /clients/{client_id}/projects:
+    $ref: "paths/projects.yaml#/collection"
+  /projects/{project_id}:
+    $ref: "paths/projects.yaml#/item"
+
+  # Users
+  /users/me:
+    $ref: "paths/users.yaml#/me"
+
+# ─── Components ───────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login or /auth/register
+
+  schemas:
+    # Auth
+    AuthResponse:
+      $ref: "schemas/auth.yaml#/AuthResponse"
+    LoginRequest:
+      $ref: "schemas/auth.yaml#/LoginRequest"
+    LogoutRequest:
+      $ref: "schemas/auth.yaml#/LogoutRequest"
+    MessageResponse:
+      $ref: "schemas/auth.yaml#/MessageResponse"
+    RefreshRequest:
+      $ref: "schemas/auth.yaml#/RefreshRequest"
+    RegisterRequest:
+      $ref: "schemas/auth.yaml#/RegisterRequest"
+    StartRegistrationRequest:
+      $ref: "schemas/auth.yaml#/StartRegistrationRequest"
+    TokenResponse:
+      $ref: "schemas/auth.yaml#/TokenResponse"
+    CodeRequestResponse:
+      $ref: "schemas/auth.yaml#/CodeRequestResponse"
+
+    # Client
+    ClientResponse:
+      $ref: "schemas/client.yaml#/ClientResponse"
+    CreateClientRequest:
+      $ref: "schemas/client.yaml#/CreateClientRequest"
+    PaginatedClientResponse:
+      $ref: "schemas/client.yaml#/PaginatedClientResponse"
+    UpdateClientRequest:
+      $ref: "schemas/client.yaml#/UpdateClientRequest"
+
+    # Error
+    ErrorResponse:
+      $ref: "schemas/error.yaml#/ErrorResponse"
+
+    # Order
+    CreateOrderRequest:
+      $ref: "schemas/order.yaml#/CreateOrderRequest"
+    OrderResponse:
+      $ref: "schemas/order.yaml#/OrderResponse"
+    OrderStatus:
+      $ref: "schemas/order.yaml#/OrderStatus"
+    PaginatedOrderResponse:
+      $ref: "schemas/order.yaml#/PaginatedOrderResponse"
+    UpdateOrderRequest:
+      $ref: "schemas/order.yaml#/UpdateOrderRequest"
+
+    # Piece
+    CreatePieceRequest:
+      $ref: "schemas/piece.yaml#/CreatePieceRequest"
+    PaginatedPieceResponse:
+      $ref: "schemas/piece.yaml#/PaginatedPieceResponse"
+    PieceResponse:
+      $ref: "schemas/piece.yaml#/PieceResponse"
+    UpdatePieceRequest:
+      $ref: "schemas/piece.yaml#/UpdatePieceRequest"
+
+    # Piece Definition
+    CreatePieceDefinitionRequest:
+      $ref: "schemas/piece_definition.yaml#/CreatePieceDefinitionRequest"
+    PaginatedPieceDefinitionResponse:
+      $ref: "schemas/piece_definition.yaml#/PaginatedPieceDefinitionResponse"
+    PieceDefinitionResponse:
+      $ref: "schemas/piece_definition.yaml#/PieceDefinitionResponse"
+    UpdatePieceDefinitionRequest:
+      $ref: "schemas/piece_definition.yaml#/UpdatePieceDefinitionRequest"
+
+    # Project
+    CreateProjectRequest:
+      $ref: "schemas/project.yaml#/CreateProjectRequest"
+    PaginatedProjectResponse:
+      $ref: "schemas/project.yaml#/PaginatedProjectResponse"
+    ProjectResponse:
+      $ref: "schemas/project.yaml#/ProjectResponse"
+    UpdateProjectRequest:
+      $ref: "schemas/project.yaml#/UpdateProjectRequest"
+
+    # User
+    UpdateUserRequest:
+      $ref: "schemas/user.yaml#/UpdateUserRequest"
+    UserResponse:
+      $ref: "schemas/user.yaml#/UserResponse"

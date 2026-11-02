@@ -1,0 +1,11 @@
+# ─── Error ──────────────────────────────────────────────────
+ErrorResponse:
+  type: object
+  description: Standard error response
+  required:
+    - error
+  properties:
+    error:
+      type: string
+      description: Human-readable error message
+      example: "descriptive error message"
