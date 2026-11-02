@@ -145,19 +145,36 @@ host API, since both use port 8080.
 `make contract-breaking` requires a locally available `BASE_REF` (default `main`).
 `make clean` deletes untracked/ignored artifacts and database volumes, preserving `.env`.
 
+#### Switching from podman-compose
+
+Use `docker compose` consistently with the socket configuration above. Although
+both providers use Podman, `podman-compose` and Docker Compose attach different
+resource labels. Mixing them on the same project can cause an error such as
+`com.docker.compose.network` being empty instead of `default`.
+
+If the stack was originally created with `podman-compose`, migrate it once:
+
+```bash
+podman-compose --profile smoke down
+make services-start
+```
+
+This recreates containers and the network while preserving named data volumes.
+Do not add `-v`, which would delete those volumes.
+
 #### Fully containerized alternative
 
 For a container build and smoke test without host Go tools:
 
 ```bash
-podman-compose --profile smoke up -d --build
-podman-compose --profile smoke logs -f app
+docker compose --profile smoke up -d --build
+docker compose --profile smoke logs -f app
 ```
 
 Stop that stack while preserving database volumes:
 
 ```bash
-podman-compose --profile smoke down
+docker compose --profile smoke down
 ```
 
 With Docker CLI compatibility configured, `make docker-start` and
