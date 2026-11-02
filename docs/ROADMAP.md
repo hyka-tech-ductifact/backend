@@ -46,7 +46,7 @@ stays in Ductifact.
 | T.3 | Per-module route registration instead of positional services in `SetupRoutes` | ⬜ | 🔴 Now · 🧱 |
 | T.4 | Split `main.go` wiring into a core bootstrap (DB, Redis, auth, email, storage, health) and domain modules | ⬜ | 🔴 Now · 🧱 |
 | T.5 | Separate core migrations (users, locale, OTP) from domain migrations | ⬜ | 🔴 Now · 🧱 |
-| T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title, `cliff.toml` | ⬜ | 🔴 Now · 🧱 |
+| T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title | ⬜ | 🔴 Now · 🧱 |
 | T.7 | Vendor-neutral storage adapter (`S3Storage`); `minio-go` kept as a generic, maintained S3 client. Swap to `aws-sdk-go-v2` only if `minio-go` stops being maintained | ✅ | 🧱 |
 | T.8 | Vendor-neutral `S3_*` settings in backend config, compose and CI | ✅ | 🧱 |
 | T.9 | Infra: replace the withdrawn MinIO image with RustFS, pass `S3_*` to the backend, rename `MINIO_*` secrets/vars, migrate staging and production objects (`rclone sync`), update `smoke.sh` health check | ⬜ | 🔴 Now |
@@ -183,7 +183,6 @@ Current CD model: each merge into `main` publishes an immutable candidate image;
 |---|------|--------|
 | 12.1 | Pre-commit hooks (auto lint + format) | ✅ |
 | 12.2 | Dependabot / Renovate (dependency updates) | ✅ |
-| 12.3 | Automated changelog (conventional commits) | ✅ |
 | 12.4 | Makefile targets for all operations | ✅ |
 | 12.5 | Hot reload in development (`air`) | ✅ |
 | 12.6 | Coverage report (HTML) | ✅ |

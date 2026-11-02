@@ -25,8 +25,8 @@ CONTRACT_DIR     := contracts/openapi
 CONTRACT_SPEC    := $(CONTRACT_DIR)/openapi.yaml
 CONTRACT_BUNDLE  := $(CONTRACT_DIR)/bundled.yaml
 CONTRACT_SOURCES := $(shell find $(CONTRACT_DIR) -name '*.yaml' ! -name bundled.yaml)
-REDOCLY_IMAGE    ?= redocly/cli:2.20.5
-OASDIFF_IMAGE    ?= tufin/oasdiff:v1.35.0
+REDOCLY_IMAGE    ?= docker.io/redocly/cli:2.20.5
+OASDIFF_IMAGE    ?= docker.io/tufin/oasdiff:v1.35.0
 BASE_REF         ?= main
 
 # ─── .PHONY ─────────────────────────────────────────────────
@@ -39,8 +39,7 @@ BASE_REF         ?= main
 	contract-validate contract-bundle contract-breaking \
 	docker-build docker-start docker-stop \
 	fmt lint vulncheck deps clean \
-	validate-branch \
-	changelog
+	validate-branch
 
 # ═══════════════════════════════════════════════════════════════
 # Help
@@ -96,10 +95,6 @@ help:
 	@echo ""
 	@echo "  CI:"
 	@echo "    validate-branch  - Validate branch name and target"
-	@echo ""
-	@echo "  Release:"
-	@echo "    changelog        - Generate CHANGELOG.md (auto-bumps version via SemVer)"
-	@echo "                       Override: make changelog VERSION=v1.0.0"
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "    clean            - Remove build artifacts and temp files"
@@ -205,7 +200,7 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE         ?= schemathesis/schemathesis:v4.16.1
+ST_IMAGE         ?= docker.io/schemathesis/schemathesis:v4.16.1
 ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
 _ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
@@ -349,6 +344,7 @@ deps:
 	@echo "Installing dev tools..."
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/segmentio/golines@latest
 	go install gotest.tools/gotestsum@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -379,21 +375,6 @@ validate-branch:
 		fi; \
 	fi; \
 	echo "✅ Branch '$$BRANCH' → '$${BASE:-*}' is valid"
-
-# ═══════════════════════════════════════════════════════════════
-# Release
-# ═══════════════════════════════════════════════════════════════
-
-# Generate CHANGELOG.md from conventional commits using git-cliff.
-# By default, calculates the next version automatically via SemVer:
-#   fix  → patch (0.2.0 → 0.2.1)
-#   feat → minor (0.2.0 → 0.3.0)
-#   feat! / BREAKING CHANGE → major (0.2.0 → 1.0.0)
-# Override: make changelog VERSION=v1.0.0
-changelog:
-	@echo "Generating CHANGELOG.md..."
-	$(if $(VERSION),git-cliff --tag $(VERSION) --output CHANGELOG.md,git-cliff --bump --output CHANGELOG.md)
-	@echo "✅ CHANGELOG.md updated"
 
 # ═══════════════════════════════════════════════════════════════
 # Maintenance
