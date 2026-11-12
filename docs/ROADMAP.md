@@ -49,7 +49,7 @@ stays in Ductifact.
 | T.6 | Single `APP_NAME` driving module-independent names: compose project, container prefixes, bucket, `SMTP_FROM`, Swagger title | ⬜ | 🔴 Now · 🧱 |
 | T.7 | Vendor-neutral storage adapter (`S3Storage`); `minio-go` kept as a generic, maintained S3 client. Swap to `aws-sdk-go-v2` only if `minio-go` stops being maintained | ✅ | 🧱 |
 | T.8 | Vendor-neutral `S3_*` settings in backend config, compose and CI | ✅ | 🧱 |
-| T.9 | Infra: replace the withdrawn MinIO image with RustFS, pass `S3_*` to the backend, rename `MINIO_*` secrets/vars, migrate staging and production objects (`rclone sync`), update `smoke.sh` health check | ⬜ | 🔴 Now |
+| T.9 | Infra config aligned with RustFS and `S3_*` (compose, CI, smoke checks); pending: configure GitHub Environment secrets and migrate staging/production objects (`rclone copy` + `rclone check`) before rollout | ✅ | 🧱 |
 | T.10 | Dedicated app access key scoped to its bucket instead of the S3 server root credentials (staging/production) | ⬜ | 🟡 Next · 🧱 |
 
 T.1 made 24.4 obsolete: the contract and the implementation ship in the same commit.
