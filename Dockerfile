@@ -10,7 +10,7 @@ ARG APP_COMMIT=unknown
 RUN redocly bundle openapi.yaml -o bundled.yaml \
  && sed -i "1,/^  version: .*/s/^  version: .*/  version: ${APP_COMMIT}/" bundled.yaml
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM docker.io/library/golang:1.26-alpine AS builder
+FROM docker.io/library/golang:1.26.11-alpine AS builder
 
 WORKDIR /app
 

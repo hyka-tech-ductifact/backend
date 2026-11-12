@@ -78,7 +78,7 @@ sudo apt-get update
 sudo apt-get install -y golang-go make build-essential curl podman podman-compose podman-docker docker-compose-v2
 ```
 
-The module requires Go 1.26 and pins toolchain `go1.26.10` in `go.mod`.
+The module requires Go 1.26 and pins toolchain `go1.26.11` in `go.mod`.
 Go downloads that toolchain automatically when needed (with `GOTOOLCHAIN=auto`,
 the default), so the first Go command needs network access.
 
