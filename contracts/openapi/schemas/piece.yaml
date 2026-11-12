@@ -1,0 +1,88 @@
+# ─── Piece Schemas ───────────────────────────────────────────
+
+CreatePieceRequest:
+  type: object
+  description: Request body for creating a new piece (order line)
+  required:
+    - title
+    - definition_id
+    - dimensions
+    - quantity
+  properties:
+    title:
+      $ref: "_fields.yaml#/PieceTitle"
+    definition_id:
+      $ref: "_fields.yaml#/UUID"
+      description: ID of the piece definition (shape template)
+    dimensions:
+      $ref: "_fields.yaml#/Dimensions"
+    quantity:
+      $ref: "_fields.yaml#/Quantity"
+
+UpdatePieceRequest:
+  type: object
+  description: Request body for updating a piece. All fields are optional.
+  properties:
+    title:
+      $ref: "_fields.yaml#/PieceTitle"
+      example: "Side panel (revised)"
+    dimensions:
+      $ref: "_fields.yaml#/Dimensions"
+      example:
+        Length: 200.0
+        Width: 100.0
+    quantity:
+      $ref: "_fields.yaml#/Quantity"
+      example: 20
+
+PieceResponse:
+  type: object
+  description: Piece data returned by the API
+  required:
+    - id
+    - title
+    - definition_id
+    - dimensions
+    - quantity
+    - order_id
+  properties:
+    id:
+      $ref: "_fields.yaml#/UUID"
+      description: Unique piece identifier
+    title:
+      $ref: "_fields.yaml#/PieceTitle"
+    definition_id:
+      $ref: "_fields.yaml#/UUID"
+      description: ID of the piece definition used
+    dimensions:
+      $ref: "_fields.yaml#/Dimensions"
+    quantity:
+      $ref: "_fields.yaml#/Quantity"
+    order_id:
+      $ref: "_fields.yaml#/UUID"
+      description: ID of the order this piece belongs to
+
+PaginatedPieceResponse:
+  type: object
+  description: Paginated list of pieces with navigation metadata
+  required:
+    - data
+    - page
+    - page_size
+    - total_items
+    - total_pages
+  properties:
+    data:
+      type: array
+      items:
+        $ref: "#/PieceResponse"
+    page:
+      $ref: "_fields.yaml#/Page"
+    page_size:
+      $ref: "_fields.yaml#/PageSize"
+    total_items:
+      $ref: "_fields.yaml#/TotalItems"
+      example: 8
+    total_pages:
+      $ref: "_fields.yaml#/TotalPages"
+      example: 1

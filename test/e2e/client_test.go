@@ -128,7 +128,11 @@ func TestE2E_ListClients_SearchSortAndPagination(t *testing.T) {
 	require.Len(t, clients, 1)
 	assert.Equal(t, "Alpha Duct", clients[0].(map[string]any)["name"])
 
-	outOfRange := helpers.AuthGetJSON(t, url("/clients")+"?search=duct&sort_by=name&sort_order=asc&page=99&page_size=1", token)
+	outOfRange := helpers.AuthGetJSON(
+		t,
+		url("/clients")+"?search=duct&sort_by=name&sort_order=asc&page=99&page_size=1",
+		token,
+	)
 	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
 	outOfRangeBody := helpers.ParseBody(t, outOfRange)
 	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))

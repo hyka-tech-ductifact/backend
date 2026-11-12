@@ -13,7 +13,7 @@ import (
 
 // FileHandler serves files from storage as a reverse proxy.
 // The client accesses /v1/files/{key} and the handler streams
-// the object directly from the FileStorage port (e.g. MinIO).
+// the object directly from the FileStorage port (e.g. S3).
 type FileHandler struct {
 	fileStorage ports.FileStorage
 }

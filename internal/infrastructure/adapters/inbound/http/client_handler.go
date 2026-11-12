@@ -100,7 +100,11 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		return
 	}
 
-	result, err := h.clientService.ListClientsByUserID(c.Request.Context(), userID, query.ClientListQuery{ListQuery: base})
+	result, err := h.clientService.ListClientsByUserID(
+		c.Request.Context(),
+		userID,
+		query.ClientListQuery{ListQuery: base},
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return

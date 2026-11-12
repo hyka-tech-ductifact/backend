@@ -131,10 +131,34 @@ func TestPostgresPieceRepository_ListByOrderID_SearchDefinitionSortAndPagination
 	otherDefinition := createTestPieceDef(t, defRepo, user.ID)
 
 	pieces := []entities.CreatePieceParams{
-		{Title: "Beta Panel", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 100, "Width": 50}, Quantity: 2},
-		{Title: "Alpha Panel", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 200, "Width": 100}, Quantity: 5},
-		{Title: "Other Panel", OrderID: order.ID, DefinitionID: otherDefinition.ID, Dimensions: map[string]float64{"Length": 50, "Width": 25}, Quantity: 9},
-		{Title: "Unrelated", OrderID: order.ID, DefinitionID: definition.ID, Dimensions: map[string]float64{"Length": 75, "Width": 25}, Quantity: 8},
+		{
+			Title:        "Beta Panel",
+			OrderID:      order.ID,
+			DefinitionID: definition.ID,
+			Dimensions:   map[string]float64{"Length": 100, "Width": 50},
+			Quantity:     2,
+		},
+		{
+			Title:        "Alpha Panel",
+			OrderID:      order.ID,
+			DefinitionID: definition.ID,
+			Dimensions:   map[string]float64{"Length": 200, "Width": 100},
+			Quantity:     5,
+		},
+		{
+			Title:        "Other Panel",
+			OrderID:      order.ID,
+			DefinitionID: otherDefinition.ID,
+			Dimensions:   map[string]float64{"Length": 50, "Width": 25},
+			Quantity:     9,
+		},
+		{
+			Title:        "Unrelated",
+			OrderID:      order.ID,
+			DefinitionID: definition.ID,
+			Dimensions:   map[string]float64{"Length": 75, "Width": 25},
+			Quantity:     8,
+		},
 	}
 	for _, params := range pieces {
 		piece, err := entities.NewPiece(params)

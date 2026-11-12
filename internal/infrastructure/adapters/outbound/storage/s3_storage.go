@@ -13,21 +13,22 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// MinIOStorage implements ports.FileStorage using MinIO (S3-compatible).
-type MinIOStorage struct {
+// S3Storage implements ports.FileStorage against any S3-compatible server.
+// minio-go is used only as a generic S3 client; it does not require a MinIO server.
+type S3Storage struct {
 	client *minio.Client
 	bucket string
 }
 
-// NewMinIOStorage creates a new MinIO client and ensures the bucket exists.
+// NewS3Storage creates an S3 client and ensures the bucket exists.
 // endpoint: "localhost:9000", useSSL: false for local dev.
-func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOStorage, error) {
+func NewS3Storage(endpoint, accessKey, secretKey, bucket string, useSSL bool) (*S3Storage, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("minio client: %w", err)
+		return nil, fmt.Errorf("s3 client: %w", err)
 	}
 
 	// Ensure bucket exists (idempotent)
@@ -40,36 +41,36 @@ func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool)
 		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 			return nil, fmt.Errorf("creating bucket %q: %w", bucket, err)
 		}
-		slog.Info("minio bucket created", "bucket", bucket)
+		slog.Info("s3 bucket created", "bucket", bucket)
 	}
 
-	return &MinIOStorage{client: client, bucket: bucket}, nil
+	return &S3Storage{client: client, bucket: bucket}, nil
 }
 
-// Upload stores a file in MinIO under the given key.
-func (s *MinIOStorage) Upload(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
+// Upload stores a file under the given key.
+func (s *S3Storage) Upload(ctx context.Context, key string, reader io.Reader, contentType string, size int64) error {
 	_, err := s.client.PutObject(ctx, s.bucket, key, reader, size, minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
-		return fmt.Errorf("minio upload %q: %w", key, err)
+		return fmt.Errorf("s3 upload %q: %w", key, err)
 	}
 	return nil
 }
 
-// GetObject retrieves a file from MinIO by its key.
+// GetObject retrieves a file by its key.
 // Returns ports.ErrFileNotFound if the key doesn't exist.
-func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileObject, error) {
+func (s *S3Storage) GetObject(ctx context.Context, key string) (*ports.FileObject, error) {
 	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("minio get %q: %w", key, err)
+		return nil, fmt.Errorf("s3 get %q: %w", key, err)
 	}
 
 	// Stat to check existence and get metadata
 	info, err := obj.Stat()
 	if err != nil {
 		obj.Close()
-		// MinIO returns an ErrorResponse with various codes for missing/invalid objects
+		// S3 servers report missing/invalid objects with different codes (including provider-specific X* codes)
 		errResp := minio.ErrorResponse{}
 		if errors.As(err, &errResp) {
 			switch errResp.Code {
@@ -79,7 +80,7 @@ func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileOb
 				return nil, ports.ErrFileNotFound
 			}
 		}
-		return nil, fmt.Errorf("minio stat %q: %w", key, err)
+		return nil, fmt.Errorf("s3 stat %q: %w", key, err)
 	}
 
 	return &ports.FileObject{
@@ -89,20 +90,20 @@ func (s *MinIOStorage) GetObject(ctx context.Context, key string) (*ports.FileOb
 	}, nil
 }
 
-// Delete removes a file from MinIO. Returns nil if the file doesn't exist.
-func (s *MinIOStorage) Delete(ctx context.Context, key string) error {
+// Delete removes a file. Returns nil if the file doesn't exist.
+func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	err := s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {
-		return fmt.Errorf("minio delete %q: %w", key, err)
+		return fmt.Errorf("s3 delete %q: %w", key, err)
 	}
 	return nil
 }
 
-// Ping checks whether MinIO is reachable by verifying the bucket exists.
-func (s *MinIOStorage) Ping(ctx context.Context) error {
+// Ping checks whether the S3 server is reachable by verifying the bucket exists.
+func (s *S3Storage) Ping(ctx context.Context) error {
 	_, err := s.client.BucketExists(ctx, s.bucket)
 	if err != nil {
-		return fmt.Errorf("minio ping: %w", err)
+		return fmt.Errorf("s3 ping: %w", err)
 	}
 	return nil
 }

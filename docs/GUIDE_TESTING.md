@@ -9,7 +9,7 @@ The backend has 4 test levels, each with a different scope and purpose:
 | **Unit** | Domain logic, services, value objects | None (uses mocks) | `test/unit/` |
 | **Integration** | Repositories against real PostgreSQL | DB | `test/integration/persistence/` |
 | **Integration (Redis)** | Redis adapters (blacklist, rate limiter, throttler, health) | Redis | `test/integration/redis/` |
-| **Contract** | API responses match the OpenAPI spec | DB + running server | `test/contract/` |
+| **Contract** | API behaviour matches the OpenAPI spec | DB + running server + Docker | `test/schemathesis.toml` |
 | **E2E** | Full HTTP flows end-to-end | DB + running server | `test/e2e/` |
 
 ## Test pyramid
@@ -45,9 +45,16 @@ Each test cleans the database before running (TRUNCATE) to ensure isolation.
 
 ### Contract tests
 
-Validate that every API response conforms to the OpenAPI spec (`contracts/openapi/bundled.yaml`). Uses `kin-openapi` to load the spec and validate response bodies, status codes, and schemas automatically.
+Validate that the running API conforms to the OpenAPI spec in `contracts/openapi/`
+(bundled to `bundled.yaml` by `make contract-bundle`). Uses
+[Schemathesis](https://schemathesis.readthedocs.io/) in Docker to generate requests
+from the spec (examples, coverage, fuzzing and stateful phases) and check status
+codes, response schemas and headers. Config lives in `test/schemathesis.toml`;
+custom media-type strategies in `test/schemathesis_hooks.py`.
 
-A coverage tracker ensures all spec-defined operations are tested. Untested operations fail the suite.
+Every operation defined in the spec is exercised; the spec itself is linted
+(`make contract-validate`) and checked for breaking changes (`make contract-breaking`)
+separately.
 
 ### E2E tests
 
@@ -67,7 +74,7 @@ Black-box HTTP tests against the running server. They don't import any internal 
 ```bash
 make test-unit              # unit tests (no dependencies)
 make test-integration       # requires services (make services-start)
-make test-contract          # requires services + server (make services-start && make app-start)
+make test-contract          # requires services + server (make app-start) and Docker
 make test-e2e               # requires services + server (make services-start && make app-start)
 make test                   # all tests
 ```

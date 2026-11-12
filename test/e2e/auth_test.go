@@ -13,6 +13,7 @@ import (
 )
 
 const registrationStartedMessage = "if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email"
+
 const passwordResetStartedMessage = "if the address is associated with an account, a password reset code has been sent; it may take a few minutes, so check the spam folder before requesting another code"
 
 func assertTokenMetadata(t *testing.T, body map[string]any) {
@@ -107,6 +108,18 @@ func TestE2E_StartRegistration_EmptyBody_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+func TestE2E_StartRegistration_RejectsUnknownField(t *testing.T) {
+	clean(t)
+
+	resp := helpers.PostJSON(t, url("/auth/register"), map[string]string{
+		"email":            "attacker@example.com",
+		"unexpected_field": "not allowed",
+	})
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
 // ─── Complete Registration (verify) ──────────────────────────────────────────
 
 func TestE2E_Register_Success(t *testing.T) {
@@ -139,6 +152,28 @@ func TestE2E_Register_Success(t *testing.T) {
 			Error,
 	)
 	assert.Equal(t, int64(0), count)
+}
+
+func TestE2E_Register_RejectsUnknownFieldBeforeCreatingAccount(t *testing.T) {
+	clean(t)
+	seedRegistrationOTP(t, "attacker@example.com", "123456")
+
+	resp := helpers.PostJSON(t, url("/auth/register/verify"), map[string]string{
+		"email":            "attacker@example.com",
+		"code":             "123456",
+		"name":             "Attacker",
+		"password":         "securepass123",
+		"unexpected_field": "not allowed",
+	})
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var count int64
+	require.NoError(t, env.db.Raw(
+		"SELECT COUNT(*) FROM users WHERE email = ?",
+		"attacker@example.com",
+	).Scan(&count).Error)
+	assert.Zero(t, count)
 }
 
 func TestE2E_Register_WrongCode_Returns400(t *testing.T) {

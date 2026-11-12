@@ -210,7 +210,9 @@ func TestE2E_ListPieces_SearchDefinitionSortAndPagination(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	listURL := pieceURL(orderID) + "?search=panel&definition_id=" + definitionID + "&sort_by=quantity&sort_order=desc&page=1&page_size=1"
+	listURL := pieceURL(
+		orderID,
+	) + "?search=panel&definition_id=" + definitionID + "&sort_by=quantity&sort_order=desc&page=1&page_size=1"
 	resp := helpers.AuthGetJSON(t, listURL, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body := helpers.ParseBody(t, resp)
@@ -220,7 +222,13 @@ func TestE2E_ListPieces_SearchDefinitionSortAndPagination(t *testing.T) {
 	assert.Equal(t, float64(5), data[0].(map[string]any)["quantity"])
 	assert.Equal(t, definitionID, data[0].(map[string]any)["definition_id"])
 
-	outOfRange := helpers.AuthGetJSON(t, pieceURL(orderID)+"?search=panel&definition_id="+definitionID+"&sort_by=quantity&sort_order=desc&page=99&page_size=1", token)
+	outOfRange := helpers.AuthGetJSON(
+		t,
+		pieceURL(
+			orderID,
+		)+"?search=panel&definition_id="+definitionID+"&sort_by=quantity&sort_order=desc&page=99&page_size=1",
+		token,
+	)
 	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
 	outOfRangeBody := helpers.ParseBody(t, outOfRange)
 	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))

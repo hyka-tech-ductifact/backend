@@ -61,6 +61,9 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Since we do
 **squash merge**, the PR title becomes the commit message on `main`. CI validates
 the PR title format automatically.
 
+Each published backend image is identified by its commit (`sha-<commit>`).
+The project does not use SemVer releases or generate a changelog.
+
 ### Format
 
 ```
@@ -69,11 +72,11 @@ the PR title format automatically.
 
 ### Types
 
-| Type | When to use | In changelog? |
-|------|------------|---------------|
-| `feat` | New feature | ✅ |
-| `fix` | Bug fix | ✅ |
-| `chore` | Everything else (docs, deps, refactor, CI, tests...) | ❌ |
+| Type | When to use |
+|------|------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `chore` | Everything else (docs, deps, refactor, CI, tests...) |
 
 ### Examples
 
@@ -94,10 +97,25 @@ feat(api)!: change pagination response format
 
 ---
 
-## 5) PR rules
+## 5) API contract changes
+
+The OpenAPI spec lives in `contracts/openapi/` and is part of this repository:
+a PR that changes the API must change the spec and the implementation together.
+
+- Edit the source files under `contracts/openapi/`, never `bundled.yaml`.
+- Run `make contract-validate` and `make contract-breaking` before pushing.
+- The contract has no version of its own; it is identified by the backend
+  commit. CI runs the same checks on every PR (`Contract Spec` job) and fails
+  on breaking changes against the target branch.
+- A breaking change that must ship is a `feat(api)!` PR and goes through a new
+  path prefix (`/v2`), keeping `/v1` until consumers migrate.
+
+---
+
+## 6) PR rules
 
 - No direct pushes to `main`
-- CI must pass (tests, lint, build, **PR title validation**)
-- PR title must follow Conventional Commits format (see §5)
+- CI must pass (tests, lint, build, contract spec, **PR title validation**)
+- PR title must follow Conventional Commits format (see §4)
 - Keep PRs small and focused
 - Use **squash merge** (1 PR = 1 commit)

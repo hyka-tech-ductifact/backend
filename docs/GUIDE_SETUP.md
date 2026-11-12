@@ -4,12 +4,12 @@
 
 - Go 1.26+
 - Docker + Compose plugin v2+ (or Podman)
-- Make
+- Make and a C compiler (for tests with `CI=1`, which enable the race detector)
 - Redis 7+ (provided by `docker compose` in dev)
 
 ## Go bin directory
 
-Dev tools (`air`, `gotestsum`, `golangci-lint`) are installed via `make deps` into `$(go env GOPATH)/bin`. Add it to your `PATH`:
+Dev tools (`air`, `gotestsum`, `golangci-lint`, `golines`, `govulncheck`) are installed via `make deps` into `$(go env GOPATH)/bin`. Add it to your `PATH`:
 
 ```bash
 echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.bashrc
@@ -45,7 +45,7 @@ Key variables:
 make deps
 ```
 
-This runs `go mod tidy`, `go mod download`, and installs dev tools (`air`, `golangci-lint`, `gotestsum`).
+This runs `go mod tidy`, `go mod download`, and installs `air`, `golangci-lint`, `golines`, `gotestsum`, and `govulncheck`.
 
 ---
 
@@ -63,43 +63,125 @@ Verify:
 docker compose version
 ```
 
-### Option B — Podman (WSL / Linux, no Docker Engine)
+### Option B — Podman (Ubuntu / Linux)
 
-If you can't or don't want to install Docker Engine, Podman works as a drop-in replacement.
+#### Local development with Make (hot reload, tests, formatting, lint)
 
-#### 1. Install Podman + Docker CLI compatibility
+In this workflow, the API and Go tools run on the host. PostgreSQL, RustFS,
+Redis, Mailpit, and contract tools run in containers managed by Podman.
 
-```bash
-sudo apt install -y podman podman-docker docker-ce-cli docker-compose-plugin
-```
-
-#### 2. Silence the Podman emulation notice
+Install the host dependencies and Docker CLI compatibility. These package
+names are available on Ubuntu 26.04; other distributions may use different names.
 
 ```bash
-sudo mkdir -p /etc/containers
-sudo touch /etc/containers/nodocker
+sudo apt-get update
+sudo apt-get install -y golang-go make build-essential curl podman podman-compose podman-docker docker-compose-v2
 ```
 
-#### 3. Enable the Podman user socket
+The module requires Go 1.26 and pins toolchain `go1.26.11` in `go.mod`.
+Go downloads that toolchain automatically when needed (with `GOTOOLCHAIN=auto`,
+the default), so the first Go command needs network access.
+
+The Makefile calls `docker` and `docker compose`. `podman-docker` provides the
+Docker-compatible CLI, while Docker Compose connects to the Podman user socket:
 
 ```bash
 systemctl --user enable --now podman.socket
+export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/podman/podman.sock"
 ```
 
-#### 4. Set DOCKER_HOST
-
-Add to `~/.bashrc`:
+Persist the socket setting for future Bash sessions:
 
 ```bash
-echo 'export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock' >> ~/.bashrc
-source ~/.bashrc
+echo 'export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/podman/podman.sock"' >> ~/.bashrc
 ```
 
-#### 5. Verify
+Verify the engine and Compose provider:
 
 ```bash
+go version
+make --version
+docker info
 docker compose version
-docker run hello-world
 ```
 
-> **Note:** Image names in `Dockerfile` and `docker-compose*.yml` must be fully qualified (e.g. `docker.io/library/golang:1.26-alpine`) because Podman does not resolve short names by default.
+From `backend/`, create `.env` if it does not already exist. Set `JWT_SECRET`
+to a random secret (`openssl rand -base64 32`); keep service hosts as `localhost`
+for the host API. Then install the Go dependencies and tools:
+
+```bash
+make deps
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+Add the Go bin directory to `~/.bashrc` as described above for future terminals.
+
+Start development:
+
+```bash
+make dev
+```
+
+In another terminal, from `backend/`:
+
+```bash
+curl --fail http://localhost:8080/readyz
+make test-unit
+make test-integration
+make test-e2e
+make test-contract
+make fmt
+make lint
+make vulncheck
+```
+
+Integration tests require the services, and E2E/contract tests require the API.
+`make services-start` starts just the services; `make app-start` builds and
+starts the API in the background without hot reload. Stop development with
+`make dev-stop`. Avoid running the containerized API at the same time as the
+host API, since both use port 8080.
+
+`make validate-branch` requires `BRANCH` and optionally `BASE`, as in CI.
+`make contract-breaking` requires a locally available `BASE_REF` (default `main`).
+`make clean` deletes untracked/ignored artifacts and database volumes, preserving `.env`.
+
+#### Switching from podman-compose
+
+Use `docker compose` consistently with the socket configuration above. Although
+both providers use Podman, `podman-compose` and Docker Compose attach different
+resource labels. Mixing them on the same project can cause an error such as
+`com.docker.compose.network` being empty instead of `default`.
+
+If the stack was originally created with `podman-compose`, migrate it once:
+
+```bash
+podman-compose --profile smoke down
+make services-start
+```
+
+This recreates containers and the network while preserving named data volumes.
+Do not add `-v`, which would delete those volumes.
+
+#### Fully containerized alternative
+
+For a container build and smoke test without host Go tools:
+
+```bash
+docker compose --profile smoke up -d --build
+docker compose --profile smoke logs -f app
+```
+
+Stop that stack while preserving database volumes:
+
+```bash
+docker compose --profile smoke down
+```
+
+With Docker CLI compatibility configured, `make docker-start` and
+`make docker-stop` provide the Makefile's container smoke-test workflow.
+
+API docs: http://localhost:8080/docs. Email inbox: http://localhost:8025.
+
+Use fully qualified image names (for example,
+`docker.io/library/postgres:15-alpine`) so Podman can resolve them without
+configuring short-name search registries.

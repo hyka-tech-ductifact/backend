@@ -20,8 +20,14 @@ _junit_flag = $(if $(filter 1,$(CI)),--junitfile $(1)-test-results.xml,)
 # Generate coverage report (e.g. make test-unit COVERAGE=1)
 COVERAGE ?= 0
 
-# GitHub org/user that owns the contracts repo
-CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
+# ─── OpenAPI contract ────────────────────────────────────────
+CONTRACT_DIR     := contracts/openapi
+CONTRACT_SPEC    := $(CONTRACT_DIR)/openapi.yaml
+CONTRACT_BUNDLE  := $(CONTRACT_DIR)/bundled.yaml
+CONTRACT_SOURCES := $(shell find $(CONTRACT_DIR) -name '*.yaml' ! -name bundled.yaml)
+REDOCLY_IMAGE    ?= docker.io/redocly/cli:2.20.5
+OASDIFF_IMAGE    ?= docker.io/tufin/oasdiff:v1.35.0
+BASE_REF         ?= main
 
 # ─── .PHONY ─────────────────────────────────────────────────
 
@@ -30,10 +36,10 @@ CONTRACTS_REPO ?= hyka-tech-ductifact/contracts
 	services-start services-stop \
 	test test-unit test-integration test-e2e test-clean \
 	test-contract \
+	contract-validate contract-bundle contract-breaking \
 	docker-build docker-start docker-stop \
-	fmt lint deps clean \
-	validate-branch ensure-contract \
-	changelog
+	fmt lint vulncheck deps clean \
+	validate-branch
 
 # ═══════════════════════════════════════════════════════════════
 # Help
@@ -70,9 +76,11 @@ help:
 	@echo "      ST_MAX_EXAMPLES   - Override examples per operation:     make test-contract ST_MAX_EXAMPLES=200"
 	@echo "      ST_SEED           - Reproduce a test run with a seed:     make test-contract ST_SEED=<seed>"
 	@echo ""
-	@echo "  Contracts:"
-	@echo "    ensure-contract  - Ensure bundled.yaml is present"
-	@echo "                       Uses ../contracts if available, otherwise downloads from release"
+	@echo "  Contracts (source: contracts/openapi/):"
+	@echo "    contract-validate - Lint the OpenAPI spec (redocly)"
+	@echo "    contract-bundle   - Generate contracts/openapi/bundled.yaml (only if sources changed)"
+	@echo "    contract-breaking - Detect breaking changes vs BASE_REF (default: main)"
+	@echo "                        make contract-breaking BASE_REF=origin/main"
 	@echo ""
 	@echo "  Docker (smoke test):"
 	@echo "    docker-build     - Build Docker image"
@@ -82,14 +90,11 @@ help:
 	@echo "  Code quality:"
 	@echo "    fmt              - Format code"
 	@echo "    lint             - Lint code"
+	@echo "    vulncheck        - Scan dependencies for known vulnerabilities (govulncheck)"
 	@echo "    deps             - Install dependencies and dev tools"
 	@echo ""
 	@echo "  CI:"
 	@echo "    validate-branch  - Validate branch name and target"
-	@echo ""
-	@echo "  Release:"
-	@echo "    changelog        - Generate CHANGELOG.md (auto-bumps version via SemVer)"
-	@echo "                       Override: make changelog VERSION=v1.0.0"
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "    clean            - Remove build artifacts and temp files"
@@ -99,7 +104,7 @@ help:
 # ═══════════════════════════════════════════════════════════════
 
 # Start DB and run with hot reload (main dev workflow)
-dev: ensure-contract services-start ensure-seed
+dev: contract-bundle services-start ensure-seed
 	@echo "Running ductifact with hot reloading..."
 	air
 
@@ -115,11 +120,12 @@ app-build:
 	@echo "Building ductifact..."
 	go build -o bin/api ./cmd/api
 
-# Build and start API in background (used in CI and local testing)
-app-start: ensure-contract app-build services-start
-	./bin/api &
+# Build and start API in background (used in CI and local testing).
+# Output goes to api.log so a piped `make app-start | ...` is not held open by the server.
+app-start: contract-bundle app-build services-start
+	./bin/api > api.log 2>&1 &
 	@sleep 3
-	@echo "✅ API running in background"
+	@echo "✅ API running in background (logs: api.log)"
 
 # Seed the database with development data if the users table is empty.
 # Runs automatically as part of `make dev` — no manual invocation needed.
@@ -194,14 +200,14 @@ test-e2e:
 
 # ─── Schemathesis (contract testing) ─────────────────────────
 # Runs via Docker — config lives in test/schemathesis.toml
-ST_IMAGE         ?= schemathesis/schemathesis:v4.16.1
+ST_IMAGE         ?= docker.io/schemathesis/schemathesis:v4.16.1
 ST_MAX_EXAMPLES  ?= $(if $(filter 1,$(CI)),100,20)
 _ST_SEED_FLAG    := $(if $(ST_SEED),--seed $(ST_SEED),)
 
 # Run contract tests with Schemathesis against the OpenAPI spec.
 # Requires: running API server (make dev) and Docker.
 # Auth: logs in with the seeded dev user; seed is ensured before login.
-test-contract: ensure-contract ensure-seed
+test-contract: contract-bundle ensure-seed
 	@echo "Running contract tests (Schemathesis)..."
 	@mkdir -p schemathesis-report
 	@docker exec ductifact_dev_postgres psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -c "INSERT INTO users (id, name, email, password_hash, locale, created_at, updated_at, deleted_at) VALUES (gen_random_uuid(), 'Schemathesis Bot', 'st@test.ductifact.dev', CHR(36) || '2a' || CHR(36) || '10' || CHR(36) || 'rEhzOFFg9EHdgq9lnGw2hulMCZSXU4RzeYV0iuLWKoVAs8Snqs9yy', 'en', NOW(), NOW(), NULL) ON CONFLICT (email) WHERE deleted_at IS NULL DO UPDATE SET name = EXCLUDED.name, password_hash = CHR(36) || '2a' || CHR(36) || '10' || CHR(36) || 'rEhzOFFg9EHdgq9lnGw2hulMCZSXU4RzeYV0iuLWKoVAs8Snqs9yy', locale = EXCLUDED.locale, updated_at = NOW(), deleted_at = NULL;" >/dev/null
@@ -216,7 +222,7 @@ test-contract: ensure-contract ensure-seed
 	docker run --rm --network host \
 		--user 0:0 \
 		-e SCHEMATHESIS_HOOKS=schemathesis_hooks \
-		-v $(CURDIR)/contracts/openapi/bundled.yaml:/spec/bundled.yaml:ro \
+		-v $(CURDIR)/$(CONTRACT_BUNDLE):/spec/bundled.yaml:ro \
 		-v $(CURDIR)/test/schemathesis.toml:/spec/schemathesis.toml:ro \
 		-v $(CURDIR)/test/schemathesis_hooks.py:/spec/schemathesis_hooks.py:ro \
 		-v $(CURDIR)/schemathesis-report:/spec/schemathesis-report \
@@ -235,44 +241,50 @@ test-clean:
 	@echo "Test cache cleared!"
 
 # ═══════════════════════════════════════════════════════════════
-# Contracts
+# Contracts (OpenAPI)
 # ═══════════════════════════════════════════════════════════════
+# Source of truth: contracts/openapi/. The contract is versioned by the
+# backend commit: the Docker image stamps info.version with APP_COMMIT.
+# bundled.yaml is a generated artifact (git-ignored), consumed by
+# /docs, Schemathesis and the Docker image.
 
-# Ensure bundled.yaml is present and up to date.
-# Tries ../contracts/openapi/bundled.yaml first (local dev), otherwise
-# downloads from the GitHub release matching ContractVersion.
-ensure-contract:
-	$(eval CONTRACT_VERSION := $(shell grep '^const ContractVersion' internal/config/contract_version.go | sed 's/.*"\(.*\)"/\1/'))
-	@mkdir -p contracts/openapi; \
-	if [ -f ../contracts/openapi/bundled.yaml ]; then \
-		cp ../contracts/openapi/bundled.yaml contracts/openapi/bundled.yaml; \
-		SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
-		echo "✅ bundled.yaml v$$SPEC_VERSION (local)"; \
-	else \
-		if [ ! -f contracts/openapi/bundled.yaml ]; then \
-			NEED_FETCH=1; \
-		else \
-			SPEC_VERSION=$$(grep '^\s*version:' contracts/openapi/bundled.yaml | head -1 | sed 's/.*version:\s*//'); \
-			if [ "$$SPEC_VERSION" != "$(CONTRACT_VERSION)" ]; then \
-				echo "⚠️  bundled.yaml is v$$SPEC_VERSION but ContractVersion is $(CONTRACT_VERSION)"; \
-				NEED_FETCH=1; \
-			fi; \
-		fi; \
-		if [ "$$NEED_FETCH" = "1" ]; then \
-			echo "Fetching contracts v$(CONTRACT_VERSION)..."; \
-			curl -fsSL \
-				"https://github.com/$(CONTRACTS_REPO)/releases/download/v$(CONTRACT_VERSION)/bundled.yaml" \
-				-o contracts/openapi/bundled.yaml; \
-		fi; \
-		echo "✅ bundled.yaml v$(CONTRACT_VERSION) (release)"; \
-	fi
+# Lint and validate the OpenAPI spec
+contract-validate:
+	@echo "Validating OpenAPI spec..."
+	docker run --rm -v $(CURDIR)/$(CONTRACT_DIR):/spec:ro $(REDOCLY_IMAGE) lint /spec/openapi.yaml
+
+# Resolve all $ref into bundled.yaml. Rebuilt only when a spec file changes.
+contract-bundle: $(CONTRACT_BUNDLE)
+
+$(CONTRACT_BUNDLE): $(CONTRACT_SOURCES)
+	@echo "Bundling OpenAPI spec..."
+	@docker run --rm -v $(CURDIR)/$(CONTRACT_DIR):/spec $(REDOCLY_IMAGE) bundle /spec/openapi.yaml -o /spec/bundled.yaml
+	@echo "✅ $@"
+
+# Detect breaking changes against BASE_REF (branch, tag or commit).
+# Skips when BASE_REF has no contract yet (first PR after the move).
+contract-breaking: contract-bundle
+	@if ! git cat-file -e "$(BASE_REF):$(CONTRACT_SPEC)" 2>/dev/null; then \
+		echo "⚠️  $(BASE_REF) has no $(CONTRACT_SPEC) — skipping breaking-change check"; exit 0; \
+	fi; \
+	BASE_DIR=$$(mktemp -d); \
+	git archive "$(BASE_REF)" -- $(CONTRACT_DIR) | tar -x -C "$$BASE_DIR"; \
+	docker run --rm -v "$$BASE_DIR/$(CONTRACT_DIR)":/spec $(REDOCLY_IMAGE) bundle /spec/openapi.yaml -o /spec/bundled.yaml >/dev/null 2>&1; \
+	docker run --rm \
+		-v "$$BASE_DIR/$(CONTRACT_DIR)":/base:ro \
+		-v $(CURDIR)/$(CONTRACT_DIR):/spec:ro \
+		$(OASDIFF_IMAGE) breaking --fail-on ERR /base/bundled.yaml /spec/bundled.yaml; \
+	EXIT=$$?; rm -rf "$$BASE_DIR"; \
+	if [ $$EXIT -eq 0 ]; then echo "✅ No breaking changes vs $(BASE_REF)"; \
+	else echo "❌ Breaking changes found vs $(BASE_REF)"; fi; \
+	exit $$EXIT
 
 # ═══════════════════════════════════════════════════════════════
 # Docker (validates Dockerfile builds and app starts)
 # ═══════════════════════════════════════════════════════════════
 
-# Build Docker image
-docker-build: ensure-contract
+# Build Docker image (the Dockerfile bundles the spec itself)
+docker-build:
 	@echo "Building Docker image..."
 	docker compose --profile smoke build \
 		--build-arg APP_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) \
@@ -313,11 +325,16 @@ fmt:
 	golines -m 120 -w --no-reformat-tags .
 	go fmt ./...
 
-# Lint code
-lint:
+# Lint code and OpenAPI spec
+lint: contract-validate
 	@echo "Linting code..."
 	go vet ./...
 	golangci-lint run
+
+# Report known vulnerabilities in dependencies that the code actually calls
+vulncheck:
+	@echo "Checking dependencies for known vulnerabilities..."
+	govulncheck ./...
 
 # Install dependencies and dev tools
 deps:
@@ -327,7 +344,9 @@ deps:
 	@echo "Installing dev tools..."
 	go install github.com/air-verse/air@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/segmentio/golines@latest
 	go install gotest.tools/gotestsum@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 # ═══════════════════════════════════════════════════════════════
 # CI
@@ -356,21 +375,6 @@ validate-branch:
 		fi; \
 	fi; \
 	echo "✅ Branch '$$BRANCH' → '$${BASE:-*}' is valid"
-
-# ═══════════════════════════════════════════════════════════════
-# Release
-# ═══════════════════════════════════════════════════════════════
-
-# Generate CHANGELOG.md from conventional commits using git-cliff.
-# By default, calculates the next version automatically via SemVer:
-#   fix  → patch (0.2.0 → 0.2.1)
-#   feat → minor (0.2.0 → 0.3.0)
-#   feat! / BREAKING CHANGE → major (0.2.0 → 1.0.0)
-# Override: make changelog VERSION=v1.0.0
-changelog:
-	@echo "Generating CHANGELOG.md..."
-	$(if $(VERSION),git-cliff --tag $(VERSION) --output CHANGELOG.md,git-cliff --bump --output CHANGELOG.md)
-	@echo "✅ CHANGELOG.md updated"
 
 # ═══════════════════════════════════════════════════════════════
 # Maintenance

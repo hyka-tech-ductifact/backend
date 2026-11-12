@@ -58,15 +58,15 @@ func main() {
 	// --- Piece Definition wiring ---
 	pieceDefRepo := persistence.NewPostgresPieceDefinitionRepository(db)
 
-	fileStorage, err := storage.NewMinIOStorage(
-		cfg.MinIO.Endpoint,
-		cfg.MinIO.AccessKey,
-		cfg.MinIO.SecretKey,
-		cfg.MinIO.Bucket,
-		cfg.MinIO.UseSSL,
+	fileStorage, err := storage.NewS3Storage(
+		cfg.S3.Endpoint,
+		cfg.S3.AccessKey,
+		cfg.S3.SecretKey,
+		cfg.S3.Bucket,
+		cfg.S3.UseSSL,
 	)
 	if err != nil {
-		slog.Error("failed to connect to MinIO", "error", err)
+		slog.Error("failed to connect to S3 object storage", "error", err)
 		os.Exit(1)
 	}
 
@@ -232,8 +232,12 @@ func main() {
 
 	port := cfg.App.Port
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:              ":" + port,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Start server in a goroutine so it doesn't block
