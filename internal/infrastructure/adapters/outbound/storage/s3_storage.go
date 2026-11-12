@@ -70,7 +70,7 @@ func (s *S3Storage) GetObject(ctx context.Context, key string) (*ports.FileObjec
 	info, err := obj.Stat()
 	if err != nil {
 		obj.Close()
-		// S3 servers report missing/invalid objects with different codes (including MinIO-style X* codes)
+		// S3 servers report missing/invalid objects with different codes (including provider-specific X* codes)
 		errResp := minio.ErrorResponse{}
 		if errors.As(err, &errResp) {
 			switch errResp.Code {

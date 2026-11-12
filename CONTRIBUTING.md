@@ -61,6 +61,9 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Since we do
 **squash merge**, the PR title becomes the commit message on `main`. CI validates
 the PR title format automatically.
 
+Each published backend image is identified by its commit (`sha-<commit>`).
+The project does not use SemVer releases or generate a changelog.
+
 ### Format
 
 ```
@@ -69,11 +72,11 @@ the PR title format automatically.
 
 ### Types
 
-| Type | When to use | In changelog? |
-|------|------------|---------------|
-| `feat` | New feature | ✅ |
-| `fix` | Bug fix | ✅ |
-| `chore` | Everything else (docs, deps, refactor, CI, tests...) | ❌ |
+| Type | When to use |
+|------|------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `chore` | Everything else (docs, deps, refactor, CI, tests...) |
 
 ### Examples
 

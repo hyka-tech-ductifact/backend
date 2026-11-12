@@ -1,6 +1,6 @@
 # File proxy — serves images from storage
 #
-# This endpoint acts as a reverse proxy to the object storage (MinIO).
+# This endpoint acts as a reverse proxy to the S3-compatible object storage.
 # image_url and thumbnail_url fields in responses point here.
 # Files are immutable (keys contain UUIDs) so aggressive caching is safe.
 

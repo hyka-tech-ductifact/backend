@@ -22,7 +22,7 @@ concurrency:
 # Docker smoke test uses standalone docker build + run (no compose).
 env:
   CI: "1"
-  GO_VERSION: "1.26"
+  GO_VERSION: "1.26.11"
   DB_USER: ci_user
   DB_PASSWORD: ci_password
   DB_NAME: ci_db
