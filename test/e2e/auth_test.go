@@ -13,6 +13,7 @@ import (
 )
 
 const registrationStartedMessage = "if the address is valid, an email with the next steps has been sent; it may take a few minutes, so check the spam folder before requesting another email"
+
 const passwordResetStartedMessage = "if the address is associated with an account, a password reset code has been sent; it may take a few minutes, so check the spam folder before requesting another code"
 
 func assertTokenMetadata(t *testing.T, body map[string]any) {

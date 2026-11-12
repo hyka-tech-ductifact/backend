@@ -130,7 +130,11 @@ func TestE2E_ListPieceDefinitions_SearchFiltersSortAndPagination(t *testing.T) {
 	assert.False(t, data[0].(map[string]any)["predefined"].(bool))
 	assert.NotNil(t, data[0].(map[string]any)["archived_at"])
 
-	outOfRange := helpers.AuthGetJSON(t, pieceDefURL()+"?search=panel&predefined=false&include_archived=true&sort_by=name&sort_order=asc&page=99&page_size=1", token)
+	outOfRange := helpers.AuthGetJSON(
+		t,
+		pieceDefURL()+"?search=panel&predefined=false&include_archived=true&sort_by=name&sort_order=asc&page=99&page_size=1",
+		token,
+	)
 	require.Equal(t, http.StatusOK, outOfRange.StatusCode)
 	outOfRangeBody := helpers.ParseBody(t, outOfRange)
 	assert.Empty(t, requirePaginatedData(t, outOfRangeBody, 99, 1, 2, 2))

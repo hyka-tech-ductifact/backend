@@ -16,7 +16,7 @@ import (
 
 func pieceDefinitionListQuery(pg query.PageRequest, includeArchived bool) query.PieceDefinitionListQuery {
 	return query.PieceDefinitionListQuery{
-		ListQuery:     query.ListQuery{Page: pg},
+		ListQuery:       query.ListQuery{Page: pg},
 		IncludeArchived: includeArchived,
 	}
 }
