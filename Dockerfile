@@ -1,5 +1,5 @@
 # ── Stage 0: Bundle OpenAPI spec ───────────────────────────────────
-FROM docker.io/redocly/cli:2.20.5 AS spec
+FROM docker.io/redocly/cli:2.77.0 AS spec
 
 WORKDIR /spec
 
@@ -10,7 +10,7 @@ ARG APP_COMMIT=unknown
 RUN redocly bundle openapi.yaml -o bundled.yaml \
  && sed -i "1,/^  version: .*/s/^  version: .*/  version: ${APP_COMMIT}/" bundled.yaml
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM docker.io/library/golang:1.26.11-alpine AS builder
+FROM docker.io/library/golang:1.27.0-alpine AS builder
 
 WORKDIR /app
 
